@@ -53,15 +53,6 @@
                         </span>
                     </div>
 
-                    <div class="hidden lg:flex flex-1 justify-center px-4">
-                        <div class="bg-dark-base border border-gray-800 rounded-full px-6 py-1.5 flex items-center gap-4 text-sm shadow-inner hover:border-gold-500/30 transition-colors cursor-default">
-                            <span class="text-gray-400 flex items-center"><i class="fa-solid fa-fire text-gold-500 mr-1.5"></i> สมาคมฯ (Bid): <span class="text-gold-400 font-bold ml-1">{{ formatCurrency(goldPriceAsk) }}</span></span>
-                            <div class="w-px h-4 bg-gray-700"></div>
-                            <span class="text-gray-400 flex items-center"><i class="fa-solid fa-coins text-gray-300 mr-1.5"></i> เงิน (Bid): <span class="text-white font-bold ml-1">{{ formatCurrency(silverPriceBuy) }}</span></span>
-                            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-2" title="Live API Active"></div>
-                        </div>
-                    </div>
-                    
                     <div class="hidden md:flex items-center space-x-6 shrink-0">
                         <button @click="currentTab = 'calculator'" :class="currentTab === 'calculator' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'" class="hover:text-gold-300 pb-1 transition-all-custom">ระบบคำนวณบิล</button>
                         
@@ -369,15 +360,23 @@
                          </div>
                     </div>
 
-                    <div class="bg-gold-900/20 border border-gold-500/30 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-lg gap-2">
-                        <span class="text-gray-300 font-medium">ยอดรับซื้อรวมของวันที่เลือก (ทั้งหมด {{ transactions.length }} รายการ):</span>
+                    <div class="bg-gold-900/20 border border-gold-500/30 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-lg gap-2 mt-4 mb-4">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <span class="text-gray-300 font-medium">ยอดรับซื้อรวม (ทั้งหมด {{ transactions.length }} รายการ):</span>
+                            <button v-if="selectedTransactions.length > 0" @click="deleteSelected" class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 text-sm rounded-lg border border-red-700/50 transition-all shadow shadow-red-900/20">
+                                <i class="fa-solid fa-trash mr-1"></i> ลบที่เลือก ({{ selectedTransactions.length }})
+                            </button>
+                        </div>
                         <span class="text-3xl font-bold text-gold-400">{{ formatCurrency(transactionsTotal) }} ฿</span>
                     </div>
                     
                     <div class="glass rounded-xl shadow-sm overflow-x-auto border border-gray-800">
                         <table class="min-w-full divide-y divide-gray-800">
-                            <thead class="bg-dark-base">
+                            <thead class="bg-dark-base border-b border-gray-800">
                                 <tr>
+                                    <th class="px-4 py-4 text-left w-12">
+                                        <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                    </th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">วันที่</th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">ลูกค้า</th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">ประเภท</th>
@@ -388,12 +387,15 @@
                             </thead>
                             <tbody class="divide-y divide-gray-800">
                                 <tr v-if="loadingTransactions">
-                                    <td colspan="6" class="px-6 py-8 text-center text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังโหลด...</td>
+                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังโหลด...</td>
                                 </tr>
                                 <tr v-else-if="transactions.length === 0">
-                                    <td colspan="6" class="px-6 py-10 text-center text-gray-500">ไม่พบรายการของวันนี้</td>
+                                    <td colspan="7" class="px-6 py-10 text-center text-gray-500">ไม่พบรายการของวันนี้</td>
                                 </tr>
-                                <tr v-for="t in transactions" :key="t.id" class="hover:bg-gray-800/30 transition-colors">
+                                <tr v-for="t in transactions" :key="t.id" class="hover:bg-gray-800/30 transition-colors" :class="selectedTransactions.includes(t.id) ? 'bg-gold-900/10' : ''">
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm">
+                                        <input type="checkbox" :value="t.id" v-model="selectedTransactions" class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{{ formatDate(t.created_at) }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-white">{{ t.customer_name }} <span class="text-xs text-gray-500 block">{{ t.phone }}</span></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gold-300">{{ getTypeName(t.type) }}</td>

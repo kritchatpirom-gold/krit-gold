@@ -65,6 +65,20 @@ createApp({
                    filter.value.type !== 'all';
         });
 
+        const selectedTransactions = ref([]);
+
+        const isAllSelected = computed(() => {
+            return transactions.value.length > 0 && selectedTransactions.value.length === transactions.value.length;
+        });
+
+        const toggleSelectAll = () => {
+            if (isAllSelected.value) {
+                selectedTransactions.value = [];
+            } else {
+                selectedTransactions.value = transactions.value.map(t => t.id);
+            }
+        };
+
         // Bill / Cart System
         const billItems = ref([]);
 
@@ -245,6 +259,7 @@ createApp({
 
         const loadTransactions = async () => {
             loadingTransactions.value = true;
+            selectedTransactions.value = [];
             
             const startDt = new Date(`${filter.value.startDate}T${filter.value.startTime}:00`);
             const endDt = new Date(`${filter.value.endDate}T${filter.value.endTime}:59`);
@@ -275,6 +290,25 @@ createApp({
             }
         };
 
+        const deleteSelected = async () => {
+            if(selectedTransactions.value.length === 0) return;
+            if(confirm(`ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ?`)) {
+                loadingTransactions.value = true;
+                const { error } = await supabase
+                    .from('transactions')
+                    .delete()
+                    .in('id', selectedTransactions.value);
+
+                if (!error) {
+                    selectedTransactions.value = [];
+                    await loadTransactions();
+                } else {
+                    alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
+                    loadingTransactions.value = false;
+                }
+            }
+        };
+
         const transactionsTotal = computed(() => {
             return transactions.value.reduce((sum, t) => sum + (Number(t.net_price) || 0), 0);
         });
@@ -282,12 +316,27 @@ createApp({
         const saveAndPrint = async () => {
             if (billItems.value.length === 0) return;
             
+            const handleAfterPrint = () => {
+                billItems.value = [];
+                resetForm();
+                window.removeEventListener('afterprint', handleAfterPrint);
+            };
+
+            const triggerPrint = () => {
+                window.addEventListener('afterprint', handleAfterPrint);
+                window.print();
+                
+                // Fallback for mobile browsers that don't block JS execution
+                // and might not reliably fire afterprint, giving them 3 secs to render PDF.
+                setTimeout(() => {
+                    handleAfterPrint();
+                }, 3000); 
+            };
+
             // If completely public guest (no login), just print without calling DB
             if(!isLoggedIn.value) {
                 nextTick(() => {
-                    window.print();
-                    billItems.value = [];
-                    resetForm();
+                    triggerPrint();
                 });
                 return;
             }
@@ -314,17 +363,17 @@ createApp({
                 alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
             } else {
                 nextTick(() => {
-                    window.print();
-                    billItems.value = [];
-                    resetForm();
+                    triggerPrint();
                 });
             }
         };
 
         // Graph
         const initChart = () => {
-            if (document.getElementById('tradingview_gold') && window.TradingView) {
-                new TradingView.widget({
+            const container = document.getElementById('tradingview_gold');
+            if (container && window.TradingView) {
+                container.innerHTML = '';
+                new window.TradingView.widget({
                   "autosize": true,
                   "symbol": "OANDA:XAUUSD",
                   "interval": "60",
@@ -333,13 +382,15 @@ createApp({
                   "style": "1",
                   "locale": "th_TH",
                   "enable_publishing": false,
-                  "backgroundColor": "transparent",
+                  "backgroundColor": "rgba(24, 24, 27, 0.4)",
                   "gridColor": "rgba(255, 255, 255, 0.05)",
                   "hide_top_toolbar": false,
                   "hide_legend": false,
                   "save_image": false,
                   "container_id": "tradingview_gold"
                 });
+            } else if (container && !window.TradingView) {
+                setTimeout(initChart, 300);
             }
         };
 
@@ -452,6 +503,10 @@ createApp({
             isFilterActive,
             loadTransactions,
             deleteTransaction,
+            deleteSelected,
+            selectedTransactions,
+            isAllSelected,
+            toggleSelectAll,
             transactionsTotal,
 
             calcForm,
