@@ -48,8 +48,22 @@ createApp({
         // Transactions & Filter
         const transactions = ref([]);
         const loadingTransactions = ref(false);
-        const filterDate = ref(new Date().toISOString().split('T')[0]);
-        const isFilterActive = computed(() => filterDate.value !== new Date().toISOString().split('T')[0]);
+        const filter = ref({
+            startDate: new Date().toISOString().split('T')[0],
+            startTime: '00:00',
+            endDate: new Date().toISOString().split('T')[0],
+            endTime: '23:59',
+            type: 'all'
+        });
+
+        const isFilterActive = computed(() => {
+            const today = new Date().toISOString().split('T')[0];
+            return filter.value.startDate !== today || 
+                   filter.value.endDate !== today || 
+                   filter.value.startTime !== '00:00' || 
+                   filter.value.endTime !== '23:59' || 
+                   filter.value.type !== 'all';
+        });
 
         // Bill / Cart System
         const billItems = ref([]);
@@ -217,17 +231,22 @@ createApp({
 
         const loadTransactions = async () => {
             loadingTransactions.value = true;
-            const startDate = new Date(filterDate.value);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = new Date(filterDate.value);
-            endDate.setHours(23, 59, 59, 999);
-
-            const { data, error } = await supabase
+            
+            const startDt = new Date(`${filter.value.startDate}T${filter.value.startTime}:00`);
+            const endDt = new Date(`${filter.value.endDate}T${filter.value.endTime}:59`);
+            
+            let query = supabase
                 .from('transactions')
                 .select('*')
-                .gte('created_at', startDate.toISOString())
-                .lte('created_at', endDate.toISOString())
+                .gte('created_at', startDt.toISOString())
+                .lte('created_at', endDt.toISOString())
                 .order('created_at', { ascending: false });
+                
+            if (filter.value.type !== 'all') {
+                query = query.eq('type', filter.value.type);
+            }
+
+            const { data, error } = await query;
                 
             if (data) transactions.value = data;
             else transactions.value = [];
@@ -415,7 +434,7 @@ createApp({
 
             transactions,
             loadingTransactions,
-            filterDate,
+            filter,
             isFilterActive,
             loadTransactions,
             deleteTransaction,
