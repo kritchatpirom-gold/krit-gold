@@ -374,8 +374,7 @@ createApp({
             if (container && window.TradingView) {
                 container.innerHTML = '';
                 new window.TradingView.widget({
-                  "width": "100%",
-                  "height": "100%",
+                  "autosize": true,
                   "symbol": "OANDA:XAUUSD",
                   "interval": "60",
                   "timezone": "Asia/Bangkok",
@@ -448,7 +447,10 @@ createApp({
             checkAuth();
             
             nextTick(() => {
-                initChart();
+                setTimeout(() => {
+                    initChart();
+                }, 500); // 500ms delay for Chrome CSS transition
+                
                 fetchPrices();
                 setInterval(fetchPrices, 30000); // 30 sec interval
             });
@@ -456,11 +458,11 @@ createApp({
 
         watch(currentTab, (newTab) => {
             if (newTab === 'home') {
-                nextTick(() => {
+                setTimeout(() => {
                     initChart();
                     const timeStr = new Date().toLocaleTimeString('th-TH');
                     updateChart(timeStr, goldPrice.value, silverPrice.value);
-                });
+                }, 400); // 400ms delay passing CSS fade transition
             } else if (newTab === 'history' && isAdmin.value) {
                 loadTransactions();
             }
