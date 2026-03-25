@@ -309,6 +309,40 @@ createApp({
             }
         };
 
+        const exportCSV = () => {
+            if (transactions.value.length === 0) return;
+
+            let csvContent = 'วันที่,เวลา,ลูกค้า,เบอร์โทรศัพท์,ประเภทสินทรัพย์,เปอร์เซ็นต์/น้ำหนัก,ยอดสุทธิ (บาท)\n';
+            
+            transactions.value.forEach(t => {
+                const dt = new Date(t.created_at);
+                const dDate = dt.toLocaleDateString('th-TH');
+                const dTime = dt.toLocaleTimeString('th-TH');
+                
+                const name = `"${t.customer_name || 'เงินสด'}"`;
+                const phone = `"${t.phone || '-'}"`;
+                const type = `"${getTypeName(t.type)}"`;
+                
+                let detail = '-';
+                if(t.type === 'tong_lom' || t.type === 'tong_roop') detail = `"${t.percent}% / ${t.weight} กรัม"`;
+                else if(t.type === 'tong_tang' || t.type === 'silver') detail = `"${t.weight} กรัม"`;
+
+                csvContent += `${dDate},${dTime},${name},${phone},${type},${detail},${t.net_price}\n`;
+            });
+
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // Add BOM for Excel UTF-8 representation
+            const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            const fileName = `KritGold_Sales_${filter.value.startDate}_to_${filter.value.endDate}.csv`;
+            link.setAttribute("download", fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
         const transactionsTotal = computed(() => {
             return transactions.value.reduce((sum, t) => sum + (Number(t.net_price) || 0), 0);
         });
@@ -507,6 +541,7 @@ createApp({
             loadTransactions,
             deleteTransaction,
             deleteSelected,
+            exportCSV,
             selectedTransactions,
             isAllSelected,
             toggleSelectAll,
