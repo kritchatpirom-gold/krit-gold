@@ -89,6 +89,7 @@ createApp({
             percent: null,
             customerName: '',
             phone: '',
+            idCard: '',
             manualPrice: null
         });
 
@@ -99,15 +100,38 @@ createApp({
                 percent: null,
                 customerName: '',
                 phone: '',
+                idCard: '',
                 manualPrice: null
             };
         };
 
-        const isFormValid = computed(() => {
-            if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem') {
-                return calcForm.value.weight > 0;
+        const isPhoneValid = computed(() => {
+            return /^0[0-9]{9}$/.test(calcForm.value.phone);
+        });
+
+        const isIdCardValid = computed(() => {
+            let id = calcForm.value.idCard;
+            if (!id || id.length !== 13 || !/^\d{13}$/.test(id)) return false;
+            let sum = 0;
+            for (let i = 0; i < 12; i++) {
+                sum += parseFloat(id.charAt(i)) * (13 - i);
             }
-            return calcForm.value.weight > 0 && calcForm.value.percent !== null;
+            let checkSum = (11 - (sum % 11)) % 10;
+            return checkSum === parseFloat(id.charAt(12));
+        });
+
+        const isFormValid = computed(() => {
+            let baseValid = false;
+            if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem') {
+                baseValid = calcForm.value.weight > 0;
+            } else {
+                baseValid = calcForm.value.weight > 0 && calcForm.value.percent !== null;
+            }
+
+            if (isLoggedIn.value) {
+                return baseValid && isIdCardValid.value && calcForm.value.customerName.trim().length > 1;
+            }
+            return baseValid;
         });
 
         const currentAssetPrice = computed(() => {
@@ -151,6 +175,10 @@ createApp({
                 base = gp;
                 const baseAfterPercent = base * 0.96;
                 net = baseAfterPercent * 0.0656 * w;
+            } else if (tForm.type === 'redeem') {
+                base = gp;
+                const baseAfterPercent = base * 0.95;
+                net = baseAfterPercent * 0.0656 * w;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
                 net = (base - 300) * 0.0656 * (p / 100) * w;
@@ -176,7 +204,10 @@ createApp({
                 weight: calcForm.value.weight,
                 basePrice: calculatedResult.value.basePrice,
                 premium: calculatedResult.value.premium,
-                netPrice: calculatedResult.value.netPrice
+                netPrice: calculatedResult.value.netPrice,
+                customerName: calcForm.value.customerName,
+                phone: calcForm.value.phone,
+                idCard: calcForm.value.idCard
             });
             calcForm.value.weight = null;
             calcForm.value.percent = null;
@@ -391,8 +422,8 @@ createApp({
             saving.value = true;
             
             const trData = billItems.value.map(item => ({
-                customer_name: calcForm.value.customerName || 'เงินสด',
-                phone: calcForm.value.phone || '',
+                customer_name: (item.customerName || 'เงินสด') + (item.idCard ? ` [${item.idCard}]` : ''),
+                phone: item.phone || '',
                 type: item.type,
                 base_price: item.basePrice,
                 premium_amount: item.premium,
@@ -564,6 +595,8 @@ createApp({
             isFormValid,
             currentAssetPrice,
             calculatedResult,
+            isPhoneValid, 
+            isIdCardValid,
             
             billItems,
             addToBill,
