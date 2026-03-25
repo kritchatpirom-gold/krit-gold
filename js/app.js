@@ -104,14 +104,14 @@ createApp({
         };
 
         const isFormValid = computed(() => {
-            if (calcForm.value.type === 'tong_roop') {
+            if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem') {
                 return calcForm.value.weight > 0;
             }
             return calcForm.value.weight > 0 && calcForm.value.percent !== null;
         });
 
         const currentAssetPrice = computed(() => {
-            if (calcForm.value.type === 'tong_lom' || calcForm.value.type === 'tong_roop' || calcForm.value.type === 'tong_tang') {
+            if (calcForm.value.type === 'tong_lom' || calcForm.value.type === 'tong_roop' || calcForm.value.type === 'tong_tang' || calcForm.value.type === 'redeem') {
                 return Number(goldPrice.value) || 0;
             } else if (calcForm.value.type === 'silver') {
                 return Number(silverPrice.value) || 0;
@@ -163,7 +163,7 @@ createApp({
             return {
                 basePrice: base,
                 premium: premium,
-                netPrice: Math.max(0, net)
+                netPrice: Math.floor(Math.max(0, net) * 100) / 100
             };
         });
 
@@ -172,7 +172,7 @@ createApp({
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
-                percent: calcForm.value.type === 'tong_roop' ? 96.5 : calcForm.value.percent,
+                percent: (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem') ? 96.5 : calcForm.value.percent,
                 weight: calcForm.value.weight,
                 basePrice: calculatedResult.value.basePrice,
                 premium: calculatedResult.value.premium,
@@ -204,7 +204,8 @@ createApp({
                 'tong_lom': 'ทองหลอม',
                 'tong_roop': 'ทองรูปพรรณ',
                 'tong_tang': 'ทองคำแท่ง',
-                'silver': 'เงิน (ซิลเวอร์)'
+                'silver': 'เงิน (ซิลเวอร์)',
+                'redeem': 'ไถ่ถอน'
             };
             return types[type] || type;
         };
