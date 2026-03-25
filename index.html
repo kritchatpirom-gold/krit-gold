@@ -253,7 +253,7 @@
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-4 bg-dark-base/50 p-4 rounded-xl border border-gray-800">
-                                        <div>
+                                        <div v-show="calcForm.type !== 'tong_roop'">
                                             <label class="block text-sm font-medium text-gray-400 mb-1">ความบริสุทธิ์ (%)</label>
                                             <div class="relative">
                                                 <input type="number" step="0.01" v-model.number="calcForm.percent" class="w-full pl-4 pr-8 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none" min="0" max="100">
@@ -264,7 +264,7 @@
                                                 <i class="fa-solid fa-arrow-trend-up mr-1.5"></i> ได้รับราคาบวกพรีเมียม: +{{ formatCurrency(calculatedResult.premium) }} บาท
                                             </div>
                                         </div>
-                                        <div>
+                                        <div :class="calcForm.type === 'tong_roop' ? 'col-span-2' : ''">
                                             <label class="block text-sm font-medium text-gray-400 mb-1">น้ำหนัก (กรัม)</label>
                                             <div class="relative">
                                                 <input type="number" step="0.01" v-model.number="calcForm.weight" class="w-full pl-4 pr-10 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none" min="0">
@@ -513,9 +513,9 @@
                     <thead style="display: table-header-group;">
                         <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
                             <th style="text-align: left; padding: 4px 0; width: 30%;">รายการ</th>
-                            <th style="text-align: center; padding: 4px 0; width: 15%;">ความบริสุทธิ์</th>
+                            <th style="text-align: center; padding: 4px 0; width: 15%;">เปอร์เซ็นต์</th>
                             <th style="text-align: center; padding: 4px 0; width: 12%;">น้ำหนัก(ก.)</th>
-                            <th style="text-align: right; padding: 4px 0; width: 23%;">ราคา/กรัม (อ้างอิง)</th>
+                            <th style="text-align: right; padding: 4px 0; width: 23%;">ราคา/กรัม</th>
                             <th style="text-align: right; padding: 4px 0; width: 20%;">ยอดสุทธิ(฿)</th>
                         </tr>
                     </thead>
@@ -525,8 +525,11 @@
                             <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%</td>
                             <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }}</td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle;">
-                                {{ formatCurrency(item.netPrice / item.weight) }}
-                                <div style="font-size: 7.5pt; color: #666;">({{ formatCurrency(item.basePrice) }}<span v-if="item.premium>0">+{{item.premium}}</span>)</div>
+                                <span v-if="item.type === 'silver'">{{ Math.floor(item.netPrice / item.weight).toLocaleString('th-TH') }}</span>
+                                <span v-else>{{ formatCurrency(item.netPrice / item.weight) }}</span>
+                                <div v-if="item.type !== 'silver'" style="font-size: 7.5pt; color: #666;">
+                                    ({{ formatCurrency(item.basePrice) }}<span v-if="item.premium>0">+{{item.premium}}</span>)
+                                </div>
                             </td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle; font-weight: bold; font-size: 9.5pt;">
                                 {{ formatCurrency(item.netPrice) }}

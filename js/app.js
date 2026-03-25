@@ -104,6 +104,9 @@ createApp({
         };
 
         const isFormValid = computed(() => {
+            if (calcForm.value.type === 'tong_roop') {
+                return calcForm.value.weight > 0;
+            }
             return calcForm.value.weight > 0 && calcForm.value.percent !== null;
         });
 
@@ -147,7 +150,7 @@ createApp({
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
                 const baseAfterPercent = base * 0.96;
-                net = baseAfterPercent * 0.0656 * (p / 100) * w;
+                net = baseAfterPercent * 0.0656 * w;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
                 net = (base - 300) * 0.0656 * (p / 100) * w;
@@ -174,7 +177,7 @@ createApp({
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
-                percent: calcForm.value.percent,
+                percent: calcForm.value.type === 'tong_roop' ? 96.5 : calcForm.value.percent,
                 weight: calcForm.value.weight,
                 basePrice: calculatedResult.value.basePrice,
                 premium: calculatedResult.value.premium,
