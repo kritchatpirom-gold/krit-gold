@@ -46,14 +46,23 @@
         <nav class="glass sticky top-0 z-40 border-b border-gray-800 no-print">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-20 items-center">
-                    <div class="flex items-center space-x-3 cursor-pointer" @click="currentTab = 'home'">
+                    <div class="flex items-center space-x-3 cursor-pointer shrink-0" @click="currentTab = 'home'">
                         <img src="/images/logo.jpg" alt="กฤตหลอมทอง" class="w-[50px] h-[50px] rounded-full border border-gold-400 shadow-xl object-cover hover:scale-110 transition-transform">
                         <span class="font-bold text-xl sm:text-2xl tracking-tight text-white">
                             กฤตหลอมทอง <span class="text-gold-400">อุบลราชธานี</span>
                         </span>
                     </div>
+
+                    <div class="hidden lg:flex flex-1 justify-center px-4">
+                        <div class="bg-dark-base border border-gray-800 rounded-full px-6 py-1.5 flex items-center gap-4 text-sm shadow-inner hover:border-gold-500/30 transition-colors cursor-default">
+                            <span class="text-gray-400 flex items-center"><i class="fa-solid fa-fire text-gold-500 mr-1.5"></i> สมาคมฯ (Bid): <span class="text-gold-400 font-bold ml-1">{{ formatCurrency(goldPriceAsk) }}</span></span>
+                            <div class="w-px h-4 bg-gray-700"></div>
+                            <span class="text-gray-400 flex items-center"><i class="fa-solid fa-coins text-gray-300 mr-1.5"></i> เงิน (Bid): <span class="text-white font-bold ml-1">{{ formatCurrency(silverPriceBuy) }}</span></span>
+                            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-2" title="Live API Active"></div>
+                        </div>
+                    </div>
                     
-                    <div class="hidden md:flex items-center space-x-6">
+                    <div class="hidden md:flex items-center space-x-6 shrink-0">
                         <button @click="currentTab = 'calculator'" :class="currentTab === 'calculator' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'" class="hover:text-gold-300 pb-1 transition-all-custom">ระบบคำนวณบิล</button>
                         
                         <div v-if="isAdmin" class="h-8 w-px bg-gray-700 mx-2"></div>
@@ -177,12 +186,12 @@
                     </div>
 
                     <!-- About Us Banner -->
-                    <div class="relative rounded-2xl overflow-hidden glass-card p-8 sm:p-10 border border-gold-500/30 bg-cover bg-center mt-8 text-center" style="background-image: linear-gradient(rgba(10, 10, 9, 0.8), rgba(10, 10, 9, 0.9)), url('/images/banner.jpg');">
+                    <div class="relative rounded-2xl overflow-hidden p-8 sm:p-12 border border-gold-500/50 bg-cover bg-center mt-8 text-center shadow-2xl" style="background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.7)), url('/images/banner.jpg');">
                         <div class="relative z-10 flex flex-col items-center">
-                            <h3 class="text-2xl sm:text-3xl font-bold text-gold-400 mb-4 whitespace-nowrap"><i class="fa-solid fa-store mr-2"></i> เกี่ยวกับเรา</h3>
-                            <div class="text-gray-300 space-y-2 text-lg">
-                                <p><i class="fa-solid fa-location-dot text-gold-500 w-6"></i> 73 ต.ในเมือง อ.เมืองอุบล จ.อุบลราชธานี 34000</p>
-                                <p><i class="fa-solid fa-phone text-gold-500 w-6"></i> โทร <a href="tel:0801474845" class="hover:text-white transition">080-1474845</a> กฤต</p>
+                            <h3 class="text-3xl sm:text-4xl font-bold text-gold-400 mb-5 whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-wide"><i class="fa-solid fa-store mr-2"></i> เกี่ยวกับเรา</h3>
+                            <div class="text-white space-y-3 text-lg font-medium drop-shadow-md">
+                                <p class="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm border border-gold-500/20"><i class="fa-solid fa-location-dot text-gold-500 w-6 mr-1"></i> 73 ต.ในเมือง อ.เมืองอุบล จ.อุบลราชธานี 34000</p>
+                                <p class="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm border border-gold-500/20"><i class="fa-solid fa-phone text-gold-500 w-6 mr-1"></i> โทร <a href="tel:0801474845" class="text-gold-300 hover:text-white transition">080-1474845</a> กฤต</p>
                             </div>
                         </div>
                     </div>
@@ -224,8 +233,11 @@
                                             <button @click="calcForm.type = 'tong_tang'" :class="calcForm.type === 'tong_tang' ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองคำแท่ง</button>
                                             <button @click="calcForm.type = 'silver'" :class="calcForm.type === 'silver' ? 'bg-gray-700/50 text-gray-300 border-gray-500' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">เงิน (ซิลเวอร์)</button>
                                         </div>
-                                        <div class="mt-2 text-sm text-gold-400 font-medium" v-if="currentAssetPrice > 0">
-                                            อ้างอิงราคาปัจจุบัน: {{ formatCurrency(currentAssetPrice) }} บาท
+                                        <div class="mt-3 flex items-center gap-2">
+                                            <label class="text-sm font-medium text-gray-400 whitespace-nowrap"><i class="fa-solid fa-edit mr-1"></i> ราคาอ้างอิง:</label>
+                                            <input type="number" :placeholder="currentAssetPrice" v-model.number="calcForm.manualPrice" class="w-32 px-3 py-1.5 bg-dark-base border border-gray-600 text-gold-400 rounded-lg focus:border-gold-500 outline-none text-sm transition-colors text-right font-bold">
+                                            <span class="text-xs text-gray-500" v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice">(อิงราคา API)</span>
+                                            <span class="text-xs text-yellow-500" v-else>(ราคาแบบปรับเอง)</span>
                                         </div>
                                     </div>
 

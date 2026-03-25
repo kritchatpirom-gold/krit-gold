@@ -74,7 +74,8 @@ createApp({
             weight: null,
             percent: null,
             customerName: '',
-            phone: ''
+            phone: '',
+            manualPrice: null
         });
 
         const resetForm = () => {
@@ -83,7 +84,8 @@ createApp({
                 weight: null,
                 percent: null,
                 customerName: '',
-                phone: ''
+                phone: '',
+                manualPrice: null
             };
         };
 
@@ -100,6 +102,16 @@ createApp({
             return 0;
         });
 
+        watch(() => calcForm.value.type, () => {
+             calcForm.value.manualPrice = currentAssetPrice.value;
+        });
+
+        watch(currentAssetPrice, (newVal) => {
+             if (!calcForm.value.manualPrice || calcForm.value.manualPrice === 0) {
+                 calcForm.value.manualPrice = newVal;
+             }
+        });
+
         const calculatedResult = computed(() => {
             let base = 0;
             let premium = 0;
@@ -108,8 +120,10 @@ createApp({
             const tForm = calcForm.value;
             const w = Number(tForm.weight) || 0;
             const p = Number(tForm.percent) || 0;
-            const gp = Number(goldPrice.value) || 40000;
-            const sp = Number(silverPrice.value) || 30000; // per kg
+            const refPrice = Number(tForm.manualPrice) > 0 ? Number(tForm.manualPrice) : currentAssetPrice.value;
+            
+            const gp = refPrice;
+            const sp = refPrice;
 
             if (tForm.type === 'tong_lom') {
                 base = gp;
@@ -358,11 +372,11 @@ createApp({
                        const buy = parseFloat(dataXag.buy);
                        silverPriceSpot.value = parseFloat(dataXag.spot);
                        silverPriceExchange.value = parseFloat(dataXag.exchange);
-                       priceTrendSilver.value = sell - (silverPrice.value || sell);
+                       priceTrendSilver.value = buy - (silverPrice.value || buy);
                        
                        silverPriceSell.value = sell;
                        silverPriceBuy.value = buy;
-                       silverPrice.value = sell; // Reference for calculation
+                       silverPrice.value = buy; // Reference for calculation (รับซื้อ)
                    }
                 }
                 
