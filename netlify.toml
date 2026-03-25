@@ -3,8 +3,13 @@
   publish = "."
 
 [[redirects]]
-  from = "/api/proxy"
-  to = "/.netlify/functions/proxy"
+  from = "/api/gold"
+  to = "/.netlify/functions/proxy-gold"
+  status = 200
+
+[[redirects]]
+  from = "/api/xag"
+  to = "/.netlify/functions/proxy-xag"
   status = 200
   
 [[redirects]]

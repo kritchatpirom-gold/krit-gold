@@ -14,9 +14,22 @@ createApp({
         const authLoading = ref(false);
         const mobileMenuOpen = ref(false);
 
+        // Roles
+        const isAdmin = computed(() => user.value && user.value.email === 'admin@kritgold.com');
+        const isEmployee = computed(() => user.value && user.value.email === 'user@kritgold.com');
+        const isLoggedIn = computed(() => user.value !== null);
+
         // Prices & Chart
-        const goldPrice = ref(0);
-        const silverPrice = ref(0);
+        const goldPriceAsk = ref(0);
+        const goldPriceBid = ref(0);
+        const goldPrice = ref(0); // Using Ask (รับซื้อ) as reference
+        
+        const silverPriceSell = ref(0);
+        const silverPriceBuy = ref(0);
+        const silverPriceSpot = ref(0);
+        const silverPriceExchange = ref(0);
+        const silverPrice = ref(0); // Reference for calc
+        
         const priceTrendGold = ref(0);
         const priceTrendSilver = ref(0);
         let priceChart = null;
@@ -32,10 +45,13 @@ createApp({
         const loadingPremiums = ref(false);
         const saving = ref(false);
 
-        // Transactions
+        // Transactions & Filter
         const transactions = ref([]);
         const loadingTransactions = ref(false);
         const filterDate = ref(new Date().toISOString().split('T')[0]);
+
+        // Bill / Cart System
+        const billItems = ref([]);
 
         // Calculator Form
         const calcForm = ref({
@@ -75,20 +91,16 @@ createApp({
                 base = gp;
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 premium = activePremium ? Number(activePremium.premium_amount) : 0;
-                // (ราคาทองแท่ง + ราคาบวก) * 0.0656 * (%ทอง/100) * น้ำหนัก
                 net = (base + premium) * 0.0656 * (p / 100) * w;
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
-                // (ราคาทองแท่ง - 4%) * 0.0656 * (%/100) * น้ำหนัก
                 const baseAfterPercent = base * 0.96;
                 net = baseAfterPercent * 0.0656 * (p / 100) * w;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
-                // (ราคาทองแท่ง - 300) * 0.0656 * (%/100) * น้ำหนัก
                 net = (base - 300) * 0.0656 * (p / 100) * w;
             } else if (tForm.type === 'silver') {
                 base = sp;
-                // ((ราคาเงินแท่ง - 13000) / 1000) * (%เงิน/100) * น้ำหนัก
                 net = ((base - 13000) / 1000) * (p / 100) * w;
             }
 
@@ -97,6 +109,29 @@ createApp({
                 premium: premium,
                 netPrice: Math.max(0, net)
             };
+        });
+
+        const addToBill = () => {
+            if(!isFormValid.value) return;
+            billItems.value.push({
+                id: Date.now() + Math.random(),
+                type: calcForm.value.type,
+                percent: calcForm.value.percent,
+                weight: calcForm.value.weight,
+                basePrice: calculatedResult.value.basePrice,
+                premium: calculatedResult.value.premium,
+                netPrice: calculatedResult.value.netPrice
+            });
+            calcForm.value.weight = null;
+            calcForm.value.percent = null;
+        };
+
+        const removeBillItem = (idx) => {
+            billItems.value.splice(idx, 1);
+        };
+
+        const billTotal = computed(() => {
+            return billItems.value.reduce((sum, item) => sum + item.netPrice, 0);
         });
 
         const formatCurrency = (val) => {
@@ -123,8 +158,7 @@ createApp({
             const { data } = await supabase.auth.getSession();
             user.value = data.session?.user || null;
             if (user.value) {
-                loadPremiums();
-                if (currentTab.value === 'history') loadTransactions();
+                if (isAdmin.value && currentTab.value === 'history') loadTransactions();
             }
         };
 
@@ -142,7 +176,6 @@ createApp({
             } else {
                 user.value = data.user;
                 showAuth.value = false;
-                loadPremiums();
                 currentTab.value = 'calculator';
             }
         };
@@ -153,7 +186,7 @@ createApp({
             currentTab.value = 'home';
         };
 
-        // Data Management
+        // DB Data
         const loadPremiums = async () => {
             loadingPremiums.value = true;
             const { data, error } = await supabase.from('gold_premiums').select('*').order('range_min', { ascending: true });
@@ -199,35 +232,53 @@ createApp({
             }
         };
 
+        const transactionsTotal = computed(() => {
+            return transactions.value.reduce((sum, t) => sum + (Number(t.net_price) || 0), 0);
+        });
+
         const saveAndPrint = async () => {
-            if (!isFormValid.value) return;
+            if (billItems.value.length === 0) return;
+            
+            // If completely public guest (no login), just print without calling DB
+            if(!isLoggedIn.value) {
+                nextTick(() => {
+                    window.print();
+                    billItems.value = [];
+                    resetForm();
+                });
+                return;
+            }
+            
+            // Logged in (Employee or Admin): Save to DB first
             saving.value = true;
             
-            const trData = {
-                customer_name: calcForm.value.customerName,
-                phone: calcForm.value.phone,
-                type: calcForm.value.type,
-                base_price: calculatedResult.value.basePrice,
-                premium_amount: calculatedResult.value.premium,
-                percent: calcForm.value.percent,
-                weight: calcForm.value.weight,
-                net_price: calculatedResult.value.netPrice
-            };
+            const trData = billItems.value.map(item => ({
+                customer_name: calcForm.value.customerName || 'เงินสด',
+                phone: calcForm.value.phone || '',
+                type: item.type,
+                base_price: item.basePrice,
+                premium_amount: item.premium,
+                percent: item.percent,
+                weight: item.weight,
+                net_price: item.netPrice,
+                created_at: new Date().toISOString()
+            }));
 
-            const { error } = await supabase.from('transactions').insert([trData]);
+            const { error } = await supabase.from('transactions').insert(trData);
             saving.value = false;
             
             if (error) {
-                alert('เกิดข้อผิดพลาด: ' + error.message);
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
             } else {
                 nextTick(() => {
                     window.print();
+                    billItems.value = [];
                     resetForm();
                 });
             }
         };
 
-        // Initialize App Graph and API
+        // Graph
         const initChart = () => {
             const ctx = document.getElementById('priceChart');
             if(!ctx) return;
@@ -237,14 +288,28 @@ createApp({
                 data: {
                     labels: [],
                     datasets: [
-                        { label: 'ราคาทองคำ (บาท)', data: [], borderColor: '#c88c3a', backgroundColor: 'rgba(200, 140, 58, 0.1)', fill: true, tension: 0.4 },
-                        { label: 'ราคาเงิน XAG (กิโล)', data: [], borderColor: '#94a3b8', backgroundColor: 'rgba(148, 163, 184, 0.1)', fill: true, tension: 0.4 }
+                        { label: 'ราคาทองคำ (รับซื้อ)', data: [], borderColor: '#d4af37', backgroundColor: 'rgba(212, 175, 55, 0.1)', fill: true, tension: 0.4 },
+                        { label: 'ราคาซิลเวอร์ (Sell)', data: [], borderColor: '#9ca3af', backgroundColor: 'rgba(156, 163, 175, 0.1)', fill: true, tension: 0.4 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: { y: { beginAtZero: false } }
+                    color: '#e5e7eb',
+                    scales: { 
+                        y: { 
+                            beginAtZero: false,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#e5e7eb' } }
+                    }
                 }
             });
         };
@@ -266,52 +331,51 @@ createApp({
 
         const fetchPrices = async () => {
             try {
-                // Fetch proxy from Netlify
-                const res = await fetch('/api/proxy');
-                let data = null;
-                if(res.ok) {
-                   const text = await res.text();
-                   try { data = JSON.parse(text); } catch(e){}
+                // Fetch Gold API
+                const resGold = await fetch('/api/gold');
+                if (resGold.ok) {
+                   const dataGold = await resGold.json();
+                   if (dataGold && dataGold.gold965) {
+                       const ask = parseFloat(dataGold.gold965.ask); // ราคารับซื้อ
+                       const bid = parseFloat(dataGold.gold965.bid); // ราคาขายออก
+                       priceTrendGold.value = ask - (goldPrice.value || ask);
+                       goldPriceAsk.value = ask;
+                       goldPriceBid.value = bid;
+                       goldPrice.value = ask; 
+                   }
                 }
 
-                if(!data && goldPrice.value === 0) {
-                    // Fallback mock if API unavailable
-                    const goldMock = 40000 + (Math.random() * 200 - 100);
-                    const silverMock = 30000 + (Math.random() * 200 - 100);
-                    
-                    priceTrendGold.value = goldMock - goldPrice.value;
-                    priceTrendSilver.value = silverMock - silverPrice.value;
-                    
-                    goldPrice.value = goldMock;
-                    silverPrice.value = silverMock;
-                } else if(data) {
-                    // Adjust path based on real API struct:
-                    // Usually jk-goldtrader API has some nested objects. E.g., data.gold.sell, data.xag.sell
-                    // Let's assume a generic attempt, if it fails, we keep mock.
-                    const currGold = parseFloat(data?.Gold?.Sell || data?.gold?.sell || data?.price || goldPrice.value + (Math.random() * 50 - 25));
-                    const currSilver = parseFloat(data?.Silver?.Sell || data?.xag?.sell || silverPrice.value + (Math.random() * 50 - 25));
-                    
-                    priceTrendGold.value = currGold - goldPrice.value;
-                    priceTrendSilver.value = currSilver - silverPrice.value;
-                    
-                    goldPrice.value = currGold;
-                    silverPrice.value = currSilver;
+                // Fetch XAG API
+                const resXag = await fetch('/api/xag');
+                if (resXag.ok) {
+                   const dataXag = await resXag.json();
+                   if (dataXag) {
+                       const sell = parseFloat(dataXag.sell);
+                       const buy = parseFloat(dataXag.buy);
+                       silverPriceSpot.value = parseFloat(dataXag.spot);
+                       silverPriceExchange.value = parseFloat(dataXag.exchange);
+                       priceTrendSilver.value = sell - (silverPrice.value || sell);
+                       
+                       silverPriceSell.value = sell;
+                       silverPriceBuy.value = buy;
+                       silverPrice.value = sell; // Reference for calculation
+                   }
                 }
                 
-                const timeStr = new Date().toLocaleTimeString('th-TH');
-                updateChart(timeStr, goldPrice.value, silverPrice.value);
-                
+                // Update graph
+                if (goldPrice.value > 0 || silverPrice.value > 0) {
+                    const timeStr = new Date().toLocaleTimeString('th-TH');
+                    updateChart(timeStr, goldPrice.value, silverPrice.value);
+                }
             } catch(err) {
                 console.error('Fetch prices failed', err);
             }
         };
 
         onMounted(() => {
-            checkAuth();
+            // anyone needs premiums for correct calculations
             loadPremiums();
-            
-            goldPrice.value = 40500;
-            silverPrice.value = 31200;
+            checkAuth();
             
             nextTick(() => {
                 initChart();
@@ -327,7 +391,7 @@ createApp({
                     const timeStr = new Date().toLocaleTimeString('th-TH');
                     updateChart(timeStr, goldPrice.value, silverPrice.value);
                 });
-            } else if (newTab === 'history') {
+            } else if (newTab === 'history' && isAdmin.value) {
                 loadTransactions();
             }
         });
@@ -335,6 +399,9 @@ createApp({
         return {
             currentTab,
             user,
+            isLoggedIn,
+            isAdmin,
+            isEmployee,
             showAuth,
             authForm,
             authError,
@@ -343,8 +410,16 @@ createApp({
             login,
             logout,
             
+            goldPriceAsk,
+            goldPriceBid,
             goldPrice,
+            
+            silverPriceSell,
+            silverPriceBuy,
+            silverPriceSpot,
+            silverPriceExchange,
             silverPrice,
+
             priceTrendGold,
             priceTrendSilver,
             
@@ -358,11 +433,17 @@ createApp({
             filterDate,
             loadTransactions,
             deleteTransaction,
+            transactionsTotal,
 
             calcForm,
             resetForm,
             isFormValid,
             calculatedResult,
+            
+            billItems,
+            addToBill,
+            removeBillItem,
+            billTotal,
             saveAndPrint,
             
             formatCurrency,
