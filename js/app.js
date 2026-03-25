@@ -152,8 +152,14 @@ createApp({
                 base = gp;
                 net = (base - 300) * 0.0656 * (p / 100) * w;
             } else if (tForm.type === 'silver') {
-                base = sp;
-                net = ((base - 13000) / 1000) * (p / 100) * w;
+                const deduct13 = sp * 0.87;
+                base = deduct13; // Set base to Spot - 13% for receipt display
+                
+                // (ราคารับซื้อซิลเวอร์-13%)/1000 แล้วเอาแค่จำนวนเต็มโดยตัดทศนิยมทิ้ง
+                const pricePerGramInt = Math.floor(deduct13 / 1000);
+                
+                // แล้วค่อยมาคูณกับน้ำหนักและเปอร์เซ็น
+                net = pricePerGramInt * (p / 100) * w;
             }
 
             return {

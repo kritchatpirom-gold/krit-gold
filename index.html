@@ -492,79 +492,78 @@
 
         <!-- Receipt Print Section -->
         <div id="print-area" class="print-only">
-            <div class="print-receipt-container" style="width: 100%; max-width: 800px; margin: 0 auto; padding: 10px;">
-                <div class="text-center mb-6 flex flex-col items-center">
-                    <img src="/images/logo.jpg" alt="Logo" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 5px; border: 1px solid #000;">
-                    <h1 style="font-size: 18pt; font-weight: bold; margin-bottom: 5px;">กฤตหลอมทอง อุบลราชธานี</h1>
-                    <p style="font-size: 11pt; color: #333;">โทร. 080-1474845</p>
+            <div class="print-receipt-container" style="width: 100%; max-width: 148mm; margin: 0 auto; padding: 5px 15px;">
+                <div class="text-center mb-3 flex flex-col items-center">
+                    <img src="/images/logo.jpg" alt="Logo" style="width: 55px; height: 55px; border-radius: 50%; object-fit: cover; margin-bottom: 3px; border: 1px solid #000;">
+                    <h1 style="font-size: 14pt; font-weight: bold; margin-bottom: 2px;">กฤตหลอมทอง อุบลราชธานี</h1>
+                    <p style="font-size: 9pt; color: #333;">โทร. 080-1474845</p>
                 </div>
                 
-                <div style="border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 11pt; margin-bottom: 5px;">
+                <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 3px;">
                         <span><b>วันที่:</b> {{ formatDate(new Date()) }}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 11pt;">
+                    <div style="display: flex; justify-content: space-between; font-size: 9pt;">
                         <span><b>ลูกค้า:</b> {{ calcForm.customerName || 'เงินสด' }}</span>
                         <span><b>จำนวน:</b> {{ billItems.length }} รายการ</span>
                     </div>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 15px;" class="print-table">
-                    <thead>
-                        <tr style="border-bottom: 1px solid #000;">
-                            <th style="text-align: left; padding: 8px 0; width: 45%;">รายการ (ประเภทสินทรัพย์)</th>
-                            <th style="text-align: right; padding: 8px 0; width: 25%;">รายละเอียดราคา</th>
-                            <th style="text-align: right; padding: 8px 0; width: 30%;">ยอดสุทธิ (บาท)</th>
+                <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-bottom: 10px; page-break-inside: auto;" class="print-table">
+                    <thead style="display: table-header-group;">
+                        <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
+                            <th style="text-align: left; padding: 4px 0; width: 30%;">รายการ</th>
+                            <th style="text-align: center; padding: 4px 0; width: 15%;">ความบริสุทธิ์</th>
+                            <th style="text-align: center; padding: 4px 0; width: 12%;">น้ำหนัก(ก.)</th>
+                            <th style="text-align: right; padding: 4px 0; width: 23%;">ราคา/กรัม (อ้างอิง)</th>
+                            <th style="text-align: right; padding: 4px 0; width: 20%;">ยอดสุทธิ(฿)</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr v-for="item in billItems" :key="item.id" style="border-bottom: 1px dashed #ccc;">
-                            <td style="padding: 10px 0; vertical-align: top;">
-                                <b>{{ getTypeName(item.type) }}</b><br>
-                                <span style="font-size: 9pt; color: #555;">ความบริสุทธิ์: {{ item.percent }}%</span><br>
-                                <span style="font-size: 9pt; color: #555;">น้ำหนัก: {{ item.weight }} กรัม</span>
+                    <tbody style="page-break-inside: auto;">
+                        <tr v-for="item in billItems" :key="item.id" style="border-bottom: 1px dashed #ccc; page-break-inside: avoid; break-inside: avoid;">
+                            <td style="padding: 6px 0; vertical-align: middle;"><b>{{ getTypeName(item.type) }}</b></td>
+                            <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%</td>
+                            <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }}</td>
+                            <td style="text-align: right; padding: 6px 0; vertical-align: middle;">
+                                {{ formatCurrency(item.netPrice / item.weight) }}
+                                <div style="font-size: 7.5pt; color: #666;">({{ formatCurrency(item.basePrice) }}<span v-if="item.premium>0">+{{item.premium}}</span>)</div>
                             </td>
-                            <td style="text-align: right; padding: 10px 0; vertical-align: top; font-size: 9pt; color: #333;">
-                                ราคาอ้างอิง: {{ formatCurrency(item.basePrice) }} ฿<br>
-                                ราคาบวกเพิ่ม: {{ item.premium }} ฿<br>
-                                ราคาต่อกรัม: {{ formatCurrency(item.netPrice / item.weight) }} ฿
-                            </td>
-                            <td style="text-align: right; padding: 10px 0; vertical-align: top; font-weight: bold; font-size: 11pt;">
+                            <td style="text-align: right; padding: 6px 0; vertical-align: middle; font-weight: bold; font-size: 9.5pt;">
                                 {{ formatCurrency(item.netPrice) }}
                             </td>
                         </tr>
                     </tbody>
                 </table>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
-                    <span style="font-size: 14pt; font-weight: bold;">ยอดสุทธิรวมทั้งสิ้น</span>
-                    <span style="font-size: 16pt; font-weight: bold;">{{ formatCurrency(billTotal) }} บาท</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
+                    <span style="font-size: 11pt; font-weight: bold;">ยอดสุทธิรวมทั้งสิ้น</span>
+                    <span style="font-size: 13pt; font-weight: bold;">{{ formatCurrency(billTotal) }} บาท</span>
                 </div>
                 
-                <div style="font-size: 11pt; margin-bottom: 15px;">
-                    <p style="font-weight: bold; margin-bottom: 5px;">ชำระเงินโดย:</p>
-                    <div style="display: flex; align-items: center; gap: 20px;">
-                        <span><span style="display: inline-block; width: 14px; height: 14px; border: 1px solid #000; margin-right: 5px;"></span> เงินสด</span>
-                        <span><span style="display: inline-block; width: 14px; height: 14px; border: 1px solid #000; margin-right: 5px;"></span> เงินโอน ธนาคาร ........................................................................</span>
+                <div style="font-size: 9pt; margin-bottom: 10px;">
+                    <p style="font-weight: bold; margin-bottom: 4px;">ชำระเงินโดย:</p>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span><span style="display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 4px; vertical-align: middle;"></span> เงินสด</span>
+                        <span><span style="display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 4px; vertical-align: middle;"></span> เงินโอน ธนาคาร ....................................................</span>
                     </div>
                 </div>
 
-                <div style="border: 1px solid #666; padding: 10px; border-radius: 4px; font-size: 9pt; line-height: 1.5; margin-bottom: 40px; text-align: justify;">
+                <div style="border: 1px solid #666; padding: 6px; border-radius: 4px; font-size: 8pt; line-height: 1.4; margin-bottom: 30px; text-align: justify;">
                     ข้าพเจ้าขอรับรองว่าเป็นสมบัติของข้าพเจ้าโดยแท้จริง และขอรับรองว่าของที่นำมาขายนั้นเป็นของที่บริสุทธิ์ ถ้าหากเป็นของทุจริตแล้ว ข้าพเจ้าขอรับผิดชอบทั้งสิ้น และได้อ่านทวนเรียบร้อยแล้วจึงลงนามไว้เป็นหลักฐาน
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 10pt; text-align: center; padding: 0 20px;">
-                    <div style="width: 45%;">
-                        <p style="margin-bottom: 5px;">ลงชื่อ..........................................................ผู้ขาย/ผู้รับเงิน</p>
-                        <p>(..........................................................)</p>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9pt; text-align: center; padding: 0 5px;">
+                    <div style="width: 48%;">
+                        <p style="margin-bottom: 4px;">ลงชื่อ....................................................ผู้ขาย/ผู้รับ</p>
+                        <p>(....................................................)</p>
                     </div>
-                    <div style="width: 45%;">
-                        <p style="margin-bottom: 5px;">ลงชื่อ..........................................................ผู้ซื้อ/ผู้จ่ายเงิน</p>
-                        <p>(..........................................................)</p>
+                    <div style="width: 48%;">
+                        <p style="margin-bottom: 4px;">ลงชื่อ....................................................ผู้ซื้อ/ผู้จ่าย</p>
+                        <p>(....................................................)</p>
                     </div>
                 </div>
                 
-                <div style="text-align: center; margin-top: 30px; font-size: 9pt; color: #666;">
+                <div style="text-align: center; margin-top: 20px; font-size: 8pt; color: #666;">
                     <p>ขอบคุณที่ใช้บริการกฤตหลอมทองครับ</p>
                 </div>
             </div>
