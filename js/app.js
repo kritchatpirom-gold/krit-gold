@@ -49,6 +49,7 @@ createApp({
         const transactions = ref([]);
         const loadingTransactions = ref(false);
         const filterDate = ref(new Date().toISOString().split('T')[0]);
+        const isFilterActive = computed(() => filterDate.value !== new Date().toISOString().split('T')[0]);
 
         // Bill / Cart System
         const billItems = ref([]);
@@ -74,6 +75,15 @@ createApp({
 
         const isFormValid = computed(() => {
             return calcForm.value.weight > 0 && calcForm.value.percent !== null;
+        });
+
+        const currentAssetPrice = computed(() => {
+            if (calcForm.value.type === 'tong_lom' || calcForm.value.type === 'tong_roop' || calcForm.value.type === 'tong_tang') {
+                return Number(goldPrice.value) || 0;
+            } else if (calcForm.value.type === 'silver') {
+                return Number(silverPrice.value) || 0;
+            }
+            return 0;
         });
 
         const calculatedResult = computed(() => {
@@ -280,53 +290,28 @@ createApp({
 
         // Graph
         const initChart = () => {
-            const ctx = document.getElementById('priceChart');
-            if(!ctx) return;
-            
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [
-                        { label: 'ราคาทองคำ (รับซื้อ)', data: [], borderColor: '#d4af37', backgroundColor: 'rgba(212, 175, 55, 0.1)', fill: true, tension: 0.4 },
-                        { label: 'ราคาซิลเวอร์ (Sell)', data: [], borderColor: '#9ca3af', backgroundColor: 'rgba(156, 163, 175, 0.1)', fill: true, tension: 0.4 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    color: '#e5e7eb',
-                    scales: { 
-                        y: { 
-                            beginAtZero: false,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: '#9ca3af' }
-                        },
-                        x: {
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: '#9ca3af' }
-                        }
-                    },
-                    plugins: {
-                        legend: { labels: { color: '#e5e7eb' } }
-                    }
-                }
-            });
+            if (document.getElementById('tradingview_gold') && window.TradingView) {
+                new TradingView.widget({
+                  "autosize": true,
+                  "symbol": "OANDA:XAUUSD",
+                  "interval": "60",
+                  "timezone": "Asia/Bangkok",
+                  "theme": "dark",
+                  "style": "1",
+                  "locale": "th_TH",
+                  "enable_publishing": false,
+                  "backgroundColor": "transparent",
+                  "gridColor": "rgba(255, 255, 255, 0.05)",
+                  "hide_top_toolbar": false,
+                  "hide_legend": false,
+                  "save_image": false,
+                  "container_id": "tradingview_gold"
+                });
+            }
         };
 
         const updateChart = (timeLabel, gold, silver) => {
-            if(!priceChart) return;
-            
-            if(priceChart.data.labels.length > 20) {
-                priceChart.data.labels.shift();
-                priceChart.data.datasets[0].data.shift();
-                priceChart.data.datasets[1].data.shift();
-            }
-            
-            priceChart.data.labels.push(timeLabel);
-            priceChart.data.datasets[0].data.push(gold);
-            priceChart.data.datasets[1].data.push(silver);
-            priceChart.update();
+            // TradingView widget handles real-time data internally
         };
 
         const fetchPrices = async () => {
@@ -431,6 +416,7 @@ createApp({
             transactions,
             loadingTransactions,
             filterDate,
+            isFilterActive,
             loadTransactions,
             deleteTransaction,
             transactionsTotal,
@@ -438,6 +424,7 @@ createApp({
             calcForm,
             resetForm,
             isFormValid,
+            currentAssetPrice,
             calculatedResult,
             
             billItems,

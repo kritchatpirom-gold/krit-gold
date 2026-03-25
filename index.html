@@ -35,6 +35,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="/css/style.css" rel="stylesheet">
 </head>
@@ -104,10 +105,10 @@
                         
                         <div class="flex-1 relative z-10 text-center md:text-left">
                             <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold text-gradient-gold mb-4 leading-tight">
-                                รับซื้อทองคำ <br class="hidden md:block"/> ด้วยความซื่อสัตย์
+                                บริการโปร่งใส <br class="hidden md:block"/> ทุกขั้นตอน
                             </h1>
                             <p class="text-lg text-gray-400 mb-8 max-w-2xl font-light">
-                                บริการรับซื้อ-ขาย แลกเปลี่ยน ทองคำหลอม ทองรูปพรรณ ทองคำแท่ง และเงินแท่ง ประเมินราคาด้วยระบบ AI มาตรฐานสากล
+                                บริการรับซื้อ ทองคำหลอม ทองรูปพรรณ ทองคำแท่ง และเครื่องเงินทุกสภาพ เช็คเปอร์เซ็นประเมินราคาด้วยระบบที่ได้มาตรฐานสากล
                             </p>
                             <div class="flex flex-wrap gap-4 justify-center md:justify-start">
                                 <a href="tel:0801474845" class="px-8 py-3 rounded-full border border-gold-500/50 bg-gold-900/30 text-gold-400 font-medium hover:bg-gold-800/50 transition-all-custom flex items-center hover-glow shadow-lg">
@@ -116,6 +117,9 @@
                                 <button @click="currentTab = 'calculator'" class="px-8 py-3 rounded-full bg-gold-500 hover:bg-gold-400 text-black font-bold transition-all-custom shadow-lg hover-glow">
                                     เริ่มประเมินราคา
                                 </button>
+                                <a href="https://www.facebook.com/profile.php?id=61580807143261" target="_blank" class="w-12 h-12 rounded-full border border-[#1877F2]/50 bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center hover:bg-[#1877F2]/20 transition-all-custom shadow-lg hover-glow-fb cursor-pointer">
+                                    <i class="fa-brands fa-facebook-f text-xl"></i>
+                                </a>
                             </div>
                         </div>
 
@@ -164,11 +168,15 @@
                     </div>
 
                     <!-- Chart -->
-                    <div class="glass p-6 rounded-2xl border border-gray-800 relative z-10 w-full" style="height: 400px;">
+                    <div class="glass p-6 rounded-2xl border border-gray-800 relative z-10 w-full" style="height: 500px;">
                         <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-bold text-gray-200">กราฟความเคลื่อนไหว</h2>
+                            <h2 class="text-xl font-bold text-gray-200">กราฟราคาทองคำ</h2>
                         </div>
-                        <canvas id="priceChart"></canvas>
+                        <!-- TradingView Widget BEGIN -->
+                        <div class="tradingview-widget-container" style="height: calc(100% - 40px); width: 100%;">
+                          <div id="tradingview_gold" style="height: 100%; width: 100%;"></div>
+                        </div>
+                        <!-- TradingView Widget END -->
                     </div>
                 </div>
             </transition>
@@ -207,6 +215,9 @@
                                             <button @click="calcForm.type = 'tong_roop'" :class="calcForm.type === 'tong_roop' ? 'bg-gold-600/30 text-gold-400 border-gold-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองรูปพรรณ</button>
                                             <button @click="calcForm.type = 'tong_tang'" :class="calcForm.type === 'tong_tang' ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองคำแท่ง</button>
                                             <button @click="calcForm.type = 'silver'" :class="calcForm.type === 'silver' ? 'bg-gray-700/50 text-gray-300 border-gray-500' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">เงิน (ซิลเวอร์)</button>
+                                        </div>
+                                        <div class="mt-2 text-sm text-gold-400 font-medium" v-if="currentAssetPrice > 0">
+                                            อ้างอิงราคาปัจจุบัน: {{ formatCurrency(currentAssetPrice) }} บาท
                                         </div>
                                     </div>
 
@@ -302,7 +313,10 @@
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
                         <h2 class="text-2xl font-bold text-white"><i class="fa-solid fa-list text-gold-500 mr-2"></i> ข้อมูลยอดซื้อขาย ทั้งหมด</h2>
                         <div class="flex gap-2 w-full sm:w-auto">
-                            <input type="date" v-model="filterDate" class="px-4 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none">
+                            <div class="relative flex items-center">
+                                <i class="fa-solid fa-filter absolute left-3" :class="isFilterActive ? 'text-white' : 'text-gray-500'"></i>
+                                <input type="date" v-model="filterDate" class="pl-9 pr-4 py-2 bg-dark-base border text-white rounded-lg focus:border-gold-500 outline-none transition-colors" :class="isFilterActive ? 'border-gray-300' : 'border-gray-700'">
+                            </div>
                             <button @click="loadTransactions" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg border border-gray-700 transition">ค้นหา</button>
                         </div>
                     </div>

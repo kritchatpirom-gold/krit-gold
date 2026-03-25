@@ -16,8 +16,10 @@ body {
   background-color: var(--bg-dark-base);
   color: #f3f4f6;
   background-image: 
-    radial-gradient(circle at 15% 50%, rgba(212, 175, 55, 0.05), transparent 50%),
-    radial-gradient(circle at 85% 30%, rgba(212, 175, 55, 0.08), transparent 50%);
+    linear-gradient(rgba(10, 10, 9, 0.85), rgba(10, 10, 9, 0.95)),
+    url('../images/bg.png');
+  background-size: cover;
+  background-position: center;
   background-attachment: fixed;
 }
 
@@ -78,6 +80,12 @@ body {
 .hover-glow:hover {
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
   border-color: rgba(212, 175, 55, 0.6);
+  transform: translateY(-2px);
+}
+
+.hover-glow-fb:hover {
+  box-shadow: 0 0 15px rgba(24, 119, 242, 0.4);
+  border-color: rgba(24, 119, 242, 0.6);
   transform: translateY(-2px);
 }
 
