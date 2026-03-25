@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>กฤตหลอมทอง อุบลราชธานี</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: {
+                            50: '#fbf9f1',
+                            100: '#f5f0db',
+                            200: '#eadab5',
+                            300: '#debf84',
+                            400: '#d2a056',
+                            500: '#c88c3a',
+                            600: '#b1702e',
+                            700: '#935528',
+                            800: '#7a4527',
+                            900: '#643922',
+                            950: '#381c10',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen">
+    <div id="app" v-cloak class="min-h-screen flex flex-col relative">
+        <nav class="glass sticky top-0 z-40 border-b border-gray-200 no-print">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-20 items-center">
+                    <div class="flex items-center space-x-3 cursor-pointer" @click="currentTab = 'home'">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-white shadow-lg">
+                            <i class="fa-solid fa-gem text-xl"></i>
+                        </div>
+                        <span class="font-bold text-xl sm:text-2xl text-slate-800 tracking-tight">
+                            กฤตหลอมทอง <span class="text-gold-600">อุบลราชธานี</span>
+                        </span>
+                    </div>
+                    
+                    <div class="hidden md:flex items-center space-x-6">
+                        <div v-if="user" class="h-8 w-px bg-slate-300 mx-2"></div>
+                        <button v-if="user" @click="currentTab = 'calculator'" :class="currentTab === 'calculator' ? 'text-gold-600 font-bold' : 'text-slate-600 font-medium'" class="hover:text-gold-500 transition-all-custom">ระบบคำนวณ</button>
+                        <button v-if="user" @click="currentTab = 'history'" :class="currentTab === 'history' ? 'text-gold-600 font-bold' : 'text-slate-600 font-medium'" class="hover:text-gold-500 transition-all-custom">ยอดซื้อขาย</button>
+                        <button v-if="user" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'text-gold-600 font-bold' : 'text-slate-600 font-medium'" class="hover:text-gold-500 transition-all-custom">ตั้งค่า</button>
+                        <button v-if="user" @click="logout" class="ml-4 px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-all-custom">ออกจากระบบ</button>
+                        <button v-else @click="showAuth = true" class="px-5 py-2.5 rounded-lg bg-gold-500 hover:bg-gold-600 text-white font-medium shadow-md transition-all-custom hover-lift">เข้าสู่ระบบ</button>
+                    </div>
+
+                    <div class="md:hidden flex items-center">
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-slate-600 hover:text-slate-900 focus:outline-none p-2">
+                            <i class="fa-solid fa-bars text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div v-if="mobileMenuOpen" class="md:hidden glass border-t border-gray-200">
+                <div class="px-4 pt-2 pb-5 space-y-3">
+                    <button v-if="user" @click="currentTab = 'calculator'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-slate-700">ระบบคำนวณ</button>
+                    <button v-if="user" @click="currentTab = 'history'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-slate-700">สรุปยอดซื้อขาย / ลบ</button>
+                    <button v-if="user" @click="currentTab = 'settings'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-slate-700">ตั้งค่าระบบ</button>
+                    <button v-if="!user" @click="showAuth = true; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-gold-600 font-bold">เข้าสู่ระบบจัดการ</button>
+                    <button v-if="user" @click="logout(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-red-600">ออกจากระบบ</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-grow pt-8 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full no-print">
+            <transition name="fade" mode="out-in">
+                <div v-if="currentTab === 'home'" key="home" class="space-y-8">
+                    <div class="relative rounded-2xl overflow-hidden glass p-8 sm:p-12 mb-8 flex flex-col md:flex-row items-center gap-8 shadow-sm">
+                        <div class="flex-1 relative z-10">
+                            <h1 class="text-4xl sm:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gold-600 to-gold-400 mb-4">รับซื้อทองคำด้วยความซื่อสัตย์</h1>
+                            <p class="text-lg text-slate-600 mb-6 leading-relaxed">
+                                บริการรับซื้อ-ขาย แลกเปลี่ยน ทองคำหลอม ทองรูปพรรณ ทองคำแท่ง และเงินแท่ง พร้อมเครื่องมือคำนวณราคาแม่นยำและเป็นธรรม อัปเดตราคาสดแบบ Real-time
+                            </p>
+                            <div class="flex flex-wrap gap-4">
+                                <a href="tel:0801474845" class="px-6 py-3 rounded-full bg-slate-800 text-white font-medium hover:bg-slate-700 transition-all-custom flex items-center shadow-lg hover-lift">
+                                    <i class="fa-solid fa-phone mr-2"></i> โทรปรึกษา: 080-1474845
+                                </a>
+                                <button v-if="user" @click="currentTab = 'calculator'" class="px-6 py-3 rounded-full bg-gold-500 text-white font-medium hover:bg-gold-600 transition-all-custom shadow-lg hover-lift">เริ่มระบบคำนวณ</button>
+                            </div>
+                        </div>
+                        <div class="md:w-1/3 flex justify-center z-10 w-full">
+                            <div class="bg-white rounded-2xl shadow-xl w-full p-6 border border-gold-100 flex flex-col items-center">
+                                <h3 class="text-xl font-bold text-slate-800 mb-1">ราคาอ้างอิงวันนี้</h3>
+                                <div class="w-full space-y-3 mt-4">
+                                    <div class="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-100">
+                                        <span class="font-medium text-slate-600">ทองคำ (ต่อบาท)</span>
+                                        <span class="font-bold text-lg text-green-600">{{ formatCurrency(goldPrice) }}</span>
+                                    </div>
+                                    <div class="bg-slate-50 p-4 rounded-xl flex justify-between items-center border border-slate-100">
+                                        <span class="font-medium text-slate-600">เงิน XAG (ต่อกิโล)</span>
+                                        <span class="font-bold text-lg text-green-600">{{ formatCurrency(silverPrice) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold text-slate-800">กราฟความเคลื่อนไหวราคาทอง (วันนี้)</h2>
+                        </div>
+                        <div class="relative h-80 w-full" style="min-height: 320px;">
+                            <canvas id="priceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+
+            <transition name="slide-fade" mode="out-in">
+                <div v-if="currentTab === 'calculator' && user" key="calculator" class="max-w-4xl mx-auto space-y-6">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <h2 class="text-3xl font-bold text-slate-800">ระบบคำนวณราคารับซื้อ</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="glass p-6 rounded-2xl shadow-sm">
+                            <h3 class="font-bold text-lg border-b pb-3 mb-4 text-slate-700">ข้อมูลการประเมิน</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">ชื่อลูกค้า</label>
+                                    <input type="text" v-model="calcForm.customerName" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">เบอร์ติดต่อ</label>
+                                    <input type="tel" v-model="calcForm.phone" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">ประเภทสินทรัพย์</label>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button @click="calcForm.type = 'tong_lom'" :class="calcForm.type === 'tong_lom' ? 'bg-gold-500 text-white' : 'bg-white text-slate-600'" class="p-2 rounded-lg border text-sm font-medium">ทองหลอม</button>
+                                        <button @click="calcForm.type = 'tong_roop'" :class="calcForm.type === 'tong_roop' ? 'bg-gold-500 text-white' : 'bg-white text-slate-600'" class="p-2 rounded-lg border text-sm font-medium">ทองรูปพรรณ</button>
+                                        <button @click="calcForm.type = 'tong_tang'" :class="calcForm.type === 'tong_tang' ? 'bg-slate-700 text-white' : 'bg-white text-slate-600'" class="p-2 rounded-lg border text-sm font-medium">ทองคำแท่ง</button>
+                                        <button @click="calcForm.type = 'silver'" :class="calcForm.type === 'silver' ? 'bg-slate-400 text-white' : 'bg-white text-slate-600'" class="p-2 rounded-lg border text-sm font-medium">เงิน (ซิลเวอร์)</button>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4 pt-2">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1">ความบริสุทธิ์ (%)</label>
+                                        <input type="number" step="0.01" v-model.number="calcForm.percent" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-600 mb-1">น้ำหนัก (กรัม)</label>
+                                        <input type="number" step="0.01" v-model.number="calcForm.weight" class="w-full px-4 py-2 border border-slate-300 rounded-lg">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="glass p-6 rounded-2xl shadow-sm flex flex-col justify-between border-t-4 border-t-gold-500">
+                            <div>
+                                <h3 class="font-bold text-lg border-b pb-3 mb-4 text-slate-700">สรุปการคำนวณ</h3>
+                                <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 text-white text-center shadow-inner">
+                                    <span class="block text-slate-300 text-sm font-medium mb-1">ราคาสุทธิที่รับซื้อได้</span>
+                                    <span class="block text-4xl sm:text-5xl font-bold text-gold-400">{{ formatCurrency(calculatedResult.netPrice) }}</span>
+                                </div>
+                            </div>
+                            <button @click="saveAndPrint" :disabled="!isFormValid || saving" :class="!isFormValid || saving ? 'opacity-50 cursor-not-allowed bg-slate-300' : 'bg-gold-600 hover:bg-gold-500 text-white'" class="w-full mt-6 py-4 rounded-xl font-bold text-lg transition-all-custom flex justify-center items-center">
+                                บันทึกและพิมพ์ใบเสนอราคา
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="currentTab === 'history' && user" key="history" class="space-y-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-3xl font-bold text-slate-800">สรุปยอดซื้อขาย</h2>
+                        <div class="flex gap-2 w-full sm:w-auto">
+                            <input type="date" v-model="filterDate" class="px-4 py-2 border border-slate-300 rounded-lg">
+                            <button @click="loadTransactions" class="px-4 py-2 bg-slate-200 rounded-lg">ค้นหา</button>
+                        </div>
+                    </div>
+                    <div class="glass rounded-2xl shadow-sm overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">วันที่</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">ลูกค้า</th>
+                                    <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">ประเภท</th>
+                                    <th class="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase">น้ำหนัก/สุทธิ</th>
+                                    <th class="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase">ลบ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-slate-100">
+                                <tr v-for="t in transactions" :key="t.id">
+                                    <td class="px-6 py-4">{{ formatDate(t.created_at) }}</td>
+                                    <td class="px-6 py-4">{{ t.customer_name }}</td>
+                                    <td class="px-6 py-4">{{ getTypeName(t.type) }}</td>
+                                    <td class="px-6 py-4 text-right">{{ formatCurrency(t.net_price) }}</td>
+                                    <td class="px-6 py-4 text-center">
+                                        <button @click="deleteTransaction(t.id)" class="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg"><i class="fa-solid fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div v-if="currentTab === 'settings' && user" key="settings" class="max-w-4xl mx-auto space-y-6">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <h2 class="text-3xl font-bold text-slate-800">ตั้งค่าระบบ (ราคาบวกทองหลอม)</h2>
+                    </div>
+                    <div class="glass p-8 rounded-2xl shadow-sm">
+                        <button @click="savePremiums" :disabled="saving" class="mb-4 px-4 py-2 bg-green-500 text-white rounded-lg">บันทึกการตั้งค่า</button>
+                        <div class="space-y-4">
+                            <div v-for="(p, i) in premiums" :key="p.id" class="flex gap-4 bg-white p-4 rounded-xl border">
+                                <span class="w-1/3 px-3 py-1 font-semibold rounded-lg">ช่วง %: {{ p.label }}</span>
+                                <input type="number" v-model.number="p.premium_amount" class="w-1/3 px-4 py-2 border border-slate-300 rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+        </main>
+
+        <div v-if="showAuth" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showAuth = false"></div>
+            <div class="bg-white rounded-2xl shadow-2xl z-10 w-full max-w-md p-8">
+                <h3 class="text-xl font-bold text-center mb-6">เข้าสู่ระบบจัดการ</h3>
+                <form @submit.prevent="login" class="space-y-5">
+                    <input type="email" v-model="authForm.email" required class="w-full px-4 py-3 border rounded-xl" placeholder="admin@kritgold.com">
+                    <input type="password" v-model="authForm.password" required class="w-full px-4 py-3 border rounded-xl" placeholder="••••••••">
+                    <button type="submit" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold">เข้าสู่ระบบ</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="print-area" class="print-only">
+            <div class="print-receipt-container">
+                <div class="text-center mb-6 border-b-2 border-dashed border-gray-400 pb-4">
+                    <h1 class="print-title">กฤตหลอมทอง อุบลราชธานี</h1>
+                    <p>รับซื้อ-ขาย ทองคำ เงิน แลกเปลี่ยน ทองคำหลอม</p>
+                    <p>โทร. 080-1474845</p>
+                </div>
+                <h2 class="text-xl font-bold text-center mb-4">ใบเสนอราคารับซื้อ</h2>
+                <div class="flex justify-between mb-4">
+                    <strong>ชื่อลูกค้า:</strong> <span>{{ calcForm.customerName || '-' }}</span>
+                </div>
+                <div class="flex justify-between items-center bg-gray-100 p-4 border-2 border-black rounded font-bold">
+                    <span class="text-xl">ราคาสุทธิที่รับซื้อได้</span>
+                    <span class="text-2xl">{{ formatCurrency(calculatedResult.netPrice) }} บาท</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/js/app.js" type="module"></script>
+</body>
+</html>
