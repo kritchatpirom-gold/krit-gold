@@ -53,7 +53,7 @@ createApp({
             startTime: '00:00',
             endDate: new Date().toISOString().split('T')[0],
             endTime: '23:59',
-            type: 'all'
+            type: ['tong_lom', 'tong_roop', 'tong_tang', 'silver']
         });
 
         const isFilterActive = computed(() => {
@@ -62,7 +62,7 @@ createApp({
                    filter.value.endDate !== today || 
                    filter.value.startTime !== '00:00' || 
                    filter.value.endTime !== '23:59' || 
-                   filter.value.type !== 'all';
+                   filter.value.type.length !== 4;
         });
 
         const selectedTransactions = ref([]);
@@ -271,8 +271,12 @@ createApp({
                 .lte('created_at', endDt.toISOString())
                 .order('created_at', { ascending: false });
                 
-            if (filter.value.type !== 'all') {
-                query = query.eq('type', filter.value.type);
+            if (filter.value.type.length > 0 && filter.value.type.length < 4) {
+                query = query.in('type', filter.value.type);
+            } else if (filter.value.type.length === 0) {
+                transactions.value = [];
+                loadingTransactions.value = false;
+                return;
             }
 
             const { data, error } = await query;
@@ -329,6 +333,9 @@ createApp({
 
                 csvContent += `${dDate},${dTime},${name},${phone},${type},${detail},${t.net_price}\n`;
             });
+
+            // Add Total Row
+            csvContent += `,,,,,รวมยอดสุทธิทั้งสิ้น (บาท),${transactionsTotal.value}\n`;
 
             const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // Add BOM for Excel UTF-8 representation
             const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });

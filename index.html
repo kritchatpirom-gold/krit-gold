@@ -362,20 +362,27 @@
                              </div>
                          </div>
 
-                         <div>
-                             <label class="block text-xs font-semibold text-gray-400 mb-2">ประเภทสินทรัพย์</label>
-                             <select v-model="filter.type" class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
-                                 <option value="all">ทั้งหมด</option>
-                                 <option value="tong_lom">ทองหลอม</option>
-                                 <option value="tong_roop">ทองรูปพรรณ</option>
-                                 <option value="tong_tang">ทองคำแท่ง</option>
-                                 <option value="silver">เงิน (ซิลเวอร์)</option>
-                             </select>
+                         <div class="md:col-span-2">
+                             <label class="block text-xs font-semibold text-gray-400 mb-2">ประเภทสินทรัพย์ (เลือกได้หลายรายการ)</label>
+                             <div class="flex flex-wrap gap-2">
+                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('tong_lom') ? 'border-gold-500 text-gold-400 bg-gold-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                     <input type="checkbox" value="tong_lom" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('tong_lom')"></i>ทองหลอม
+                                 </label>
+                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('tong_roop') ? 'border-gold-500 text-gold-400 bg-gold-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                     <input type="checkbox" value="tong_roop" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('tong_roop')"></i>ทองรูปพรรณ
+                                 </label>
+                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('tong_tang') ? 'border-indigo-500 text-indigo-300 bg-indigo-900/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                     <input type="checkbox" value="tong_tang" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('tong_tang')"></i>ทองคำแท่ง
+                                 </label>
+                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('silver') ? 'border-gray-400 text-gray-200 bg-gray-600/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                     <input type="checkbox" value="silver" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('silver')"></i>เงิน (ซิลเวอร์)
+                                 </label>
+                             </div>
                          </div>
 
-                         <div class="flex gap-2">
-                             <button @click="loadTransactions" class="w-full py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black font-bold rounded-lg transition shadow-md hover-glow flex justify-center items-center">
-                                 <i class="fa-solid fa-search mr-2"></i> ค้นหา
+                         <div class="flex gap-2 col-span-1 md:col-span-4 justify-end mt-2 border-t border-gray-800 pt-4">
+                             <button @click="loadTransactions" class="px-8 py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black font-bold rounded-lg transition shadow-md hover-glow flex justify-center items-center">
+                                 <i class="fa-solid fa-search mr-2"></i> ค้นหาข้อมูลตามตัวกรอง
                              </button>
                          </div>
                     </div>
