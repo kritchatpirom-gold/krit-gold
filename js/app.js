@@ -374,7 +374,8 @@ createApp({
             if (container && window.TradingView) {
                 container.innerHTML = '';
                 new window.TradingView.widget({
-                  "autosize": true,
+                  "width": "100%",
+                  "height": "100%",
                   "symbol": "OANDA:XAUUSD",
                   "interval": "60",
                   "timezone": "Asia/Bangkok",
