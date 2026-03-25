@@ -513,21 +513,21 @@
                     <thead style="display: table-header-group;">
                         <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
                             <th style="text-align: left; padding: 4px 0; width: 30%;">รายการ</th>
-                            <th style="text-align: center; padding: 4px 0; width: 15%;">เปอร์เซ็นต์</th>
-                            <th style="text-align: center; padding: 4px 0; width: 12%;">น้ำหนัก(ก.)</th>
-                            <th style="text-align: right; padding: 4px 0; width: 23%;">ราคา/กรัม</th>
+                            <th style="text-align: left; padding: 4px 0; width: 15%;">เปอร์เซ็นต์</th>
+                            <th style="text-align: center; padding: 4px 0; width: 14%;">น้ำหนัก</th>
+                            <th style="text-align: right; padding: 4px 0; width: 21%;">ราคา/กรัม</th>
                             <th style="text-align: right; padding: 4px 0; width: 20%;">ยอดสุทธิ(฿)</th>
                         </tr>
                     </thead>
                     <tbody style="page-break-inside: auto;">
                         <tr v-for="item in billItems" :key="item.id" style="border-bottom: 1px dashed #ccc; page-break-inside: avoid; break-inside: avoid;">
                             <td style="padding: 6px 0; vertical-align: middle;"><b>{{ getTypeName(item.type) }}</b></td>
-                            <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%</td>
-                            <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }}</td>
+                            <td style="text-align: left; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%</td>
+                            <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }} g</td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle;">
                                 <span v-if="item.type === 'silver'">{{ Math.floor(item.netPrice / item.weight).toLocaleString('th-TH') }}</span>
                                 <span v-else>{{ formatCurrency(item.netPrice / item.weight) }}</span>
-                                <div v-if="item.type !== 'silver'" style="font-size: 7.5pt; color: #666;">
+                                <div style="font-size: 7.5pt; color: #666;">
                                     ({{ formatCurrency(item.basePrice) }}<span v-if="item.premium>0">+{{item.premium}}</span>)
                                 </div>
                             </td>

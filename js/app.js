@@ -158,11 +158,14 @@ createApp({
                 const deduct13 = sp * 0.87;
                 base = deduct13; // Set base to Spot - 13% for receipt display
                 
-                // (ราคารับซื้อซิลเวอร์-13%)/1000 แล้วเอาแค่จำนวนเต็มโดยตัดทศนิยมทิ้ง
-                const pricePerGramInt = Math.floor(deduct13 / 1000);
+                // Base price per gram (100%), no decimals
+                const basePerGramInt = Math.floor(deduct13 / 1000);
                 
-                // แล้วค่อยมาคูณกับน้ำหนักและเปอร์เซ็น
-                net = pricePerGramInt * (p / 100) * w;
+                // Price per gram for THIS percentage, no decimals
+                const actualPricePerGram = Math.floor(basePerGramInt * (p / 100));
+                
+                // Net is actual price per gram (integer) * weight
+                net = actualPricePerGram * w;
             }
 
             return {
