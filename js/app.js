@@ -139,8 +139,8 @@ createApp({
             const p = Number(tForm.percent) || 0;
             const refPrice = Number(tForm.manualPrice) > 0 ? Number(tForm.manualPrice) : currentAssetPrice.value;
             
-            const gp = refPrice;
-            const sp = refPrice;
+            const gp = Math.floor(refPrice);
+            const sp = Math.floor(refPrice);
 
             if (tForm.type === 'tong_lom') {
                 base = gp;
@@ -157,15 +157,7 @@ createApp({
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp * 0.87;
                 base = deduct13; // Set base to Spot - 13% for receipt display
-                
-                // Base price per gram (100%), no decimals
-                const basePerGramInt = Math.floor(deduct13 / 1000);
-                
-                // Price per gram for THIS percentage, no decimals
-                const actualPricePerGram = Math.floor(basePerGramInt * (p / 100));
-                
-                // Net is actual price per gram (integer) * weight
-                net = actualPricePerGram * w;
+                net = (deduct13 / 1000) * (p / 100) * w;
             }
 
             return {

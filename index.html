@@ -525,10 +525,9 @@
                             <td style="text-align: left; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%</td>
                             <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }} g</td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle;">
-                                <span v-if="item.type === 'silver'">{{ Math.floor(item.netPrice / item.weight).toLocaleString('th-TH') }}</span>
-                                <span v-else>{{ formatCurrency(item.netPrice / item.weight) }}</span>
+                                <span>{{ formatCurrency(item.netPrice / item.weight) }}</span>
                                 <div style="font-size: 7.5pt; color: #666;">
-                                    ({{ formatCurrency(item.basePrice) }}<span v-if="item.premium>0">+{{item.premium}}</span>)
+                                    ({{ Number(item.basePrice).toLocaleString('th-TH', { maximumFractionDigits: 0 }) }}<span v-if="item.premium>0">+{{item.premium}}</span>)
                                 </div>
                             </td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle; font-weight: bold; font-size: 9.5pt;">
