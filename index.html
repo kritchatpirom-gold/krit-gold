@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -34,13 +35,33 @@
         }
     </script>
     <style>
-        .glass { background: rgba(17, 17, 17, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 215, 0, 0.1); }
-        .hover-glow:hover { box-shadow: 0 0 20px rgba(212, 175, 55, 0.4); transform: translateY(-1px); }
-        .bg-dark-base { background-color: #0a0a0a; }
-        .bg-dark-surface { background-color: #121212; }
-        .text-gold-400 { color: #d4af37; }
-        .transition-all-custom { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        
+        .glass {
+            background: rgba(17, 17, 17, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.1);
+        }
+
+        .hover-glow:hover {
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .bg-dark-base {
+            background-color: #0a0a0a;
+        }
+
+        .bg-dark-surface {
+            background-color: #121212;
+        }
+
+        .text-gold-400 {
+            color: #d4af37;
+        }
+
+        .transition-all-custom {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         /* สไตล์ไอคอนปฏิทินให้เป็นสีส้ม/ทอง */
         input[type="date"]::-webkit-calendar-picker-indicator,
         input[type="time"]::-webkit-calendar-picker-indicator {
@@ -55,31 +76,41 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="/css/style.css" rel="stylesheet">
 </head>
+
 <body class="antialiased min-h-screen">
     <div id="app" v-cloak class="min-h-screen flex flex-col relative">
-        
+
         <!-- Navbar -->
         <nav class="glass sticky top-0 z-40 border-b border-gray-800 no-print">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-20 items-center">
                     <div class="flex items-center space-x-3 cursor-pointer shrink-0" @click="currentTab = 'home'">
-                        <img src="/images/logo.jpg" alt="กฤตหลอมทอง" class="w-[50px] h-[50px] rounded-full border border-gold-400 shadow-xl object-cover hover:scale-110 transition-transform">
+                        <img src="/images/logo.jpg" alt="กฤตหลอมทอง"
+                            class="w-[50px] h-[50px] rounded-full border border-gold-400 shadow-xl object-cover hover:scale-110 transition-transform">
                         <span class="font-bold text-xl sm:text-2xl tracking-tight text-white">
                             กฤตหลอมทอง <span class="text-gold-400">อุบลราชธานี</span>
                         </span>
                     </div>
 
                     <div class="hidden md:flex items-center space-x-6 shrink-0">
-                        <button @click="currentTab = 'calculator'" :class="currentTab === 'calculator' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'" class="hover:text-gold-300 pb-1 transition-all-custom">ระบบคำนวณบิล</button>
-                        
+                        <button @click="currentTab = 'calculator'"
+                            :class="currentTab === 'calculator' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">ระบบคำนวณบิล</button>
+
                         <div v-if="isAdmin" class="h-8 w-px bg-gray-700 mx-2"></div>
-                        <button v-if="isAdmin" @click="currentTab = 'history'" :class="currentTab === 'history' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'" class="hover:text-gold-300 pb-1 transition-all-custom">ยอดซื้อขาย</button>
-                        <button v-if="isAdmin" @click="currentTab = 'settings'" :class="currentTab === 'settings' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'" class="hover:text-gold-300 pb-1 transition-all-custom">ตั้งค่า</button>
-                        
-                        <button v-if="isLoggedIn" @click="logout" class="ml-4 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition-all-custom">
+                        <button v-if="isAdmin" @click="currentTab = 'history'"
+                            :class="currentTab === 'history' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">ยอดซื้อขาย</button>
+                        <button v-if="isAdmin" @click="currentTab = 'settings'"
+                            :class="currentTab === 'settings' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">ตั้งค่า</button>
+
+                        <button v-if="isLoggedIn" @click="logout"
+                            class="ml-4 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition-all-custom">
                             ออกจากระบบพนักงาน
                         </button>
-                        <button v-else @click="showAuth = true" class="px-5 py-2.5 rounded-lg border border-gold-400 bg-gold-600/20 hover:bg-gold-500/40 text-gold-300 font-medium shadow-lg transition-all-custom hover-glow cursor-pointer">
+                        <button v-else @click="showAuth = true"
+                            class="px-5 py-2.5 rounded-lg border border-gold-400 bg-gold-600/20 hover:bg-gold-500/40 text-gold-300 font-medium shadow-lg transition-all-custom hover-glow cursor-pointer">
                             <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบพนักงาน
                         </button>
                     </div>
@@ -91,46 +122,58 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Mobile Menu -->
             <div v-if="mobileMenuOpen" class="md:hidden glass border-t border-gray-800">
                 <div class="px-4 pt-2 pb-5 space-y-3">
-                    <button @click="currentTab = 'calculator'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ระบบคำนวณบิล</button>
-                    <button v-if="isAdmin" @click="currentTab = 'history'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">สรุปยอดซื้อขาย / ลบ</button>
-                    <button v-if="isAdmin" @click="currentTab = 'settings'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
-                    <button v-if="!isLoggedIn" @click="showAuth = true; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-gold-400 mt-2 border-t border-gray-800 pt-3">เข้าสู่ระบบพนักงาน</button>
-                    <button v-if="isLoggedIn" @click="logout(); mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md font-medium text-red-500 mt-2 border-t border-gray-800 pt-3">ออกจากระบบ</button>
+                    <button @click="currentTab = 'calculator'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ระบบคำนวณบิล</button>
+                    <button v-if="isAdmin" @click="currentTab = 'history'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">สรุปยอดซื้อขาย
+                        / ลบ</button>
+                    <button v-if="isAdmin" @click="currentTab = 'settings'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
+                    <button v-if="!isLoggedIn" @click="showAuth = true; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gold-400 mt-2 border-t border-gray-800 pt-3">เข้าสู่ระบบพนักงาน</button>
+                    <button v-if="isLoggedIn" @click="logout(); mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-red-500 mt-2 border-t border-gray-800 pt-3">ออกจากระบบ</button>
                 </div>
             </div>
         </nav>
 
         <!-- Main Content -->
         <main class="flex-grow pt-8 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full no-print">
-            
+
             <!-- Home -->
             <transition name="fade" mode="out-in">
                 <div v-if="currentTab === 'home'" key="home" class="space-y-8">
                     <!-- Luxury Hero -->
-                    <div class="relative rounded-2xl overflow-hidden glass-card p-8 sm:p-12 border border-gray-800 flex flex-col md:flex-row items-center gap-8 bg-cover bg-center" style="background-image: linear-gradient(to right, rgba(10, 10, 9, 0.95) 40%, rgba(30, 30, 33, 0.4)), url('/images/cover.jpg');">
+                    <div class="relative rounded-2xl overflow-hidden glass-card p-8 sm:p-12 border border-gray-800 flex flex-col md:flex-row items-center gap-8 bg-cover bg-center"
+                        style="background-image: linear-gradient(to right, rgba(10, 10, 9, 0.95) 40%, rgba(30, 30, 33, 0.4)), url('/images/cover.jpg');">
                         <div class="absolute -top-16 -right-16 text-gold-400/5 rotate-12 pointer-events-none">
                             <i class="fa-solid fa-gem" style="font-size: 400px;"></i>
                         </div>
-                        
+
                         <div class="flex-1 relative z-10 text-center md:text-left">
-                            <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold text-gradient-gold mb-4 leading-tight">
-                                บริการโปร่งใส <br class="hidden md:block"/> ทุกขั้นตอน
+                            <h1
+                                class="text-4xl sm:text-5xl md:text-6xl font-bold text-gradient-gold mb-4 leading-tight">
+                                บริการโปร่งใส <br class="hidden md:block" /> ทุกขั้นตอน
                             </h1>
                             <p class="text-lg text-gray-400 mb-8 max-w-2xl font-light">
-                                บริการรับซื้อ ทองคำหลอม ทองรูปพรรณ ทองคำแท่ง และเครื่องเงินทุกสภาพ เช็คเปอร์เซ็นประเมินราคาด้วยระบบที่ได้มาตรฐานสากล
+                                บริการรับซื้อ ทองคำหลอม ทองรูปพรรณ ทองคำแท่ง และเครื่องเงินทุกสภาพ
+                                เช็คเปอร์เซ็นประเมินราคาด้วยระบบที่ได้มาตรฐานสากล
                             </p>
                             <div class="flex flex-wrap gap-4 justify-center md:justify-start">
-                                <a href="tel:0801474845" class="px-8 py-3 rounded-full border border-gold-500/50 bg-gold-900/30 text-gold-400 font-medium hover:bg-gold-800/50 transition-all-custom flex items-center hover-glow shadow-lg">
+                                <a href="tel:0801474845"
+                                    class="px-8 py-3 rounded-full border border-gold-500/50 bg-gold-900/30 text-gold-400 font-medium hover:bg-gold-800/50 transition-all-custom flex items-center hover-glow shadow-lg">
                                     <i class="fa-solid fa-phone mr-3"></i> 080-147-4845
                                 </a>
-                                <button @click="currentTab = 'calculator'" class="px-8 py-3 rounded-full bg-gold-500 hover:bg-gold-400 text-black font-bold transition-all-custom shadow-lg hover-glow">
+                                <button @click="currentTab = 'calculator'"
+                                    class="px-8 py-3 rounded-full bg-gold-500 hover:bg-gold-400 text-black font-bold transition-all-custom shadow-lg hover-glow">
                                     เริ่มประเมินราคา
                                 </button>
-                                <a href="https://www.facebook.com/profile.php?id=61580807143261" target="_blank" class="px-6 py-3 rounded-full border border-[#1877F2]/50 bg-[#1877F2]/10 text-[#1877F2] font-medium flex items-center hover:bg-[#1877F2]/20 transition-all-custom shadow-lg hover-glow-fb cursor-pointer">
+                                <a href="https://www.facebook.com/profile.php?id=61580807143261" target="_blank"
+                                    class="px-6 py-3 rounded-full border border-[#1877F2]/50 bg-[#1877F2]/10 text-[#1877F2] font-medium flex items-center hover:bg-[#1877F2]/20 transition-all-custom shadow-lg hover-glow-fb cursor-pointer">
                                     <i class="fa-brands fa-facebook-f text-xl mr-3"></i> กฤต หลอมทอง อุบลราชธานี
                                 </a>
                             </div>
@@ -142,26 +185,31 @@
                                 <h3 class="text-xl font-bold text-gold-400 mb-4 flex items-center">
                                     <i class="fa-solid fa-chart-line mr-2"></i> ราคาสมาคม (Live)
                                 </h3>
-                                
+
                                 <div class="space-y-4">
                                     <div class="bg-dark-surface/50 p-4 rounded-xl border border-gray-800/50">
                                         <div class="flex justify-between items-end mb-2">
-                                            <span class="text-gold-300 font-medium"><i class="fa-solid fa-coins mr-1"></i> ทองคำแท่ง 96.5%</span>
-                                            <span class="text-xs px-2 py-0.5 rounded" :class="priceTrendGold >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
+                                            <span class="text-gold-300 font-medium"><i
+                                                    class="fa-solid fa-coins mr-1"></i> ทองคำแท่ง 96.5%</span>
+                                            <span class="text-xs px-2 py-0.5 rounded"
+                                                :class="priceTrendGold >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
                                                 {{ priceTrendGold >= 0 ? '▲' : '▼' }} {{ Math.abs(priceTrendGold) }}
                                             </span>
                                         </div>
                                         <div class="flex justify-between text-[11px] text-gray-500 mb-1">
                                             <span>สมาคม: ทองคำแท่ง 96.5%</span>
                                         </div>
-                                        <div class="flex justify-between items-center text-sm border-b border-gray-800/50 pb-2 mb-2">
+                                        <div
+                                            class="flex justify-between items-center text-sm border-b border-gray-800/50 pb-2 mb-2">
                                             <div class="flex flex-col">
                                                 <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
-                                                <span class="text-white font-bold text-2xl">{{ formatCurrency(goldPriceBid) }}</span>
+                                                <span class="text-white font-bold text-2xl">{{
+                                                    formatCurrency(goldPriceBid) }}</span>
                                             </div>
                                             <div class="flex flex-col text-right">
                                                 <span class="text-xs text-gray-400">ขายออก (Sell)</span>
-                                                <span class="text-gold-400 font-bold font-mono text-2xl">{{ formatCurrency(goldPriceAsk) }}</span>
+                                                <span class="text-gold-400 font-bold font-mono text-2xl">{{
+                                                    formatCurrency(goldPriceAsk) }}</span>
                                             </div>
                                         </div>
 
@@ -171,40 +219,51 @@
                                         <div class="flex justify-between items-center text-sm">
                                             <div class="flex flex-col">
                                                 <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
-                                                <span class="text-white font-bold text-2xl">{{ formatCurrency(goldOrnBuy) }}</span>
+                                                <span class="text-white font-bold text-2xl">{{
+                                                    formatCurrency(goldOrnBuy) }}</span>
                                             </div>
                                             <div class="flex flex-col text-right">
                                                 <span class="text-xs text-gray-400">ขายออก (Sell)</span>
-                                                <span class="text-gold-400 font-bold font-mono text-2xl">{{ formatCurrency(goldOrnSell) }}</span>
+                                                <span class="text-gold-400 font-bold font-mono text-2xl">{{
+                                                    formatCurrency(goldOrnSell) }}</span>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- Metadata Footer -->
-                                        <div v-if="goldPriceMeta.date_th" class="mt-4 pt-3 border-t border-gray-800/50 text-center">
-                                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">ข้อมูลจากสมาคมค้าทองคำ</div>
+                                        <div v-if="goldPriceMeta.date_th"
+                                            class="mt-4 pt-3 border-t border-gray-800/50 text-center">
+                                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">
+                                                ข้อมูลจากสมาคมค้าทองคำ</div>
                                             <div class="text-[11px] text-gold-500/80 font-medium">
-                                                {{ goldPriceMeta.date_th }} • {{ goldPriceMeta.time_th }} (รอบที่ {{ goldPriceMeta.round }})
+                                                {{ goldPriceMeta.date_th }} • {{ goldPriceMeta.time_th }} (รอบที่ {{
+                                                goldPriceMeta.round }})
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="bg-dark-surface/50 p-4 rounded-xl border border-gray-800/50">
                                         <div class="flex justify-between items-end mb-2">
-                                            <span class="text-gray-300 font-medium"><i class="fa-solid fa-chart-simple mr-1"></i> ซิลเวอร์ (XAG)</span>
+                                            <span class="text-gray-300 font-medium"><i
+                                                    class="fa-solid fa-chart-simple mr-1"></i> ซิลเวอร์ (XAG)</span>
                                         </div>
                                         <div class="flex justify-between items-center text-sm">
                                             <div class="flex flex-col">
                                                 <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
-                                                <span class="text-white font-bold text-xl">{{ formatCurrency(silverPriceBuy) }}</span>
+                                                <span class="text-white font-bold text-xl">{{
+                                                    formatCurrency(silverPriceBuy) }}</span>
                                             </div>
                                             <div class="flex flex-col text-right">
                                                 <span class="text-xs text-gray-400">ขายออก (Sell)</span>
-                                                <span class="text-gold-300 font-bold font-mono text-xl">{{ formatCurrency(silverPriceSell) }}</span>
+                                                <span class="text-gold-300 font-bold font-mono text-xl">{{
+                                                    formatCurrency(silverPriceSell) }}</span>
                                             </div>
                                         </div>
-                                        <div class="flex justify-between gap-2 text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-800/30">
-                                            <div>Spot: <span class="text-gray-300 ml-1">{{ silverPriceSpot }}</span></div>
-                                            <div>Exchange: <span class="text-gray-300 ml-1">{{ silverPriceExchange }}</span></div>
+                                        <div
+                                            class="flex justify-between gap-2 text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-800/30">
+                                            <div>Spot: <span class="text-gray-300 ml-1">{{ silverPriceSpot }}</span>
+                                            </div>
+                                            <div>Exchange: <span class="text-gray-300 ml-1">{{ silverPriceExchange
+                                                    }}</span></div>
                                         </div>
                                     </div>
                                 </div>
@@ -216,43 +275,66 @@
                     </div>
 
                     <!-- Chart -->
-                    <div class="glass p-6 rounded-2xl border border-gray-800 relative z-10 w-full" style="height: 500px;">
+                    <div class="glass p-6 rounded-2xl border border-gray-800 relative z-10 w-full"
+                        style="height: 500px;">
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-bold text-gray-200">กราฟราคาทองคำ</h2>
                         </div>
                         <!-- TradingView Widget BEGIN -->
-                        <div class="tradingview-widget-container" style="height: calc(100% - 40px); width: 100%; overflow: hidden;">
-                          <div id="tradingview_gold" style="height: 100%; width: 100%;"></div>
+                        <div class="tradingview-widget-container"
+                            style="height: calc(100% - 40px); width: 100%; overflow: hidden;">
+                            <div id="tradingview_gold" style="height: 100%; width: 100%;"></div>
                         </div>
                         <!-- TradingView Widget END -->
                     </div>
 
                     <!-- X-Ray & Standard Section -->
-                    <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 items-center glass p-8 rounded-2xl border border-gray-800 shadow-xl relative overflow-hidden">
-                        <div class="absolute -right-20 -top-20 bg-gold-500/10 w-64 h-64 blur-3xl rounded-full pointer-events-none"></div>
-                        <div class="absolute -left-20 -bottom-20 bg-gold-400/5 w-64 h-64 blur-3xl rounded-full pointer-events-none"></div>
-                        
+                    <div
+                        class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 items-center glass p-8 rounded-2xl border border-gray-800 shadow-xl relative overflow-hidden">
+                        <div
+                            class="absolute -right-20 -top-20 bg-gold-500/10 w-64 h-64 blur-3xl rounded-full pointer-events-none">
+                        </div>
+                        <div
+                            class="absolute -left-20 -bottom-20 bg-gold-400/5 w-64 h-64 blur-3xl rounded-full pointer-events-none">
+                        </div>
+
                         <div class="flex justify-center z-10">
-                            <img src="/images/xray.png" alt="เครื่องเช็คเปอร์เซ็นต์ทอง X-Ray" class="max-h-64 object-contain filter drop-shadow-[0_0_15px_rgba(251,191,36,0.2)] hover:scale-105 transition-transform duration-500">
+                            <img src="/images/xray.png" alt="เครื่องเช็คเปอร์เซ็นต์ทอง X-Ray"
+                                class="max-h-64 object-contain filter drop-shadow-[0_0_15px_rgba(251,191,36,0.2)] hover:scale-105 transition-transform duration-500">
                         </div>
                         <div class="text-center md:text-left z-10 space-y-4">
-                            <div class="inline-block bg-gold-900/30 border border-gold-500/30 text-gold-400 text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wide">
+                            <div
+                                class="inline-block bg-gold-900/30 border border-gold-500/30 text-gold-400 text-xs font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wide">
                                 <i class="fa-solid fa-shield-check mr-1"></i> มาตรฐานระดับสากล
                             </div>
-                            <h3 class="text-2xl sm:text-3xl font-bold text-white leading-tight">เช็คเปอร์เซ็นต์ประเมินราคา <br><span class="text-gold-400">ด้วยเครื่อง X-Ray Fischer</span></h3>
+                            <h3 class="text-2xl sm:text-3xl font-bold text-white leading-tight">
+                                เช็คเปอร์เซ็นต์ประเมินราคา <br><span class="text-gold-400">ด้วยเครื่อง X-Ray
+                                    Fischer</span></h3>
                             <p class="text-gray-400 leading-relaxed text-sm sm:text-base">
-                                ประเมินราคาทองคำหลอม ทองรูปพรรณ ทองคำแท่ง และเงินทุกสภาพ ด้วยเครื่องทดสอบเปอร์เซ็นต์ทอง Fischer (GOLDSCOPE) รุ่นมาตรฐานโลก ให้ความถูกต้องแม่นยำสูงสุด ไม่ต้องพึ่งการคาดเดา โปร่งใสและยุติธรรมที่สุด เพื่อความมั่นใจของลูกค้ากฤตหลอมทองทุกท่าน
+                                ประเมินราคาทองคำหลอม ทองรูปพรรณ ทองคำแท่ง และเงินทุกสภาพ ด้วยเครื่องทดสอบเปอร์เซ็นต์ทอง
+                                Fischer (GOLDSCOPE) รุ่นมาตรฐานโลก ให้ความถูกต้องแม่นยำสูงสุด ไม่ต้องพึ่งการคาดเดา
+                                โปร่งใสและยุติธรรมที่สุด เพื่อความมั่นใจของลูกค้ากฤตหลอมทองทุกท่าน
                             </p>
                         </div>
                     </div>
 
                     <!-- About Us Banner -->
-                    <div class="relative rounded-2xl overflow-hidden p-8 sm:p-12 border border-gold-500/50 bg-cover bg-center mt-8 text-center shadow-2xl" style="background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.7)), url('/images/banner.jpg');">
+                    <div class="relative rounded-2xl overflow-hidden p-8 sm:p-12 border border-gold-500/50 bg-cover bg-center mt-8 text-center shadow-2xl"
+                        style="background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.7)), url('/images/banner.jpg');">
                         <div class="relative z-10 flex flex-col items-center">
-                            <h3 class="text-3xl sm:text-4xl font-bold text-gold-400 mb-5 whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-wide"><i class="fa-solid fa-store mr-2"></i> เกี่ยวกับเรา</h3>
+                            <h3
+                                class="text-3xl sm:text-4xl font-bold text-gold-400 mb-5 whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tracking-wide">
+                                <i class="fa-solid fa-store mr-2"></i> เกี่ยวกับเรา</h3>
                             <div class="text-white space-y-3 text-lg font-medium drop-shadow-md">
-                                <p class="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm border border-gold-500/20"><i class="fa-solid fa-location-dot text-gold-500 w-6 mr-1"></i> 73 ต.ในเมือง อ.เมืองอุบล จ.อุบลราชธานี 34000</p>
-                                <p class="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm border border-gold-500/20"><i class="fa-solid fa-phone text-gold-500 w-6 mr-1"></i> โทร <a href="tel:0801474845" class="text-gold-300 hover:text-white transition">080-1474845</a> กฤต</p>
+                                <p
+                                    class="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm border border-gold-500/20">
+                                    <i class="fa-solid fa-location-dot text-gold-500 w-6 mr-1"></i> 73 ต.ในเมือง
+                                    อ.เมืองอุบล จ.อุบลราชธานี 34000</p>
+                                <p
+                                    class="bg-black/40 px-6 py-2 rounded-full backdrop-blur-sm border border-gold-500/20">
+                                    <i class="fa-solid fa-phone text-gold-500 w-6 mr-1"></i> โทร <a
+                                        href="tel:0801474845"
+                                        class="text-gold-300 hover:text-white transition">080-1474845</a> กฤต</p>
                             </div>
                         </div>
                     </div>
@@ -262,98 +344,167 @@
             <transition name="slide-fade" mode="out-in">
                 <!-- Calculator POS / Cart -->
                 <div v-if="currentTab === 'calculator'" key="calculator" class="max-w-6xl mx-auto">
-                    
+
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        
+
                         <!-- Left Side: Input Form -->
                         <div class="lg:col-span-7 space-y-6">
                             <div class="glass p-6 rounded-2xl border border-gray-800 relative">
-                                <span v-if="!isLoggedIn" class="absolute -top-3 right-4 px-3 py-1 bg-blue-900/50 text-blue-300 border border-blue-700/50 rounded-full text-xs font-bold shadow-lg">โหมดทั่วไป (ไม่บันทึกข้อมูล)</span>
-                                <span v-if="isEmployee && !isAdmin" class="absolute -top-3 right-4 px-3 py-1 bg-green-900/50 text-green-300 border border-green-700/50 rounded-full text-xs font-bold shadow-lg">โหมดพนักงาน</span>
-                                <span v-if="isAdmin" class="absolute -top-3 right-4 px-3 py-1 bg-purple-900/50 text-purple-300 border border-purple-700/50 rounded-full text-xs font-bold shadow-lg">โหมดผู้ดูแลระบบ</span>
-                                
-                                <h3 class="font-bold text-xl border-b border-gray-800 pb-3 mb-5 text-gold-400">ข้อมูลการประเมิน (เพิ่มเข้าบิล)</h3>
-                                
+                                <span v-if="!isLoggedIn"
+                                    class="absolute -top-3 right-4 px-3 py-1 bg-blue-900/50 text-blue-300 border border-blue-700/50 rounded-full text-xs font-bold shadow-lg">โหมดทั่วไป
+                                    (ไม่บันทึกข้อมูล)</span>
+                                <span v-if="isEmployee && !isAdmin"
+                                    class="absolute -top-3 right-4 px-3 py-1 bg-green-900/50 text-green-300 border border-green-700/50 rounded-full text-xs font-bold shadow-lg">โหมดพนักงาน</span>
+                                <span v-if="isAdmin"
+                                    class="absolute -top-3 right-4 px-3 py-1 bg-purple-900/50 text-purple-300 border border-purple-700/50 rounded-full text-xs font-bold shadow-lg">โหมดผู้ดูแลระบบ</span>
+
+                                <h3 class="font-bold text-xl border-b border-gray-800 pb-3 mb-5 text-gold-400">
+                                    ข้อมูลการประเมิน (เพิ่มเข้าบิล)</h3>
+
                                 <div class="space-y-5">
                                     <div class="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label class="block text-sm font-medium text-gray-400 mb-1">ชื่อลูกค้า (ตัวนำบิล)</label>
-                                            <input type="text" v-model="calcForm.customerName" class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors" placeholder="ระบุชื่อลูกค้า (ห้ามเว้น)" :class="(isLoggedIn && calcForm.customerName.trim().length <= 1) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
+                                            <label class="block text-sm font-medium text-gray-400 mb-1">ชื่อลูกค้า
+                                                (ตัวนำบิล)</label>
+                                            <input type="text" v-model="calcForm.customerName"
+                                                class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
+                                                placeholder="ระบุชื่อลูกค้า (ห้ามเว้น)"
+                                                :class="(isLoggedIn && calcForm.customerName.trim().length <= 1) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
                                         </div>
                                         <div>
-                                            <label class="block text-sm font-medium text-gray-400 mb-1">เบอร์ติดต่อ</label>
-                                            <input type="tel" v-model="calcForm.phone" maxlength="10" class="w-full px-4 py-2.5 bg-dark-base border text-white rounded-lg focus:ring-1 outline-none transition-colors" placeholder="08x-xxxxxxx (10 หลัก)" :class="(isLoggedIn && (!isPhoneValid && calcForm.phone)) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50 text-red-400' : 'focus:ring-gold-500 focus:border-gold-500 border-gray-700'">
+                                            <label
+                                                class="block text-sm font-medium text-gray-400 mb-1">เบอร์ติดต่อ</label>
+                                            <input type="tel" v-model="calcForm.phone" maxlength="10"
+                                                class="w-full px-4 py-2.5 bg-dark-base border text-white rounded-lg focus:ring-1 outline-none transition-colors"
+                                                placeholder="08x-xxxxxxx (10 หลัก)"
+                                                :class="(isLoggedIn && (!isPhoneValid && calcForm.phone)) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50 text-red-400' : 'focus:ring-gold-500 focus:border-gold-500 border-gray-700'">
                                         </div>
                                     </div>
 
                                     <div v-show="isLoggedIn">
-                                        <label class="block text-sm font-medium text-gray-400 mb-1">เลขบัตรประชาชน 13 หลัก <span class="text-red-500 text-xs ml-1">*จำเป็นสำหรับการสืบค้นและจับทุจริต</span></label>
-                                        <input type="text" v-model="calcForm.idCard" maxlength="13" class="w-full px-4 py-2.5 bg-dark-base border text-white rounded-lg focus:ring-1 outline-none transition-colors" placeholder="ระบุเลขบัตรประชาชน 13 หลัก" :class="(isLoggedIn && (!isIdCardValid && calcForm.idCard)) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50 text-red-400' : 'focus:ring-gold-500 focus:border-gold-500 border-gray-700'">
-                                        <p v-if="isLoggedIn && calcForm.idCard && !isIdCardValid" class="text-red-500 text-xs mt-1"><i class="fa-solid fa-circle-exclamation mr-1"></i> เลขบัตรประชาชนไม่ถูกต้องตามฐานข้อมูลกรมการปกครอง</p>
+                                        <label class="block text-sm font-medium text-gray-400 mb-1">เลขบัตรประชาชน 13
+                                            หลัก <span
+                                                class="text-red-500 text-xs ml-1">*จำเป็นสำหรับการสืบค้นและจับทุจริต</span></label>
+                                        <input type="text" v-model="calcForm.idCard" maxlength="13"
+                                            class="w-full px-4 py-2.5 bg-dark-base border text-white rounded-lg focus:ring-1 outline-none transition-colors"
+                                            placeholder="ระบุเลขบัตรประชาชน 13 หลัก"
+                                            :class="(isLoggedIn && (!isIdCardValid && calcForm.idCard)) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50 text-red-400' : 'focus:ring-gold-500 focus:border-gold-500 border-gray-700'">
+                                        <p v-if="isLoggedIn && calcForm.idCard && !isIdCardValid"
+                                            class="text-red-500 text-xs mt-1"><i
+                                                class="fa-solid fa-circle-exclamation mr-1"></i>
+                                            เลขบัตรประชาชนไม่ถูกต้องตามฐานข้อมูลกรมการปกครอง</p>
                                     </div>
-                                    
+
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-400 mb-2">ประเภทสินทรัพย์</label>
+                                        <label
+                                            class="block text-sm font-medium text-gray-400 mb-2">ประเภทสินทรัพย์</label>
                                         <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                            <button @click="calcForm.type = 'tong_lom'" :class="calcForm.type === 'tong_lom' ? 'bg-gold-600/30 text-gold-400 border-gold-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองหลอม</button>
-                                            <button @click="calcForm.type = 'tong_roop'" :class="calcForm.type === 'tong_roop' ? 'bg-gold-600/30 text-gold-400 border-gold-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองรูปพรรณ</button>
-                                            <button @click="calcForm.type = 'redeem'" :class="calcForm.type === 'redeem' ? 'bg-orange-900/40 text-orange-400 border-orange-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ไถ่ถอน</button>
-                                            <button @click="calcForm.type = 'tong_tang'" :class="calcForm.type === 'tong_tang' ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองแท่ง</button>
-                                            <button @click="calcForm.type = 'silver'" :class="calcForm.type === 'silver' ? 'bg-gray-700/50 text-gray-300 border-gray-500' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'" class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">เงิน</button>
+                                            <button @click="calcForm.type = 'tong_lom'"
+                                                :class="calcForm.type === 'tong_lom' ? 'bg-gold-600/30 text-gold-400 border-gold-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'"
+                                                class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองหลอม</button>
+                                            <button @click="calcForm.type = 'tong_roop'"
+                                                :class="calcForm.type === 'tong_roop' ? 'bg-gold-600/30 text-gold-400 border-gold-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'"
+                                                class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองรูปพรรณ</button>
+                                            <button @click="calcForm.type = 'redeem'"
+                                                :class="calcForm.type === 'redeem' ? 'bg-orange-900/40 text-orange-400 border-orange-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'"
+                                                class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ไถ่ถอน</button>
+                                            <button @click="calcForm.type = 'tong_tang'"
+                                                :class="calcForm.type === 'tong_tang' ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/50' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'"
+                                                class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">ทองแท่ง</button>
+                                            <button @click="calcForm.type = 'silver'"
+                                                :class="calcForm.type === 'silver' ? 'bg-gray-700/50 text-gray-300 border-gray-500' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'"
+                                                class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">เงิน</button>
                                         </div>
                                         <div class="mt-3 flex items-center gap-2">
-                                            <label class="text-sm font-medium text-gray-400 whitespace-nowrap"><i class="fa-solid fa-edit mr-1"></i> ราคาอ้างอิง:</label>
-                                            <input type="number" :placeholder="currentAssetPrice" v-model.number="calcForm.manualPrice" :disabled="isEmployee && !isAdmin" :title="isEmployee && !isAdmin ? 'ไม่อนุญาตให้พนักงานแก้ไขราคาอ้างอิง' : ''" :class="(isEmployee && !isAdmin) ? 'bg-dark-surface text-gray-500 border-gray-800 cursor-not-allowed' : 'bg-dark-base text-gold-400 border-gray-600 focus:border-gold-500'" class="w-32 px-3 py-1.5 border rounded-lg outline-none text-sm transition-colors text-right font-bold">
-                                            <span class="text-xs text-gray-500" v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice">(อิงราคา API)</span>
+                                            <label class="text-sm font-medium text-gray-400 whitespace-nowrap"><i
+                                                    class="fa-solid fa-edit mr-1"></i> ราคาอ้างอิง:</label>
+                                            <input type="number" :placeholder="currentAssetPrice"
+                                                v-model.number="calcForm.manualPrice" :disabled="isEmployee && !isAdmin"
+                                                :title="isEmployee && !isAdmin ? 'ไม่อนุญาตให้พนักงานแก้ไขราคาอ้างอิง' : ''"
+                                                :class="(isEmployee && !isAdmin) ? 'bg-dark-surface text-gray-500 border-gray-800 cursor-not-allowed' : 'bg-dark-base text-gold-400 border-gray-600 focus:border-gold-500'"
+                                                class="w-32 px-3 py-1.5 border rounded-lg outline-none text-sm transition-colors text-right font-bold">
+                                            <span class="text-xs text-gray-500"
+                                                v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice">(อิงราคาสมาคม)</span>
                                             <span class="text-xs text-yellow-500" v-else>(ราคาแบบปรับเอง)</span>
-                                            <span class="text-xs text-red-500 ml-1" v-if="isEmployee && !isAdmin"><i class="fa-solid fa-lock"></i> ล็อกสำหรับพนักงาน</span>
+                                            <span class="text-xs text-red-500 ml-1" v-if="isEmployee && !isAdmin"><i
+                                                    class="fa-solid fa-lock"></i> ล็อกสำหรับพนักงาน</span>
                                         </div>
                                     </div>
 
-                                    <div class="grid grid-cols-2 gap-4 bg-dark-base/50 p-4 rounded-xl border border-gray-800">
+                                    <div
+                                        class="grid grid-cols-2 gap-4 bg-dark-base/50 p-4 rounded-xl border border-gray-800">
                                         <div v-show="calcForm.type !== 'tong_roop' && calcForm.type !== 'redeem'">
-                                            <label class="block text-sm font-medium text-gray-400 mb-1">ความบริสุทธิ์ (%)</label>
+                                            <label class="block text-sm font-medium text-gray-400 mb-1">ความบริสุทธิ์
+                                                (%)</label>
                                             <div class="relative">
-                                                <input type="number" step="0.01" v-model.number="calcForm.percent" class="w-full pl-4 pr-8 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none" min="0" max="100">
+                                                <input type="number" step="0.01" v-model.number="calcForm.percent"
+                                                    class="w-full pl-4 pr-8 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none"
+                                                    min="0" max="100">
                                                 <span class="absolute right-3 top-3 text-gray-500">%</span>
                                             </div>
                                             <!-- ปุ่มความบริสุทธิ์ทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นรูปพรรณ/ไถ่ถอน/เงิน) -->
-                                            <div v-show="!isLoggedIn && calcForm.type !== 'tong_roop' && calcForm.type !== 'redeem' && calcForm.type !== 'silver'" class="mt-2 flex flex-wrap gap-1">
-                                                <button type="button" @click="calcForm.percent = 37.5" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">9k</button>
-                                                <button type="button" @click="calcForm.percent = 50.0" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">12k</button>
-                                                <button type="button" @click="calcForm.percent = 58.33" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">14k</button>
-                                                <button type="button" @click="calcForm.percent = 75.0" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">18k</button>
-                                                <button type="button" @click="calcForm.percent = 91.6" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">22k</button>
-                                                <button type="button" @click="calcForm.percent = 96.5" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">23k</button>
-                                                <button type="button" @click="calcForm.percent = 99.99" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">24k</button>
+                                            <div v-show="!isLoggedIn && calcForm.type !== 'tong_roop' && calcForm.type !== 'redeem' && calcForm.type !== 'silver'"
+                                                class="mt-2 flex flex-wrap gap-1">
+                                                <button type="button" @click="calcForm.percent = 37.5"
+                                                    class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">9k</button>
+                                                <button type="button" @click="calcForm.percent = 50.0"
+                                                    class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">12k</button>
+                                                <button type="button" @click="calcForm.percent = 58.33"
+                                                    class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">14k</button>
+                                                <button type="button" @click="calcForm.percent = 75.0"
+                                                    class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">18k</button>
+                                                <button type="button" @click="calcForm.percent = 91.6"
+                                                    class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">22k</button>
+                                                <button type="button" @click="calcForm.percent = 96.5"
+                                                    class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">23k</button>
+                                                <button type="button" @click="calcForm.percent = 99.99"
+                                                    class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">24k</button>
                                             </div>
                                             <!-- โชว์ราคาบวกทองหลอมสดๆ ทันทีที่กรอกเปอร์เซ็น -->
-                                            <div v-if="calcForm.type === 'tong_lom' && calcForm.percent !== null" class="mt-2 text-green-400 text-xs font-medium flex items-center bg-green-900/20 py-1 px-2 rounded w-fit border border-green-800/50 animate-pulse">
-                                                <i class="fa-solid fa-arrow-trend-up mr-1.5"></i> ได้รับราคาบวกพรีเมียม: +{{ formatCurrency(calculatedResult.premium) }} บาท
+                                            <div v-if="calcForm.type === 'tong_lom' && calcForm.percent !== null"
+                                                class="mt-2 text-green-400 text-xs font-medium flex items-center bg-green-900/20 py-1 px-2 rounded w-fit border border-green-800/50 animate-pulse">
+                                                <i class="fa-solid fa-arrow-trend-up mr-1.5"></i> ได้รับราคาบวกพรีเมียม:
+                                                +{{ formatCurrency(calculatedResult.premium) }} บาท
                                             </div>
                                         </div>
-                                        <div :class="(calcForm.type === 'tong_roop' || calcForm.type === 'redeem') ? 'col-span-2' : ''">
-                                            <label class="block text-sm font-medium text-gray-400 mb-1">น้ำหนัก (กรัม)</label>
+                                        <div
+                                            :class="(calcForm.type === 'tong_roop' || calcForm.type === 'redeem') ? 'col-span-2' : ''">
+                                            <label class="block text-sm font-medium text-gray-400 mb-1">น้ำหนัก
+                                                (กรัม)</label>
                                             <div class="relative">
-                                                <input type="number" step="0.01" v-model.number="calcForm.weight" class="w-full pl-4 pr-10 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none" min="0">
+                                                <input type="number" step="0.01" v-model.number="calcForm.weight"
+                                                    class="w-full pl-4 pr-10 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none"
+                                                    min="0">
                                                 <span class="absolute right-3 top-3 text-gray-500">ก.</span>
                                             </div>
                                             <!-- ปุ่มน้ำหนักทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นเงิน) -->
-                                            <div v-if="!isLoggedIn && calcForm.type !== 'silver'" class="mt-2 flex flex-wrap gap-1.5">
-                                                <button type="button" @click="calcForm.weight = 15.244" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1 บาท</button>
-                                                <button type="button" @click="calcForm.weight = 7.622" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">2 สลึง</button>
-                                                <button type="button" @click="calcForm.weight = 3.811" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1 สลึง</button>
-                                                <button type="button" @click="calcForm.weight = 1.905" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">ครึ่งสลึง</button>
+                                            <div v-if="!isLoggedIn && calcForm.type !== 'silver'"
+                                                class="mt-2 flex flex-wrap gap-1.5">
+                                                <button type="button" @click="calcForm.weight = 15.244"
+                                                    class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1
+                                                    บาท</button>
+                                                <button type="button" @click="calcForm.weight = 7.622"
+                                                    class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">2
+                                                    สลึง</button>
+                                                <button type="button" @click="calcForm.weight = 3.811"
+                                                    class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1
+                                                    สลึง</button>
+                                                <button type="button" @click="calcForm.weight = 1.905"
+                                                    class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">ครึ่งสลึง</button>
                                             </div>
                                         </div>
                                     </div>
-                                    
-                                    <div v-if="isFormValid" class="p-4 bg-gold-900/20 rounded-xl border border-gold-500/30 flex justify-between items-center transition-all">
+
+                                    <div v-if="isFormValid"
+                                        class="p-4 bg-gold-900/20 rounded-xl border border-gold-500/30 flex justify-between items-center transition-all">
                                         <div>
-                                            <div class="text-sm text-gray-400">มูลค่าต่อชิ้น (อ้างอิง: {{ formatCurrency(calculatedResult.basePrice) }})</div>
-                                            <div class="text-2xl font-bold text-gold-400 mt-1">{{ formatCurrency(calculatedResult.netPrice) }} ฿</div>
+                                            <div class="text-sm text-gray-400">มูลค่าต่อชิ้น (อ้างอิง: {{
+                                                formatCurrency(calculatedResult.basePrice) }})</div>
+                                            <div class="text-2xl font-bold text-gold-400 mt-1">{{
+                                                formatCurrency(calculatedResult.netPrice) }} ฿</div>
                                         </div>
-                                        <button @click="addToBill" class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-white rounded-lg font-bold shadow-md hover-glow transition-all">
+                                        <button @click="addToBill"
+                                            class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-white rounded-lg font-bold shadow-md hover-glow transition-all">
                                             <i class="fa-solid fa-plus mr-2"></i>เพิ่มเข้ารายการบิล
                                         </button>
                                     </div>
@@ -363,33 +514,44 @@
 
                         <!-- Right Side: Current Bill -->
                         <div class="lg:col-span-5">
-                            <div class="glass p-6 rounded-2xl border border-gold-500/30 flex flex-col h-full relative overflow-hidden">
-                                <div class="absolute top-0 right-0 w-32 h-32 bg-gold-500/10 rounded-full blur-[40px] pointer-events-none"></div>
-                                
-                                <h3 class="font-bold text-xl border-b border-gray-800 pb-3 mb-4 text-white flex justify-between items-center">
+                            <div
+                                class="glass p-6 rounded-2xl border border-gold-500/30 flex flex-col h-full relative overflow-hidden">
+                                <div
+                                    class="absolute top-0 right-0 w-32 h-32 bg-gold-500/10 rounded-full blur-[40px] pointer-events-none">
+                                </div>
+
+                                <h3
+                                    class="font-bold text-xl border-b border-gray-800 pb-3 mb-4 text-white flex justify-between items-center">
                                     <span><i class="fa-solid fa-receipt mr-2 text-gold-400"></i> รายการในบิล</span>
-                                    <span class="text-sm bg-gray-800 text-gray-300 px-2 py-1 rounded">{{ billItems.length }} รายการ</span>
+                                    <span class="text-sm bg-gray-800 text-gray-300 px-2 py-1 rounded">{{
+                                        billItems.length }} รายการ</span>
                                 </h3>
 
                                 <div class="flex-grow overflow-y-auto space-y-3 mb-6 pr-2 max-h-[300px] min-h-[150px]">
-                                    <div v-if="billItems.length === 0" class="text-center py-10 text-gray-500 border border-dashed border-gray-700 rounded-xl">
+                                    <div v-if="billItems.length === 0"
+                                        class="text-center py-10 text-gray-500 border border-dashed border-gray-700 rounded-xl">
                                         <i class="fa-solid fa-cart-arrow-down text-3xl mb-2 opacity-30"></i>
                                         <p>ยังไม่มีรายการประเมิน</p>
                                     </div>
-                                    
-                                    <div v-for="(item, idx) in billItems" :key="item.id" class="bg-dark-base border border-gray-700 p-3 rounded-lg flex justify-between items-center group transition-all">
+
+                                    <div v-for="(item, idx) in billItems" :key="item.id"
+                                        class="bg-dark-base border border-gray-700 p-3 rounded-lg flex justify-between items-center group transition-all">
                                         <div>
-                                            <div class="font-bold text-gray-200 text-sm">{{ getTypeName(item.type) }}</div>
+                                            <div class="font-bold text-gray-200 text-sm">{{ getTypeName(item.type) }}
+                                            </div>
                                             <div class="text-xs text-gray-500">
                                                 {{ item.percent }}% | น้ำหนัก: {{ item.weight }} ก.
-                                                <span v-if="item.premium > 0" class="text-green-500 ml-1">(+{{item.premium}})</span>
+                                                <span v-if="item.premium > 0"
+                                                    class="text-green-500 ml-1">(+{{item.premium}})</span>
                                             </div>
                                         </div>
                                         <div class="flex items-center gap-3">
                                             <div class="text-right">
-                                                <div class="font-bold text-gold-400">{{ formatCurrency(item.netPrice) }}</div>
+                                                <div class="font-bold text-gold-400">{{ formatCurrency(item.netPrice) }}
+                                                </div>
                                             </div>
-                                            <button @click="removeBillItem(idx)" class="w-8 h-8 rounded-full bg-red-900/30 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors">
+                                            <button @click="removeBillItem(idx)"
+                                                class="w-8 h-8 rounded-full bg-red-900/30 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors">
                                                 <i class="fa-solid fa-times"></i>
                                             </button>
                                         </div>
@@ -399,10 +561,14 @@
                                 <div class="mt-auto border-t border-gray-800 pt-4">
                                     <div class="flex justify-between items-end mb-4">
                                         <span class="text-gray-400 text-lg">ราคาสุทธิรวม:</span>
-                                        <span class="text-4xl font-bold text-white tracking-tight">{{ formatCurrency(billTotal) }} <span class="text-xl text-gold-500 font-normal">฿</span></span>
+                                        <span class="text-4xl font-bold text-white tracking-tight">{{
+                                            formatCurrency(billTotal) }} <span
+                                                class="text-xl text-gold-500 font-normal">฿</span></span>
                                     </div>
-                                    
-                                    <button @click="saveAndPrint" :disabled="billItems.length === 0 || saving" :class="billItems.length === 0 || saving ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'" class="w-full py-4 rounded-xl font-bold text-lg transition-all flex justify-center items-center">
+
+                                    <button @click="saveAndPrint" :disabled="billItems.length === 0 || saving"
+                                        :class="billItems.length === 0 || saving ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'"
+                                        class="w-full py-4 rounded-xl font-bold text-lg transition-all flex justify-center items-center">
                                         <i v-if="saving" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
                                         <i v-else class="fa-solid fa-print mr-2"></i>
                                         {{ isLoggedIn ? 'บันทึกและพิมพ์ใบเสนอราคา' : 'พิมพ์ใบเสนอราคา (ไม่บันทึก)' }}
@@ -417,123 +583,178 @@
                 <!-- History -->
                 <div v-if="currentTab === 'history' && isAdmin" key="history" class="space-y-6">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-                        <h2 class="text-2xl font-bold text-white"><i class="fa-solid fa-list text-gold-500 mr-2"></i> ข้อมูลยอดซื้อขาย ทั้งหมด</h2>
+                        <h2 class="text-2xl font-bold text-white"><i class="fa-solid fa-list text-gold-500 mr-2"></i>
+                            ข้อมูลยอดซื้อขาย ทั้งหมด</h2>
                     </div>
 
-                    <div class="glass p-4 rounded-xl border border-gray-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4 relative shadow-lg" :class="isFilterActive ? 'border-gold-500/50' : ''">
-                         <div>
-                             <label class="block text-xs font-semibold text-gray-400 mb-2">ตั้งแต่ (วันที่ - เวลา)</label>
-                             <div class="flex gap-2">
-                                 <input type="date" v-model="filter.startDate" class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
-                                 <input type="time" v-model="filter.startTime" class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
-                             </div>
-                         </div>
-                         
-                         <div>
-                             <label class="block text-xs font-semibold text-gray-400 mb-2">ถึง (วันที่ - เวลา)</label>
-                             <div class="flex gap-2">
-                                 <input type="date" v-model="filter.endDate" class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
-                                 <input type="time" v-model="filter.endTime" class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
-                             </div>
-                         </div>
+                    <div class="glass p-4 rounded-xl border border-gray-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4 relative shadow-lg"
+                        :class="isFilterActive ? 'border-gold-500/50' : ''">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-2">ตั้งแต่ (วันที่ -
+                                เวลา)</label>
+                            <div class="flex gap-2">
+                                <input type="date" v-model="filter.startDate"
+                                    class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
+                                <input type="time" v-model="filter.startTime"
+                                    class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
+                            </div>
+                        </div>
 
-                         <div>
-                             <label class="block text-xs font-semibold text-gray-400 mb-2">ค้นหา (ชื่อ / เบอร์ / เลขบัตร)</label>
-                             <input type="text" v-model="filter.search" placeholder="ระบุคำค้นหา..." class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
-                         </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-2">ถึง (วันที่ - เวลา)</label>
+                            <div class="flex gap-2">
+                                <input type="date" v-model="filter.endDate"
+                                    class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
+                                <input type="time" v-model="filter.endTime"
+                                    class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
+                            </div>
+                        </div>
 
-                         <div class="md:col-span-1">
-                             <label class="block text-xs font-semibold text-gray-400 mb-2">ช่วงความบริสุทธิ์ (%)</label>
-                             <div class="flex flex-wrap gap-1">
-                                 <button @click="togglePurity('low')" :class="filter.purityRange.includes('low') ? 'bg-gold-500 text-black' : 'bg-gray-800 text-gray-400'" class="px-2 py-1.5 rounded text-[10px] font-bold transition">ต่ำกว่า 30%</button>
-                                 <button @click="togglePurity('mid')" :class="filter.purityRange.includes('mid') ? 'bg-gold-500 text-black' : 'bg-gray-800 text-gray-400'" class="px-2 py-1.5 rounded text-[10px] font-bold transition">30%-98%</button>
-                                 <button @click="togglePurity('high')" :class="filter.purityRange.includes('high') ? 'bg-gold-500 text-black' : 'bg-gray-800 text-gray-400'" class="px-2 py-1.5 rounded text-[10px] font-bold transition">99%</button>
-                             </div>
-                         </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-2">ค้นหา (ชื่อ / เบอร์ /
+                                เลขบัตร)</label>
+                            <input type="text" v-model="filter.search" placeholder="ระบุคำค้นหา..."
+                                class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
+                        </div>
 
-                         <div class="md:col-span-4">
-                             <label class="block text-xs font-semibold text-gray-400 mb-2">ประเภทสินทรัพย์ (เลือกได้หลายรายการ)</label>
-                             <div class="flex flex-wrap gap-2">
-                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('tong_lom') ? 'border-gold-500 text-gold-400 bg-gold-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
-                                     <input type="checkbox" value="tong_lom" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('tong_lom')"></i>ทองหลอม
-                                 </label>
-                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('tong_roop') ? 'border-gold-500 text-gold-400 bg-gold-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
-                                     <input type="checkbox" value="tong_roop" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('tong_roop')"></i>ทองรูปพรรณ
-                                 </label>
-                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('tong_tang') ? 'border-indigo-500 text-indigo-300 bg-indigo-900/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
-                                     <input type="checkbox" value="tong_tang" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('tong_tang')"></i>ทองคำแท่ง
-                                 </label>
-                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('redeem') ? 'border-orange-500 text-orange-400 bg-orange-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
-                                     <input type="checkbox" value="redeem" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('redeem')"></i>ไถ่ถอน
-                                 </label>
-                                 <label class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors" :class="filter.type.includes('silver') ? 'border-gray-400 text-gray-200 bg-gray-600/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
-                                     <input type="checkbox" value="silver" v-model="filter.type" class="hidden"> <i class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('silver')"></i>เงิน (ซิลเวอร์)
-                                 </label>
-                             </div>
-                         </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-semibold text-gray-400 mb-2">ช่วงความบริสุทธิ์ (%)</label>
+                            <div class="flex flex-wrap gap-1">
+                                <button @click="togglePurity('low')"
+                                    :class="filter.purityRange.includes('low') ? 'bg-gold-500 text-black' : 'bg-gray-800 text-gray-400'"
+                                    class="px-2 py-1.5 rounded text-[10px] font-bold transition">ต่ำกว่า 30%</button>
+                                <button @click="togglePurity('mid')"
+                                    :class="filter.purityRange.includes('mid') ? 'bg-gold-500 text-black' : 'bg-gray-800 text-gray-400'"
+                                    class="px-2 py-1.5 rounded text-[10px] font-bold transition">30%-98%</button>
+                                <button @click="togglePurity('high')"
+                                    :class="filter.purityRange.includes('high') ? 'bg-gold-500 text-black' : 'bg-gray-800 text-gray-400'"
+                                    class="px-2 py-1.5 rounded text-[10px] font-bold transition">99%</button>
+                            </div>
+                        </div>
 
-                         <div class="flex gap-2 col-span-1 md:col-span-4 justify-end mt-2 border-t border-gray-800 pt-4">
-                             <button @click="loadTransactions" class="px-8 py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black font-bold rounded-lg transition shadow-md hover-glow flex justify-center items-center">
-                                 <i class="fa-solid fa-search mr-2"></i> ค้นหาข้อมูลตามตัวกรอง
-                             </button>
-                         </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-semibold text-gray-400 mb-2">ประเภทสินทรัพย์
+                                (เลือกได้หลายรายการ)</label>
+                            <div class="flex flex-wrap gap-2">
+                                <label
+                                    class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors"
+                                    :class="filter.type.includes('tong_lom') ? 'border-gold-500 text-gold-400 bg-gold-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                    <input type="checkbox" value="tong_lom" v-model="filter.type" class="hidden"> <i
+                                        class="fa-solid fa-check mr-1.5"
+                                        v-if="filter.type.includes('tong_lom')"></i>ทองหลอม
+                                </label>
+                                <label
+                                    class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors"
+                                    :class="filter.type.includes('tong_roop') ? 'border-gold-500 text-gold-400 bg-gold-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                    <input type="checkbox" value="tong_roop" v-model="filter.type" class="hidden"> <i
+                                        class="fa-solid fa-check mr-1.5"
+                                        v-if="filter.type.includes('tong_roop')"></i>ทองรูปพรรณ
+                                </label>
+                                <label
+                                    class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors"
+                                    :class="filter.type.includes('tong_tang') ? 'border-indigo-500 text-indigo-300 bg-indigo-900/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                    <input type="checkbox" value="tong_tang" v-model="filter.type" class="hidden"> <i
+                                        class="fa-solid fa-check mr-1.5"
+                                        v-if="filter.type.includes('tong_tang')"></i>ทองคำแท่ง
+                                </label>
+                                <label
+                                    class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors"
+                                    :class="filter.type.includes('redeem') ? 'border-orange-500 text-orange-400 bg-orange-600/10' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                    <input type="checkbox" value="redeem" v-model="filter.type" class="hidden"> <i
+                                        class="fa-solid fa-check mr-1.5"
+                                        v-if="filter.type.includes('redeem')"></i>ไถ่ถอน
+                                </label>
+                                <label
+                                    class="inline-flex items-center bg-dark-base border px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-colors"
+                                    :class="filter.type.includes('silver') ? 'border-gray-400 text-gray-200 bg-gray-600/30' : 'border-gray-700 text-gray-400 hover:border-gray-500'">
+                                    <input type="checkbox" value="silver" v-model="filter.type" class="hidden"> <i
+                                        class="fa-solid fa-check mr-1.5" v-if="filter.type.includes('silver')"></i>เงิน
+                                    (ซิลเวอร์)
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2 col-span-1 md:col-span-4 justify-end mt-2 border-t border-gray-800 pt-4">
+                            <button @click="loadTransactions"
+                                class="px-8 py-2 bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black font-bold rounded-lg transition shadow-md hover-glow flex justify-center items-center">
+                                <i class="fa-solid fa-search mr-2"></i> ค้นหาข้อมูลตามตัวกรอง
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="bg-gold-900/20 border border-gold-500/30 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-lg gap-2 mt-4 mb-4">
+                    <div
+                        class="bg-gold-900/20 border border-gold-500/30 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-lg gap-2 mt-4 mb-4">
                         <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                             <span class="text-gray-300 font-medium">ยอดรายการ ({{ transactions.length }} รายการ):</span>
-                            <button v-if="selectedTransactions.length > 0" @click="deleteSelected" class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 text-sm rounded-lg border border-red-700/50 transition-all shadow shadow-red-900/20">
+                            <button v-if="selectedTransactions.length > 0" @click="deleteSelected"
+                                class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 text-sm rounded-lg border border-red-700/50 transition-all shadow shadow-red-900/20">
                                 <i class="fa-solid fa-trash mr-1"></i> ลบที่เลือก ({{ selectedTransactions.length }})
                             </button>
                         </div>
                         <div class="flex items-center gap-6">
                             <div class="flex flex-col items-end">
                                 <span class="text-[10px] text-gray-500 uppercase">น้ำหนักรวม</span>
-                                <span class="text-xl font-bold text-gray-200">{{ totalWeight.toFixed(3) }} <span class="text-xs font-normal opacity-50">ก.</span></span>
+                                <span class="text-xl font-bold text-gray-200">{{ totalWeight.toFixed(3) }} <span
+                                        class="text-xs font-normal opacity-50">ก.</span></span>
                             </div>
                             <div class="flex flex-col items-end">
                                 <span class="text-[10px] text-gold-500 uppercase font-semibold">ยอดเงินรวม</span>
-                                <span class="text-3xl font-bold text-gold-400">{{ formatCurrency(transactionsTotal) }} ฿</span>
+                                <span class="text-3xl font-bold text-gold-400">{{ formatCurrency(transactionsTotal) }}
+                                    ฿</span>
                             </div>
-                            <button v-if="transactions.length > 0" @click="exportCSV" class="inline-flex items-center px-4 py-2 bg-green-900/40 border border-green-600/50 hover:bg-green-800/60 text-green-400 text-sm font-semibold rounded-lg transition-all shadow-md ml-2">
+                            <button v-if="transactions.length > 0" @click="exportCSV"
+                                class="inline-flex items-center px-4 py-2 bg-green-900/40 border border-green-600/50 hover:bg-green-800/60 text-green-400 text-sm font-semibold rounded-lg transition-all shadow-md ml-2">
                                 <i class="fa-solid fa-file-csv mr-2 text-lg"></i> CSV
                             </button>
                         </div>
                     </div>
-                    
+
                     <div class="glass rounded-xl shadow-sm overflow-x-auto border border-gray-800">
                         <table class="min-w-full divide-y divide-gray-800">
                             <thead class="bg-dark-base border-b border-gray-800">
                                 <tr>
                                     <th class="px-4 py-4 text-left w-12">
-                                        <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                        <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll"
+                                            class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
                                     </th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">วันที่</th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">ลูกค้า</th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">ประเภท</th>
-                                    <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">เปอร์เซ็นต์ / น้ำหนัก</th>
+                                    <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">เปอร์เซ็นต์ /
+                                        น้ำหนัก</th>
                                     <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">ยอดสุทธิ</th>
                                     <th class="px-6 py-4 text-center font-semibold text-gray-400 text-sm">ลบ</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-800">
                                 <tr v-if="loadingTransactions">
-                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังโหลด...</td>
+                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500"><i
+                                            class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังโหลด...</td>
                                 </tr>
                                 <tr v-else-if="transactions.length === 0">
-                                    <td colspan="7" class="px-6 py-10 text-center text-gray-500">ไม่พบรายการของวันนี้</td>
-                                </tr>
-                                <tr v-for="t in transactions" :key="t.id" class="hover:bg-gray-800/30 transition-colors" :class="selectedTransactions.includes(t.id) ? 'bg-gold-900/10' : ''">
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm">
-                                        <input type="checkbox" :value="t.id" v-model="selectedTransactions" class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                    <td colspan="7" class="px-6 py-10 text-center text-gray-500">ไม่พบรายการของวันนี้
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{{ formatDate(t.created_at) }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">{{ t.customer_name }} <span class="text-xs text-gray-500 block">{{ t.phone }}</span></td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gold-300">{{ getTypeName(t.type) }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">{{ t.percent }}% / {{ t.weight }} ก.</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right">{{ formatCurrency(t.net_price) }}</td>
+                                </tr>
+                                <tr v-for="t in transactions" :key="t.id" class="hover:bg-gray-800/30 transition-colors"
+                                    :class="selectedTransactions.includes(t.id) ? 'bg-gold-900/10' : ''">
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm">
+                                        <input type="checkbox" :value="t.id" v-model="selectedTransactions"
+                                            class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{{
+                                        formatDate(t.created_at) }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">{{ t.customer_name }}
+                                        <span class="text-xs text-gray-500 block">{{ t.phone }}</span></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gold-300">{{ getTypeName(t.type)
+                                        }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">{{
+                                        t.percent }}% / {{ t.weight }} ก.</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right">{{
+                                        formatCurrency(t.net_price) }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                        <button @click="deleteTransaction(t.id)" class="text-red-500 hover:text-red-400 p-2"><i class="fa-solid fa-trash"></i></button>
+                                        <button @click="deleteTransaction(t.id)"
+                                            class="text-red-500 hover:text-red-400 p-2"><i
+                                                class="fa-solid fa-trash"></i></button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -545,15 +766,20 @@
                 <div v-if="currentTab === 'settings' && isAdmin" key="settings" class="max-w-3xl mx-auto space-y-6">
                     <div class="glass p-8 rounded-2xl border border-gray-800">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
-                            <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-coins mr-2 text-gold-400"></i> โครงสร้างราคาบวกตารางหลอม</h3>
-                            <button @click="savePremiums" :disabled="saving" class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
+                            <h3 class="font-bold text-xl text-white"><i
+                                    class="fa-solid fa-coins mr-2 text-gold-400"></i> โครงสร้างราคาบวกตารางหลอม</h3>
+                            <button @click="savePremiums" :disabled="saving"
+                                class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
                         </div>
                         <div class="space-y-4">
-                            <div v-for="(p, i) in premiums" :key="p.id" class="flex gap-4 bg-dark-base p-4 rounded-xl border border-gray-800 items-center">
-                                <span class="w-1/3 px-3 py-1 font-semibold text-gray-300">ช่วง %: <span class="text-white">{{ p.label }}</span></span>
+                            <div v-for="(p, i) in premiums" :key="p.id"
+                                class="flex gap-4 bg-dark-base p-4 rounded-xl border border-gray-800 items-center">
+                                <span class="w-1/3 px-3 py-1 font-semibold text-gray-300">ช่วง %: <span
+                                        class="text-white">{{ p.label }}</span></span>
                                 <div class="w-2/3 flex items-center gap-2">
                                     <span class="text-sm text-gray-500">+</span>
-                                    <input type="number" v-model.number="p.premium_amount" class="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none">
+                                    <input type="number" v-model.number="p.premium_amount"
+                                        class="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none">
                                     <span class="text-sm text-gray-500">฿</span>
                                 </div>
                             </div>
@@ -566,23 +792,31 @@
         <!-- Auth Modal -->
         <div v-if="showAuth" class="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/80 backdrop-blur-md" @click="showAuth = false"></div>
-            <div class="bg-gray-900 rounded-2xl shadow-2xl z-10 w-full max-w-md p-8 border border-gray-800 text-white relative overflow-hidden animate-[fade-in_0.3s_ease-out]">
+            <div
+                class="bg-gray-900 rounded-2xl shadow-2xl z-10 w-full max-w-md p-8 border border-gray-800 text-white relative overflow-hidden animate-[fade-in_0.3s_ease-out]">
                 <div class="absolute top-0 right-0 w-32 h-32 bg-gold-500/10 blur-[50px] pointer-events-none"></div>
                 <h3 class="text-2xl font-bold text-center mb-6 text-gold-400">เข้าสู่ระบบ (Krit Gold)</h3>
                 <p class="text-center text-sm text-gray-400 mb-6">- เฉพาะพนักงาน และ ผู้จัดการ -</p>
-                
-                <div v-if="authError" class="mb-4 bg-red-900/30 text-red-400 border border-red-900 p-3 rounded-lg text-sm text-center">
+
+                <div v-if="authError"
+                    class="mb-4 bg-red-900/30 text-red-400 border border-red-900 p-3 rounded-lg text-sm text-center">
                     {{ authError }}
                 </div>
-                
+
                 <form @submit.prevent="login" class="space-y-5 relative z-10">
-                    <input type="email" v-model="authForm.email" required class="w-full px-4 py-3 bg-dark-base border border-gray-700 rounded-xl text-white outline-none focus:border-gold-500" placeholder="อีเมล (เช่น user@kritgold.com)">
-                    <input type="password" v-model="authForm.password" required class="w-full px-4 py-3 bg-dark-base border border-gray-700 rounded-xl text-white outline-none focus:border-gold-500" placeholder="รหัสผ่าน">
-                    <button type="submit" :disabled="authLoading" class="w-full py-3 bg-gold-600 hover:bg-gold-500 text-black rounded-xl font-bold mt-2 transition hover-glow flex justify-center items-center">
+                    <input type="email" v-model="authForm.email" required
+                        class="w-full px-4 py-3 bg-dark-base border border-gray-700 rounded-xl text-white outline-none focus:border-gold-500"
+                        placeholder="อีเมล (เช่น user@kritgold.com)">
+                    <input type="password" v-model="authForm.password" required
+                        class="w-full px-4 py-3 bg-dark-base border border-gray-700 rounded-xl text-white outline-none focus:border-gold-500"
+                        placeholder="รหัสผ่าน">
+                    <button type="submit" :disabled="authLoading"
+                        class="w-full py-3 bg-gold-600 hover:bg-gold-500 text-black rounded-xl font-bold mt-2 transition hover-glow flex justify-center items-center">
                         <i v-if="authLoading" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
                         {{ authLoading ? 'กำลังเข้าสู่ระบบ...' : 'ล็อคอิน' }}
                     </button>
-                    <button type="button" @click="showAuth = false" class="w-full py-2 text-gray-500 hover:text-gray-300 font-medium text-sm mt-2 transition-colors">
+                    <button type="button" @click="showAuth = false"
+                        class="w-full py-2 text-gray-500 hover:text-gray-300 font-medium text-sm mt-2 transition-colors">
                         ปิด
                     </button>
                 </form>
@@ -591,13 +825,15 @@
 
         <!-- Receipt Print Section -->
         <div id="print-area" class="print-only">
-            <div class="print-receipt-container" style="width: 100%; max-width: 148mm; margin: 0 auto; padding: 5px 15px;">
+            <div class="print-receipt-container"
+                style="width: 100%; max-width: 148mm; margin: 0 auto; padding: 5px 15px;">
                 <div class="text-center mb-3 flex flex-col items-center">
-                    <img src="/images/logo.jpg" alt="Logo" style="width: 55px; height: 55px; border-radius: 50%; object-fit: cover; margin-bottom: 3px; border: 1px solid #000;">
+                    <img src="/images/logo.jpg" alt="Logo"
+                        style="width: 55px; height: 55px; border-radius: 50%; object-fit: cover; margin-bottom: 3px; border: 1px solid #000;">
                     <h1 style="font-size: 14pt; font-weight: bold; margin-bottom: 2px;">กฤตหลอมทอง อุบลราชธานี</h1>
                     <p style="font-size: 9pt; color: #333;">โทร. 080-1474845</p>
                 </div>
-                
+
                 <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 3px;">
                         <span><b>วันที่:</b> {{ formatDate(new Date()) }}</span>
@@ -608,7 +844,9 @@
                     </div>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-bottom: 10px; page-break-inside: auto;" class="print-table">
+                <table
+                    style="width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-bottom: 10px; page-break-inside: auto;"
+                    class="print-table">
                     <thead style="display: table-header-group;">
                         <tr style="border-bottom: 1px solid #000; page-break-inside: avoid;">
                             <th style="text-align: left; padding: 4px 0; width: 30%;">รายการ</th>
@@ -619,58 +857,75 @@
                         </tr>
                     </thead>
                     <tbody style="page-break-inside: auto;">
-                        <tr v-for="item in billItems" :key="item.id" style="border-bottom: 1px dashed #ccc; page-break-inside: avoid; break-inside: avoid;">
+                        <tr v-for="item in billItems" :key="item.id"
+                            style="border-bottom: 1px dashed #ccc; page-break-inside: avoid; break-inside: avoid;">
                             <td style="padding: 6px 0; vertical-align: middle;"><b>{{ getTypeName(item.type) }}</b></td>
-                            <td style="text-align: left; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%</td>
-                            <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }} g</td>
+                            <td style="text-align: left; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%
+                            </td>
+                            <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }} g
+                            </td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle;">
-                                 <span>{{ formatPricePerGram(item.netPrice / item.weight, item.type) }}</span>
+                                <span>{{ formatPricePerGram(item.netPrice / item.weight, item.type) }}</span>
                                 <div style="font-size: 7.5pt; color: #666;">
-                                    ({{ Number(item.basePrice).toLocaleString('th-TH', { maximumFractionDigits: 0 }) }}<span v-if="item.premium>0">+{{item.premium}}</span>)
+                                    ({{ Number(item.basePrice).toLocaleString('th-TH', { maximumFractionDigits: 0 })
+                                    }}<span v-if="item.premium>0">+{{item.premium}}</span>)
                                 </div>
                             </td>
-                            <td style="text-align: right; padding: 6px 0; vertical-align: middle; font-weight: bold; font-size: 9.5pt;">
+                            <td
+                                style="text-align: right; padding: 6px 0; vertical-align: middle; font-weight: bold; font-size: 9.5pt;">
                                 {{ formatCurrency(item.netPrice) }}
                             </td>
                         </tr>
                     </tbody>
                 </table>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
                     <span style="font-size: 11pt; font-weight: bold;">ยอดสุทธิรวมทั้งสิ้น</span>
                     <span style="font-size: 13pt; font-weight: bold;">{{ formatCurrency(billTotal) }} บาท</span>
                 </div>
-                
+
                 <div style="font-size: 9pt; margin-bottom: 10px;">
                     <p style="font-weight: bold; margin-bottom: 4px;">ชำระเงินโดย:</p>
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <span><span style="display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 4px; vertical-align: middle;"></span> เงินสด</span>
-                        <span><span style="display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 4px; vertical-align: middle;"></span> เงินโอน ธนาคาร ....................................................</span>
+                        <span><span
+                                style="display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 4px; vertical-align: middle;"></span>
+                            เงินสด</span>
+                        <span><span
+                                style="display: inline-block; width: 12px; height: 12px; border: 1px solid #000; margin-right: 4px; vertical-align: middle;"></span>
+                            เงินโอน ธนาคาร ....................................................</span>
                     </div>
                 </div>
 
-                <div style="border: 1px solid #666; padding: 6px; border-radius: 4px; font-size: 8pt; line-height: 1.4; margin-bottom: 30px; text-align: justify;">
-                    ข้าพเจ้าขอรับรองว่าเป็นสมบัติของข้าพเจ้าโดยแท้จริง และขอรับรองว่าของที่นำมาขายนั้นเป็นของที่บริสุทธิ์ ถ้าหากเป็นของทุจริตแล้ว ข้าพเจ้าขอรับผิดชอบทั้งสิ้น และได้อ่านทวนเรียบร้อยแล้วจึงลงนามไว้เป็นหลักฐาน
+                <div
+                    style="border: 1px solid #666; padding: 6px; border-radius: 4px; font-size: 8pt; line-height: 1.4; margin-bottom: 30px; text-align: justify;">
+                    ข้าพเจ้าขอรับรองว่าเป็นสมบัติของข้าพเจ้าโดยแท้จริง
+                    และขอรับรองว่าของที่นำมาขายนั้นเป็นของที่บริสุทธิ์ ถ้าหากเป็นของทุจริตแล้ว
+                    ข้าพเจ้าขอรับผิดชอบทั้งสิ้น และได้อ่านทวนเรียบร้อยแล้วจึงลงนามไว้เป็นหลักฐาน
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9pt; text-align: center; padding: 0 5px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9pt; text-align: center; padding: 0 5px;">
                     <div style="width: 48%;">
-                        <p style="margin-bottom: 4px;">ลงชื่อ....................................................ผู้ขาย/ผู้รับ</p>
+                        <p style="margin-bottom: 4px;">
+                            ลงชื่อ....................................................ผู้ขาย/ผู้รับ</p>
                         <p>(....................................................)</p>
                     </div>
                     <div style="width: 48%;">
-                        <p style="margin-bottom: 4px;">ลงชื่อ....................................................ผู้ซื้อ/ผู้จ่าย</p>
+                        <p style="margin-bottom: 4px;">
+                            ลงชื่อ....................................................ผู้ซื้อ/ผู้จ่าย</p>
                         <p>(....................................................)</p>
                     </div>
                 </div>
-                
+
                 <div style="text-align: center; margin-top: 20px; font-size: 8pt; color: #666;">
                     <p>ขอบคุณที่ใช้บริการกฤตหลอมทองครับ</p>
                 </div>
             </div>
         </div>
-        
+
     </div>
     <script src="/js/app.js" type="module"></script>
 </body>
+
 </html>

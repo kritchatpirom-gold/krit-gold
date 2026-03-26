@@ -4,6 +4,13 @@ const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
 const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
+// Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
+const floor2 = (v) => {
+    if (v === null || v === undefined) return 0;
+    const s = Number(v).toFixed(4); // Rounds to 4th decimal to clean ghost bits
+    return Number(s.slice(0, -2)); // Truncates to 2nd decimal
+};
+
 createApp({
     setup() {
         const currentTab = ref('home');
@@ -187,30 +194,30 @@ createApp({
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักน้อยกว่า 5 กรัม ไม่บวกพรีเมียม
                 premium = (activePremium && w >= 5) ? Number(activePremium.premium_amount) : 0;
-                const perGram = Math.floor(Number(((base + premium) * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
-                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100 + 0.001) / 100;
-                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100 + 0.001) / 100;
+                const perGram = floor2((base + premium) * 0.0656);
+                const withPurity = floor2(perGram * (p / 100));
+                net = floor2(withPurity * w);
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
-                const baseAfterPercent = Math.floor(Number((base * 0.96).toFixed(10)) * 100 + 0.001) / 100;
-                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
-                net = Math.floor(Number((perGram * w).toFixed(10)) * 100 + 0.001) / 100;
+                const baseAfterPercent = floor2(base * 0.96);
+                const perGram = floor2(baseAfterPercent * 0.0656);
+                net = floor2(perGram * w);
             } else if (tForm.type === 'redeem') {
                 base = gp;
-                const baseAfterPercent = Math.floor(Number((base * 0.95).toFixed(10)) * 100 + 0.001) / 100;
-                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
-                net = Math.floor(Number((perGram * w).toFixed(10)) * 100 + 0.001) / 100;
+                const baseAfterPercent = floor2(base * 0.95);
+                const perGram = floor2(baseAfterPercent * 0.0656);
+                net = floor2(perGram * w);
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
-                const perGram = Math.floor(Number(((base - 300) * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
-                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100 + 0.001) / 100;
-                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100 + 0.001) / 100;
+                const perGram = floor2((base - 300) * 0.0656);
+                const withPurity = floor2(perGram * (p / 100));
+                net = floor2(withPurity * w);
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp;
                 base = deduct13;
-                const perGram = Math.floor(Number((deduct13 / 1000).toFixed(10)) + 0.001);
-                const withPercent = Math.floor(Number((perGram * (p / 100)).toFixed(10)) + 0.001);
-                net = Math.floor(Number((withPercent * w).toFixed(10)) + 0.001);
+                const perGram = Math.floor(deduct13 / 1000);
+                const withPercent = Math.floor(perGram * (p / 100));
+                net = Math.floor(withPercent * w);
             }
 
             return {
