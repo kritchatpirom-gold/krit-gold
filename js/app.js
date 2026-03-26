@@ -178,24 +178,24 @@ createApp({
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักน้อยกว่า 5 กรัม ไม่บวกพรีเมียม
                 premium = (activePremium && w >= 5) ? Number(activePremium.premium_amount) : 0;
-                const perGram = Math.floor(((base + premium) * 0.0656) * 100) / 100;
-                const withPurity = Math.floor(perGram * (p / 100) * 100) / 100;
-                net = Math.floor(withPurity * w * 100) / 100;
+                const perGram = Math.floor(((base + premium) * 0.0656 + 0.00001) * 100) / 100;
+                const withPurity = Math.floor(perGram * (p / 100) + 0.00001 * 100) / 100; // Actually better use epsilon inside the floor
+                net = Math.floor((perGram * (p / 100) * w + 0.00001) * 100) / 100;
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
-                const baseAfterPercent = Math.floor(base * 0.96 * 100) / 100;
-                const perGram = Math.floor((baseAfterPercent * 0.0656) * 100) / 100;
-                net = Math.floor(perGram * w * 100) / 100;
+                const baseAfterPercent = Math.floor((base * 0.96 + 0.00001) * 100) / 100;
+                const perGram = Math.floor((baseAfterPercent * 0.0656 + 0.00001) * 100) / 100;
+                net = Math.floor((perGram * w + 0.00001) * 100) / 100;
             } else if (tForm.type === 'redeem') {
                 base = gp;
-                const baseAfterPercent = Math.floor(base * 0.95 * 100) / 100;
-                const perGram = Math.floor((baseAfterPercent * 0.0656) * 100) / 100;
-                net = Math.floor(perGram * w * 100) / 100;
+                const baseAfterPercent = Math.floor((base * 0.95 + 0.00001) * 100) / 100;
+                const perGram = Math.floor((baseAfterPercent * 0.0656 + 0.00001) * 100) / 100;
+                net = Math.floor((perGram * w + 0.00001) * 100) / 100;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
-                const perGram = Math.floor(((base - 300) * 0.0656) * 100) / 100; // ตัดทศนิยม 2 ตำแหน่งทุกขั้นตอน
-                const withPurity = Math.floor(perGram * (p / 100) * 100) / 100;
-                net = Math.floor(withPurity * w * 100) / 100;
+                const perGram = Math.floor(((base - 300) * 0.0656 + 0.00001) * 100) / 100;
+                const withPurity = Math.floor(perGram * (p / 100) + 0.00001 * 100) / 100;
+                net = Math.floor((perGram * (p / 100) * w + 0.00001) * 100) / 100;
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp; // ราคาช่อง Reference คือตัวที่หัก 13% แล้ว (มาจาก currentAssetPrice)
                 base = deduct13;
@@ -629,9 +629,11 @@ createApp({
             savePremiums,
             saving,
 
-            formatCurrency,
+            transactions,
+            loadingTransactions,
             transactionsTotal,
             totalWeight,
+            formatCurrency,
             filter,
             isFilterActive,
             deleteTransaction,
@@ -657,7 +659,6 @@ createApp({
             billTotal,
             saveAndPrint,
 
-            formatCurrency,
             formatDate,
             getTypeName
         };
