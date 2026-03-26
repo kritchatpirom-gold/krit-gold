@@ -586,8 +586,20 @@ createApp({
             }
         };
 
+        const syncHashToTab = () => {
+            const hash = window.location.hash.replace('#', '');
+            const validTabs = ['home', 'history', 'settings'];
+            if (validTabs.includes(hash)) {
+                currentTab.value = hash;
+            } else if (!window.location.hash) {
+                currentTab.value = 'home';
+            }
+        };
+
         onMounted(() => {
-            // anyone needs premiums for correct calculations
+            syncHashToTab();
+            window.addEventListener('hashchange', syncHashToTab);
+
             loadPremiums();
             checkAuth();
 
@@ -602,15 +614,19 @@ createApp({
         });
 
         watch(currentTab, (newTab) => {
+            if (window.location.hash.replace('#', '') !== newTab) {
+                window.location.hash = newTab;
+            }
             if (newTab === 'home') {
                 setTimeout(() => {
                     initChart();
                     const timeStr = new Date().toLocaleTimeString('th-TH');
                     updateChart(timeStr, goldPrice.value, silverPrice.value);
                 }, 400); // 400ms delay passing CSS fade transition
-            } else if (newTab === 'history' && isAdmin.value) {
+            } else if (newTab === 'history') {
                 loadTransactions();
             }
+            mobileMenuOpen.value = false;
         });
 
         return {
