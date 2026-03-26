@@ -23,13 +23,15 @@ createApp({
         const goldPriceAsk = ref(0);
         const goldPriceBid = ref(0);
         const goldPrice = ref(0); // Using Ask (รับซื้อ) as reference
-        
+        const goldOrnPrice = ref(0);
+        const goldPriceMeta = ref({ date_th: '', time_th: '', round: '' });
+
         const silverPriceSell = ref(0);
         const silverPriceBuy = ref(0);
         const silverPriceSpot = ref(0);
         const silverPriceExchange = ref(0);
         const silverPrice = ref(0); // Reference for calc
-        
+
         const priceTrendGold = ref(0);
         const priceTrendSilver = ref(0);
         let priceChart = null;
@@ -53,16 +55,18 @@ createApp({
             startTime: '00:00',
             endDate: new Date().toISOString().split('T')[0],
             endTime: '23:59',
-            type: ['tong_lom', 'tong_roop', 'tong_tang', 'silver']
+            type: ['tong_lom', 'tong_roop', 'tong_tang', 'silver', 'redeem'],
+            search: ''
         });
 
         const isFilterActive = computed(() => {
             const today = new Date().toISOString().split('T')[0];
-            return filter.value.startDate !== today || 
-                   filter.value.endDate !== today || 
-                   filter.value.startTime !== '00:00' || 
-                   filter.value.endTime !== '23:59' || 
-                   filter.value.type.length !== 4;
+            return filter.value.startDate !== today ||
+                filter.value.endDate !== today ||
+                filter.value.startTime !== '00:00' ||
+                filter.value.endTime !== '23:59' ||
+                filter.value.type.length !== 5 ||
+                filter.value.search !== '';
         });
 
         const selectedTransactions = ref([]);
@@ -84,7 +88,7 @@ createApp({
 
         // Calculator Form
         const calcForm = ref({
-            type: 'tong_lom', 
+            type: 'tong_lom',
             weight: null,
             percent: null,
             customerName: '',
@@ -144,13 +148,13 @@ createApp({
         });
 
         watch(() => calcForm.value.type, () => {
-             calcForm.value.manualPrice = currentAssetPrice.value;
+            calcForm.value.manualPrice = currentAssetPrice.value;
         });
 
         watch(currentAssetPrice, (newVal) => {
-             if (!calcForm.value.manualPrice || calcForm.value.manualPrice === 0) {
-                 calcForm.value.manualPrice = newVal;
-             }
+            if (!calcForm.value.manualPrice || calcForm.value.manualPrice === 0) {
+                calcForm.value.manualPrice = newVal;
+            }
         });
 
         const calculatedResult = computed(() => {
@@ -162,30 +166,36 @@ createApp({
             const w = Number(tForm.weight) || 0;
             const p = Number(tForm.percent) || 0;
             const refPrice = Number(tForm.manualPrice) > 0 ? Number(tForm.manualPrice) : currentAssetPrice.value;
-            
+
             const gp = Math.floor(refPrice);
             const sp = Math.floor(refPrice);
 
             if (tForm.type === 'tong_lom') {
                 base = gp;
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
-                premium = activePremium ? Number(activePremium.premium_amount) : 0;
-                net = (base + premium) * 0.0656 * (p / 100) * w;
+                // ทองหลอมถ้าน้ำหนักน้อยกว่า 5 กรัม ไม่บวกพรีเมียม
+                premium = (activePremium && w >= 5) ? Number(activePremium.premium_amount) : 0;
+                const perGram = Math.floor(((base + premium) * 0.0656) * 100) / 100;
+                net = perGram * (p / 100) * w;
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
                 const baseAfterPercent = base * 0.96;
-                net = baseAfterPercent * 0.0656 * w;
+                const perGram = Math.floor((baseAfterPercent * 0.0656) * 100) / 100;
+                net = perGram * w;
             } else if (tForm.type === 'redeem') {
                 base = gp;
                 const baseAfterPercent = base * 0.95;
-                net = baseAfterPercent * 0.0656 * w;
+                const perGram = Math.floor((baseAfterPercent * 0.0656) * 100) / 100;
+                net = perGram * w;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
-                net = (base - 300) * 0.0656 * (p / 100) * w;
+                const perGram = Math.floor(((base - 300) * 0.0656) * 100) / 100; // ทองแท่งตัวเลขทศนิยมสองตำแหน่งตามโจทย์ใหม่
+                net = perGram * (p / 100) * w;
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp * 0.87;
-                base = deduct13; // Set base to Spot - 13% for receipt display
-                net = (deduct13 / 1000) * (p / 100) * w;
+                base = Math.floor(deduct13);
+                const perGram = Math.floor(deduct13 / 1000); // เงินไม่มีทศนิยมตามโจทย์เก่า
+                net = perGram * (p / 100) * w;
             }
 
             return {
@@ -196,7 +206,7 @@ createApp({
         });
 
         const addToBill = () => {
-            if(!isFormValid.value) return;
+            if (!isFormValid.value) return;
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
@@ -230,6 +240,14 @@ createApp({
             return new Date(dateStr).toLocaleString('th-TH');
         };
 
+        const formatPricePerGram = (val, type) => {
+            const digits = type === 'silver' ? 0 : 2;
+            return Number(val || 0).toLocaleString('th-TH', { 
+                minimumFractionDigits: digits, 
+                maximumFractionDigits: digits 
+            });
+        };
+
         const getTypeName = (type) => {
             const types = {
                 'tong_lom': 'ทองหลอม',
@@ -258,7 +276,7 @@ createApp({
                 password: authForm.value.password,
             });
             authLoading.value = false;
-            
+
             if (error) {
                 authError.value = error.message;
             } else {
@@ -296,34 +314,38 @@ createApp({
         const loadTransactions = async () => {
             loadingTransactions.value = true;
             selectedTransactions.value = [];
-            
+
             const startDt = new Date(`${filter.value.startDate}T${filter.value.startTime}:00`);
             const endDt = new Date(`${filter.value.endDate}T${filter.value.endTime}:59`);
-            
+
             let query = supabase
                 .from('transactions')
                 .select('*')
                 .gte('created_at', startDt.toISOString())
                 .lte('created_at', endDt.toISOString())
                 .order('created_at', { ascending: false });
-                
-            if (filter.value.type.length > 0 && filter.value.type.length < 4) {
+
+            if (filter.value.type.length > 0 && filter.value.type.length < 5) {
                 query = query.in('type', filter.value.type);
-            } else if (filter.value.type.length === 0) {
                 transactions.value = [];
                 loadingTransactions.value = false;
                 return;
             }
 
+            if (filter.value.search.trim()) {
+                const s = `%${filter.value.search.trim()}%`;
+                query = query.or(`customer_name.ilike.${s},phone.ilike.${s},id_card.ilike.${s}`);
+            }
+
             const { data, error } = await query;
-                
+
             if (data) transactions.value = data;
             else transactions.value = [];
             loadingTransactions.value = false;
         };
 
         const deleteTransaction = async (id) => {
-            if(confirm('ยืนยันการลบรายการนี้?')) {
+            if (confirm('ยืนยันการลบรายการนี้?')) {
                 const { error } = await supabase.from('transactions').delete().eq('id', id);
                 if (!error) loadTransactions();
                 else alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
@@ -331,8 +353,8 @@ createApp({
         };
 
         const deleteSelected = async () => {
-            if(selectedTransactions.value.length === 0) return;
-            if(confirm(`ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ?`)) {
+            if (selectedTransactions.value.length === 0) return;
+            if (confirm(`ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ?`)) {
                 loadingTransactions.value = true;
                 const { error } = await supabase
                     .from('transactions')
@@ -353,19 +375,19 @@ createApp({
             if (transactions.value.length === 0) return;
 
             let csvContent = 'วันที่,เวลา,ลูกค้า,เบอร์โทรศัพท์,ประเภทสินทรัพย์,เปอร์เซ็นต์/น้ำหนัก,ยอดสุทธิ (บาท)\n';
-            
+
             transactions.value.forEach(t => {
                 const dt = new Date(t.created_at);
                 const dDate = dt.toLocaleDateString('th-TH');
                 const dTime = dt.toLocaleTimeString('th-TH');
-                
+
                 const name = `"${t.customer_name || 'เงินสด'}"`;
                 const phone = `"${t.phone || '-'}"`;
                 const type = `"${getTypeName(t.type)}"`;
-                
+
                 let detail = '-';
-                if(t.type === 'tong_lom' || t.type === 'tong_roop') detail = `"${t.percent}% / ${t.weight} กรัม"`;
-                else if(t.type === 'tong_tang' || t.type === 'silver') detail = `"${t.weight} กรัม"`;
+                if (t.type === 'tong_lom' || t.type === 'tong_roop') detail = `"${t.percent}% / ${t.weight} กรัม"`;
+                else if (t.type === 'tong_tang' || t.type === 'silver') detail = `"${t.weight} กรัม"`;
 
                 csvContent += `${dDate},${dTime},${name},${phone},${type},${detail},${t.net_price}\n`;
             });
@@ -392,7 +414,7 @@ createApp({
 
         const saveAndPrint = async () => {
             if (billItems.value.length === 0) return;
-            
+
             const handleAfterPrint = () => {
                 billItems.value = [];
                 resetForm();
@@ -402,28 +424,29 @@ createApp({
             const triggerPrint = () => {
                 window.addEventListener('afterprint', handleAfterPrint);
                 window.print();
-                
+
                 // Fallback for mobile browsers that don't block JS execution
                 // and might not reliably fire afterprint, giving them 3 secs to render PDF.
                 setTimeout(() => {
                     handleAfterPrint();
-                }, 3000); 
+                }, 3000);
             };
 
             // If completely public guest (no login), just print without calling DB
-            if(!isLoggedIn.value) {
+            if (!isLoggedIn.value) {
                 nextTick(() => {
                     triggerPrint();
                 });
                 return;
             }
-            
+
             // Logged in (Employee or Admin): Save to DB first
             saving.value = true;
-            
+
             const trData = billItems.value.map(item => ({
-                customer_name: (item.customerName || 'เงินสด') + (item.idCard ? ` [${item.idCard}]` : ''),
+                customer_name: item.customerName || 'เงินสด',
                 phone: item.phone || '',
+                id_card: item.idCard || '',
                 type: item.type,
                 base_price: item.basePrice,
                 premium_amount: item.premium,
@@ -435,7 +458,7 @@ createApp({
 
             const { error } = await supabase.from('transactions').insert(trData);
             saving.value = false;
-            
+
             if (error) {
                 alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
             } else {
@@ -451,20 +474,20 @@ createApp({
             if (container && window.TradingView) {
                 container.innerHTML = '';
                 new window.TradingView.widget({
-                  "autosize": true,
-                  "symbol": "OANDA:XAUUSD",
-                  "interval": "60",
-                  "timezone": "Asia/Bangkok",
-                  "theme": "dark",
-                  "style": "1",
-                  "locale": "th_TH",
-                  "enable_publishing": false,
-                  "backgroundColor": "rgba(24, 24, 27, 0.4)",
-                  "gridColor": "rgba(255, 255, 255, 0.05)",
-                  "hide_top_toolbar": false,
-                  "hide_legend": false,
-                  "save_image": false,
-                  "container_id": "tradingview_gold"
+                    "autosize": true,
+                    "symbol": "OANDA:XAUUSD",
+                    "interval": "60",
+                    "timezone": "Asia/Bangkok",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "th_TH",
+                    "enable_publishing": false,
+                    "backgroundColor": "rgba(24, 24, 27, 0.4)",
+                    "gridColor": "rgba(255, 255, 255, 0.05)",
+                    "hide_top_toolbar": false,
+                    "hide_legend": false,
+                    "save_image": false,
+                    "container_id": "tradingview_gold"
                 });
             } else if (container && !window.TradingView) {
                 setTimeout(initChart, 300);
@@ -480,40 +503,47 @@ createApp({
                 // Fetch Gold API
                 const resGold = await fetch('/api/gold');
                 if (resGold.ok) {
-                   const dataGold = await resGold.json();
-                   if (dataGold && dataGold.gold965) {
-                       const ask = parseFloat(dataGold.gold965.ask); // ราคารับซื้อ
-                       const bid = parseFloat(dataGold.gold965.bid); // ราคาขายออก
-                       priceTrendGold.value = ask - (goldPrice.value || ask);
-                       goldPriceAsk.value = ask;
-                       goldPriceBid.value = bid;
-                       goldPrice.value = ask; 
-                   }
+                    const dataGold = await resGold.json();
+                    if (dataGold && dataGold.ok && dataGold.prices) {
+                        const barSell = parseFloat(dataGold.prices.bar.sell);
+                        const ornSell = parseFloat(dataGold.prices.orn.sell);
+                        
+                        priceTrendGold.value = barSell - (goldPrice.value || barSell);
+                        
+                        goldPrice.value = barSell;
+                        goldPriceAsk.value = barSell;
+                        goldPriceBid.value = barSell;
+                        goldOrnPrice.value = ornSell;
+                        
+                        if (dataGold.meta) {
+                            goldPriceMeta.value = dataGold.meta;
+                        }
+                    }
                 }
 
                 // Fetch XAG API
                 const resXag = await fetch('/api/xag');
                 if (resXag.ok) {
-                   const dataXag = await resXag.json();
-                   if (dataXag) {
-                       const sell = parseFloat(dataXag.sell);
-                       const buy = parseFloat(dataXag.buy);
-                       silverPriceSpot.value = parseFloat(dataXag.spot);
-                       silverPriceExchange.value = parseFloat(dataXag.exchange);
-                       priceTrendSilver.value = buy - (silverPrice.value || buy);
-                       
-                       silverPriceSell.value = sell;
-                       silverPriceBuy.value = buy;
-                       silverPrice.value = buy; // Reference for calculation (รับซื้อ)
-                   }
+                    const dataXag = await resXag.json();
+                    if (dataXag) {
+                        const sell = parseFloat(dataXag.sell);
+                        const buy = parseFloat(dataXag.buy);
+                        silverPriceSpot.value = parseFloat(dataXag.spot);
+                        silverPriceExchange.value = parseFloat(dataXag.exchange);
+                        priceTrendSilver.value = buy - (silverPrice.value || buy);
+
+                        silverPriceSell.value = sell;
+                        silverPriceBuy.value = buy;
+                        silverPrice.value = buy; // Reference for calculation (รับซื้อ)
+                    }
                 }
-                
+
                 // Update graph
                 if (goldPrice.value > 0 || silverPrice.value > 0) {
                     const timeStr = new Date().toLocaleTimeString('th-TH');
                     updateChart(timeStr, goldPrice.value, silverPrice.value);
                 }
-            } catch(err) {
+            } catch (err) {
                 console.error('Fetch prices failed', err);
             }
         };
@@ -522,12 +552,12 @@ createApp({
             // anyone needs premiums for correct calculations
             loadPremiums();
             checkAuth();
-            
+
             nextTick(() => {
                 setTimeout(() => {
                     initChart();
                 }, 500); // 500ms delay for Chrome CSS transition
-                
+
                 fetchPrices();
                 setInterval(fetchPrices, 30000); // 30 sec interval
             });
@@ -558,11 +588,13 @@ createApp({
             mobileMenuOpen,
             login,
             logout,
-            
+
             goldPriceAsk,
             goldPriceBid,
             goldPrice,
-            
+            goldOrnPrice,
+            goldPriceMeta,
+
             silverPriceSell,
             silverPriceBuy,
             silverPriceSpot,
@@ -571,7 +603,7 @@ createApp({
 
             priceTrendGold,
             priceTrendSilver,
-            
+
             premiums,
             loadingPremiums,
             savePremiums,
@@ -595,15 +627,16 @@ createApp({
             isFormValid,
             currentAssetPrice,
             calculatedResult,
-            isPhoneValid, 
+            isPhoneValid,
             isIdCardValid,
-            
+            formatPricePerGram,
+
             billItems,
             addToBill,
             removeBillItem,
             billTotal,
             saveAndPrint,
-            
+
             formatCurrency,
             formatDate,
             getTypeName

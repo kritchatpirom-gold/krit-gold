@@ -1,6 +1,6 @@
 export async function onRequest(context) {
   try {
-    const response = await fetch('https://www.jk-goldtrader.com/api/gold', {
+    const response = await fetch('https://gold-proxy.benzsnoopdog.workers.dev/', {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });

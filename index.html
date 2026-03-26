@@ -137,12 +137,20 @@
                                             </span>
                                         </div>
                                         <div class="flex justify-between text-sm text-gray-400 border-b border-gray-800 pb-2 mb-2">
-                                            <span>รับซื้อ (Ask)</span>
-                                            <span class="text-white font-bold text-lg">{{ formatCurrency(goldPriceAsk) }}</span>
+                                            <span>ทองคำแท่ง (Sell)</span>
+                                            <span class="text-white font-bold text-lg">{{ formatCurrency(goldPrice) }}</span>
                                         </div>
                                         <div class="flex justify-between text-sm text-gray-400">
-                                            <span>ขายออก (Bid)</span>
-                                            <span class="text-white font-bold text-lg">{{ formatCurrency(goldPriceBid) }}</span>
+                                            <span>ทองรูปพรรณ (Sell)</span>
+                                            <span class="text-white font-bold text-lg">{{ formatCurrency(goldOrnPrice) }}</span>
+                                        </div>
+                                        
+                                        <!-- Metadata Footer -->
+                                        <div v-if="goldPriceMeta.date_th" class="mt-4 pt-3 border-t border-gray-800/50 text-center">
+                                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">ข้อมูลจากสมาคมค้าทองคำ</div>
+                                            <div class="text-[11px] text-gold-500/80 font-medium">
+                                                {{ goldPriceMeta.date_th }} • {{ goldPriceMeta.time_th }} (รอบที่ {{ goldPriceMeta.round }})
+                                            </div>
                                         </div>
                                     </div>
 
@@ -278,6 +286,13 @@
                                                 <input type="number" step="0.01" v-model.number="calcForm.weight" class="w-full pl-4 pr-10 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none" min="0">
                                                 <span class="absolute right-3 top-3 text-gray-500">ก.</span>
                                             </div>
+                                            <!-- ปุ่มน้ำหนักทางลัด -->
+                                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                                <button type="button" @click="calcForm.weight = 15.244" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1 บาท</button>
+                                                <button type="button" @click="calcForm.weight = 7.622" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">2 สลึง</button>
+                                                <button type="button" @click="calcForm.weight = 3.811" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1 สลึง</button>
+                                                <button type="button" @click="calcForm.weight = 1.905" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">ครึ่งสลึง</button>
+                                            </div>
                                         </div>
                                     </div>
                                     
@@ -368,6 +383,11 @@
                                  <input type="date" v-model="filter.endDate" class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
                                  <input type="time" v-model="filter.endTime" class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
                              </div>
+                         </div>
+
+                         <div>
+                             <label class="block text-xs font-semibold text-gray-400 mb-2">ค้นหา (ชื่อ / เบอร์ / เลขบัตร)</label>
+                             <input type="text" v-model="filter.search" placeholder="ระบุคำค้นหา..." class="w-full px-3 py-2 bg-dark-base border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-sm transition">
                          </div>
 
                          <div class="md:col-span-2">
@@ -536,7 +556,7 @@
                             <td style="text-align: left; padding: 6px 0; vertical-align: middle;">{{ item.percent }}%</td>
                             <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }} g</td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle;">
-                                <span>{{ formatCurrency(item.netPrice / item.weight) }}</span>
+                                 <span>{{ formatPricePerGram(item.netPrice / item.weight, item.type) }}</span>
                                 <div style="font-size: 7.5pt; color: #666;">
                                     ({{ Number(item.basePrice).toLocaleString('th-TH', { maximumFractionDigits: 0 }) }}<span v-if="item.premium>0">+{{item.premium}}</span>)
                                 </div>

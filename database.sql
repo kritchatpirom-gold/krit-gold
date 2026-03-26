@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   percent NUMERIC NOT NULL,
   weight NUMERIC NOT NULL,
   net_price NUMERIC NOT NULL,
+  id_card TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
