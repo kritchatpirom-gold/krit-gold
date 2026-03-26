@@ -223,7 +223,7 @@ createApp({
             return {
                 basePrice: base,
                 premium: premium,
-                netPrice: Math.floor(Math.max(0, net) * 100) / 100
+                netPrice: floor2(Math.max(0, net))
             };
         });
 
