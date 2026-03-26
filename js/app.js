@@ -59,9 +59,9 @@ createApp({
         const transactions = ref([]);
         const loadingTransactions = ref(false);
         const filter = ref({
-            startDate: new Date().toISOString().split('T')[0],
+            startDate: new Date().toLocaleDateString('en-CA'),
             startTime: '00:00',
-            endDate: new Date().toISOString().split('T')[0],
+            endDate: new Date().toLocaleDateString('en-CA'),
             endTime: '23:59',
             type: ['tong_lom', 'tong_roop', 'tong_tang', 'silver', 'redeem'],
             search: '',
@@ -69,7 +69,7 @@ createApp({
         });
 
         const isFilterActive = computed(() => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA');
             return filter.value.startDate !== today ||
                 filter.value.endDate !== today ||
                 filter.value.startTime !== '00:00' ||
@@ -92,6 +92,34 @@ createApp({
             } else {
                 filter.value.purityRange.push(range);
             }
+        };
+
+        const setDatePreset = (preset) => {
+            const now = new Date();
+            let start = new Date();
+            let end = new Date();
+
+            if (preset === 'today') {
+                // Default is today/today
+            } else if (preset === 'yesterday') {
+                start.setDate(now.getDate() - 1);
+                end.setDate(now.getDate() - 1);
+            } else if (preset === 'week') {
+                const day = now.getDay(); // 0 = Sun
+                const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+                start.setDate(diff);
+                // end remains today
+            } else if (preset === 'month') {
+                start.setDate(1); // 1st of current month
+                // end remains today
+            }
+
+            filter.value.startDate = start.toLocaleDateString('en-CA');
+            filter.value.endDate = end.toLocaleDateString('en-CA');
+            filter.value.startTime = '00:00';
+            filter.value.endTime = '23:59';
+            
+            loadTransactions();
         };
 
         const toggleSelectAll = () => {
@@ -678,6 +706,7 @@ createApp({
             selectedTransactions,
             isAllSelected,
             togglePurity,
+            setDatePreset,
             toggleSelectAll,
 
             calcForm,

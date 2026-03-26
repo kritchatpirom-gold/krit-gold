@@ -252,8 +252,8 @@
                                             <div class="text-[14px] text-gray-500 uppercase tracking-widest mb-1">
                                                 ข้อมูลจากสมาคมค้าทองคำ</div>
                                             <div class="text-[14px] text-gold-500/80 font-medium">
-                                                (อัพเดท : {{ goldPriceMeta.date_th }}) (เวลา {{ goldPriceMeta.time_th
-                                                }}) (รอบที่ {{
+                                                อัพเดท : {{ goldPriceMeta.date_th }} เวลา {{ goldPriceMeta.time_th
+                                                }} (รอบที่ {{
                                                 goldPriceMeta.round }})
                                             </div>
                                         </div>
@@ -608,6 +608,17 @@
                             ข้อมูลยอดซื้อขาย ทั้งหมด</h2>
                     </div>
 
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <button @click="setDatePreset('today')"
+                            class="px-4 py-2 bg-dark-base border border-gray-800 hover:border-gold-500/50 text-gray-400 hover:text-gold-400 rounded-xl text-xs font-semibold transition-all duration-300 shadow-lg">วันนี้</button>
+                        <button @click="setDatePreset('yesterday')"
+                            class="px-4 py-2 bg-dark-base border border-gray-800 hover:border-gold-500/50 text-gray-400 hover:text-gold-400 rounded-xl text-xs font-semibold transition-all duration-300 shadow-lg">เมื่อวานนี้</button>
+                        <button @click="setDatePreset('week')"
+                            class="px-4 py-2 bg-dark-base border border-gray-800 hover:border-gold-500/50 text-gray-400 hover:text-gold-400 rounded-xl text-xs font-semibold transition-all duration-300 shadow-lg">สัปดาห์นี้</button>
+                        <button @click="setDatePreset('month')"
+                            class="px-4 py-2 bg-dark-base border border-gray-800 hover:border-gold-500/50 text-gray-400 hover:text-gold-400 rounded-xl text-xs font-semibold transition-all duration-300 shadow-lg">เดือนนี้</button>
+                    </div>
+
                     <div class="glass p-4 rounded-xl border border-gray-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4 relative shadow-lg"
                         :class="isFilterActive ? 'border-gold-500/50' : ''">
                         <div>
@@ -861,7 +872,7 @@
                         <span><b>วันที่:</b> {{ formatDate(new Date()) }}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 9pt;">
-                        <span><b>ลูกค้า:</b> {{ calcForm.customerName || 'เงินสด' }}</span>
+                        <span><b>ลูกค้า:</b> {{ calcForm.customerName || 'เงินสด' }}{{ calcForm.phone ? ' (' + calcForm.phone + ')' : '' }}</span>
                         <span><b>จำนวน:</b> {{ billItems.length }} รายการ</span>
                     </div>
                 </div>
