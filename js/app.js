@@ -57,7 +57,8 @@ createApp({
             endDate: new Date().toISOString().split('T')[0],
             endTime: '23:59',
             type: ['tong_lom', 'tong_roop', 'tong_tang', 'silver', 'redeem'],
-            search: ''
+            search: '',
+            purityRange: null // 'low', 'mid', 'high'
         });
 
         const isFilterActive = computed(() => {
@@ -67,7 +68,8 @@ createApp({
                 filter.value.startTime !== '00:00' ||
                 filter.value.endTime !== '23:59' ||
                 filter.value.type.length !== 5 ||
-                filter.value.search !== '';
+                filter.value.search !== '' ||
+                filter.value.purityRange !== null;
         });
 
         const selectedTransactions = ref([]);
@@ -195,7 +197,7 @@ createApp({
                 const withPurity = Math.floor(perGram * (p / 100) * 100) / 100;
                 net = Math.floor(withPurity * w * 100) / 100;
             } else if (tForm.type === 'silver') {
-                const deduct13 = Math.floor(sp * 0.87); // หัก 13% ปัดเศษทิ้ง
+                const deduct13 = sp; // ราคาช่อง Reference คือตัวที่หัก 13% แล้ว (มาจาก currentAssetPrice)
                 base = deduct13;
                 const perGram = Math.floor(deduct13 / 1000); // ราคาต่อกรัม ปัดเศษทิ้ง
                 const withPercent = Math.floor(perGram * (p / 100)); // หักเปอร์เซ็นความบริสุทธิ์ ปัดเศษทิ้ง
@@ -338,6 +340,14 @@ createApp({
                 query = query.or(`customer_name.ilike.${s},phone.ilike.${s},id_card.ilike.${s}`);
             }
 
+            if (filter.value.purityRange === 'low') {
+                query = query.lt('percent', 30);
+            } else if (filter.value.purityRange === 'mid') {
+                query = query.gte('percent', 30).lt('percent', 99);
+            } else if (filter.value.purityRange === 'high') {
+                query = query.gte('percent', 99);
+            }
+
             const { data, error } = await query;
 
             if (data) transactions.value = data;
@@ -410,7 +420,11 @@ createApp({
         };
 
         const transactionsTotal = computed(() => {
-            return transactions.value.reduce((sum, t) => sum + (Number(t.net_price) || 0), 0);
+            return transactions.value.reduce((sum, item) => sum + (Number(item.total_price) || 0), 0);
+        });
+
+        const totalWeight = computed(() => {
+            return transactions.value.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
         });
 
         const saveAndPrint = async () => {
@@ -513,9 +527,10 @@ createApp({
                         
                         priceTrendGold.value = barBuy - (goldPrice.value || barBuy);
                         
-                        goldPrice.value = barBuy; // ใช้ราคารับซื้อของทองแท่งเป็นฐานคำนวณ
-                        goldPriceAsk.value = barSell;
+                        // Use bar.buy as the base for all calculations (goldPrice)
+                        goldPrice.value = barBuy; // ใช้ราคารับซื้อ (Buy) เป็นฐานการคำนวณตามสั่ง
                         goldPriceBid.value = barBuy;
+                        goldPriceAsk.value = barSell;
                         goldOrnBuy.value = ornBuy;
                         goldOrnSell.value = ornSell;
                         
@@ -614,18 +629,18 @@ createApp({
             savePremiums,
             saving,
 
-            transactions,
-            loadingTransactions,
+            formatCurrency,
+            transactionsTotal,
+            totalWeight,
             filter,
             isFilterActive,
-            loadTransactions,
             deleteTransaction,
+            loadTransactions,
             deleteSelected,
             exportCSV,
             selectedTransactions,
             isAllSelected,
             toggleSelectAll,
-            transactionsTotal,
 
             calcForm,
             resetForm,
