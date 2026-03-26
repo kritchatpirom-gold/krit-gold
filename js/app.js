@@ -187,30 +187,30 @@ createApp({
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักน้อยกว่า 5 กรัม ไม่บวกพรีเมียม
                 premium = (activePremium && w >= 5) ? Number(activePremium.premium_amount) : 0;
-                const perGram = Math.floor(Number(((base + premium) * 0.0656).toFixed(10)) * 100) / 100;
-                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100) / 100;
-                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100) / 100;
+                const perGram = Math.floor(Number(((base + premium) * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
+                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100 + 0.001) / 100;
+                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100 + 0.001) / 100;
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
-                const baseAfterPercent = Math.floor(Number((base * 0.96).toFixed(10)) * 100) / 100;
-                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100) / 100;
-                net = Math.floor(Number((perGram * w).toFixed(10)) * 100) / 100;
+                const baseAfterPercent = Math.floor(Number((base * 0.96).toFixed(10)) * 100 + 0.001) / 100;
+                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
+                net = Math.floor(Number((perGram * w).toFixed(10)) * 100 + 0.001) / 100;
             } else if (tForm.type === 'redeem') {
                 base = gp;
-                const baseAfterPercent = Math.floor(Number((base * 0.95).toFixed(10)) * 100) / 100;
-                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100) / 100;
-                net = Math.floor(Number((perGram * w).toFixed(10)) * 100) / 100;
+                const baseAfterPercent = Math.floor(Number((base * 0.95).toFixed(10)) * 100 + 0.001) / 100;
+                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
+                net = Math.floor(Number((perGram * w).toFixed(10)) * 100 + 0.001) / 100;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
-                const perGram = Math.floor(Number(((base - 300) * 0.0656).toFixed(10)) * 100) / 100;
-                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100) / 100;
-                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100) / 100;
+                const perGram = Math.floor(Number(((base - 300) * 0.0656).toFixed(10)) * 100 + 0.001) / 100;
+                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100 + 0.001) / 100;
+                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100 + 0.001) / 100;
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp;
                 base = deduct13;
-                const perGram = Math.floor(Number((deduct13 / 1000).toFixed(10)));
-                const withPercent = Math.floor(Number((perGram * (p / 100)).toFixed(10)));
-                net = Math.floor(Number((withPercent * w).toFixed(10)));
+                const perGram = Math.floor(Number((deduct13 / 1000).toFixed(10)) + 0.001);
+                const withPercent = Math.floor(Number((perGram * (p / 100)).toFixed(10)) + 0.001);
+                net = Math.floor(Number((withPercent * w).toFixed(10)) + 0.001);
             }
 
             return {
