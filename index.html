@@ -136,13 +136,32 @@
                                                 {{ priceTrendGold >= 0 ? '▲' : '▼' }} {{ Math.abs(priceTrendGold) }}
                                             </span>
                                         </div>
-                                        <div class="flex justify-between text-sm text-gray-400 border-b border-gray-800 pb-2 mb-2">
-                                            <span>ทองคำแท่ง (Sell)</span>
-                                            <span class="text-white font-bold text-lg">{{ formatCurrency(goldPrice) }}</span>
+                                        <div class="flex justify-between text-[11px] text-gray-500 mb-1">
+                                            <span>สมาคม: ทองคำแท่ง 96.5%</span>
                                         </div>
-                                        <div class="flex justify-between text-sm text-gray-400">
-                                            <span>ทองรูปพรรณ (Sell)</span>
-                                            <span class="text-white font-bold text-lg">{{ formatCurrency(goldOrnPrice) }}</span>
+                                        <div class="flex justify-between items-center text-sm border-b border-gray-800/50 pb-2 mb-2">
+                                            <div class="flex flex-col">
+                                                <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
+                                                <span class="text-white font-bold">{{ formatCurrency(goldPriceBid) }}</span>
+                                            </div>
+                                            <div class="flex flex-col text-right">
+                                                <span class="text-xs text-gray-400">ขายออก (Sell)</span>
+                                                <span class="text-gold-400 font-bold font-mono">{{ formatCurrency(goldPriceAsk) }}</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex justify-between text-[11px] text-gray-500 mb-1">
+                                            <span>สมาคม: ทองรูปพรรณ</span>
+                                        </div>
+                                        <div class="flex justify-between items-center text-sm">
+                                            <div class="flex flex-col">
+                                                <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
+                                                <span class="text-white font-bold">{{ formatCurrency(goldOrnBuy) }}</span>
+                                            </div>
+                                            <div class="flex flex-col text-right">
+                                                <span class="text-xs text-gray-400">ขายออก (Sell)</span>
+                                                <span class="text-gold-400 font-bold font-mono">{{ formatCurrency(goldOrnSell) }}</span>
+                                            </div>
                                         </div>
                                         
                                         <!-- Metadata Footer -->

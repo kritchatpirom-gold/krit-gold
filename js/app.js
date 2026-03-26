@@ -22,8 +22,9 @@ createApp({
         // Prices & Chart
         const goldPriceAsk = ref(0);
         const goldPriceBid = ref(0);
-        const goldPrice = ref(0); // Using Ask (รับซื้อ) as reference
-        const goldOrnPrice = ref(0);
+        const goldPrice = ref(0); // Using Bar Buy as calculation base
+        const goldOrnBuy = ref(0);
+        const goldOrnSell = ref(0);
         const goldPriceMeta = ref({ date_th: '', time_th: '', round: '' });
 
         const silverPriceSell = ref(0);
@@ -176,26 +177,29 @@ createApp({
                 // ทองหลอมถ้าน้ำหนักน้อยกว่า 5 กรัม ไม่บวกพรีเมียม
                 premium = (activePremium && w >= 5) ? Number(activePremium.premium_amount) : 0;
                 const perGram = Math.floor(((base + premium) * 0.0656) * 100) / 100;
-                net = perGram * (p / 100) * w;
+                const withPurity = Math.floor(perGram * (p / 100) * 100) / 100;
+                net = Math.floor(withPurity * w * 100) / 100;
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
-                const baseAfterPercent = base * 0.96;
+                const baseAfterPercent = Math.floor(base * 0.96 * 100) / 100;
                 const perGram = Math.floor((baseAfterPercent * 0.0656) * 100) / 100;
-                net = perGram * w;
+                net = Math.floor(perGram * w * 100) / 100;
             } else if (tForm.type === 'redeem') {
                 base = gp;
-                const baseAfterPercent = base * 0.95;
+                const baseAfterPercent = Math.floor(base * 0.95 * 100) / 100;
                 const perGram = Math.floor((baseAfterPercent * 0.0656) * 100) / 100;
-                net = perGram * w;
+                net = Math.floor(perGram * w * 100) / 100;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
-                const perGram = Math.floor(((base - 300) * 0.0656) * 100) / 100; // ทองแท่งตัวเลขทศนิยมสองตำแหน่งตามโจทย์ใหม่
-                net = perGram * (p / 100) * w;
+                const perGram = Math.floor(((base - 300) * 0.0656) * 100) / 100; // ตัดทศนิยม 2 ตำแหน่งทุกขั้นตอน
+                const withPurity = Math.floor(perGram * (p / 100) * 100) / 100;
+                net = Math.floor(withPurity * w * 100) / 100;
             } else if (tForm.type === 'silver') {
-                const deduct13 = sp * 0.87;
-                base = Math.floor(deduct13);
-                const perGram = Math.floor(deduct13 / 1000); // เงินไม่มีทศนิยมตามโจทย์เก่า
-                net = perGram * (p / 100) * w;
+                const deduct13 = Math.floor(sp * 0.87); // หัก 13% ปัดเศษทิ้ง
+                base = deduct13;
+                const perGram = Math.floor(deduct13 / 1000); // ราคาต่อกรัม ปัดเศษทิ้ง
+                const withPercent = Math.floor(perGram * (p / 100)); // หักเปอร์เซ็นความบริสุทธิ์ ปัดเศษทิ้ง
+                net = Math.floor(withPercent * w); // คูณน้ำหนัก ปัดเศษทิ้ง
             }
 
             return {
@@ -505,15 +509,18 @@ createApp({
                 if (resGold.ok) {
                     const dataGold = await resGold.json();
                     if (dataGold && dataGold.ok && dataGold.prices) {
+                        const barBuy = parseFloat(dataGold.prices.bar.buy);
                         const barSell = parseFloat(dataGold.prices.bar.sell);
+                        const ornBuy = parseFloat(dataGold.prices.orn.buy);
                         const ornSell = parseFloat(dataGold.prices.orn.sell);
                         
-                        priceTrendGold.value = barSell - (goldPrice.value || barSell);
+                        priceTrendGold.value = barBuy - (goldPrice.value || barBuy);
                         
-                        goldPrice.value = barSell;
+                        goldPrice.value = barBuy; // ใช้ราคารับซื้อของทองแท่งเป็นฐานคำนวณ
                         goldPriceAsk.value = barSell;
-                        goldPriceBid.value = barSell;
-                        goldOrnPrice.value = ornSell;
+                        goldPriceBid.value = barBuy;
+                        goldOrnBuy.value = ornBuy;
+                        goldOrnSell.value = ornSell;
                         
                         if (dataGold.meta) {
                             goldPriceMeta.value = dataGold.meta;
@@ -592,7 +599,8 @@ createApp({
             goldPriceAsk,
             goldPriceBid,
             goldPrice,
-            goldOrnPrice,
+            goldOrnBuy,
+            goldOrnSell,
             goldPriceMeta,
 
             silverPriceSell,
