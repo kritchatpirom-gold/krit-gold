@@ -58,7 +58,7 @@ createApp({
             endTime: '23:59',
             type: ['tong_lom', 'tong_roop', 'tong_tang', 'silver', 'redeem'],
             search: '',
-            purityRange: null // 'low', 'mid', 'high'
+            purityRange: [] // Multi-select array
         });
 
         const isFilterActive = computed(() => {
@@ -69,7 +69,7 @@ createApp({
                 filter.value.endTime !== '23:59' ||
                 filter.value.type.length !== 5 ||
                 filter.value.search !== '' ||
-                filter.value.purityRange !== null;
+                filter.value.purityRange.length > 0;
         });
 
         const selectedTransactions = ref([]);
@@ -77,6 +77,15 @@ createApp({
         const isAllSelected = computed(() => {
             return transactions.value.length > 0 && selectedTransactions.value.length === transactions.value.length;
         });
+
+        const togglePurity = (range) => {
+            const idx = filter.value.purityRange.indexOf(range);
+            if (idx > -1) {
+                filter.value.purityRange.splice(idx, 1);
+            } else {
+                filter.value.purityRange.push(range);
+            }
+        };
 
         const toggleSelectAll = () => {
             if (isAllSelected.value) {
@@ -178,30 +187,30 @@ createApp({
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักน้อยกว่า 5 กรัม ไม่บวกพรีเมียม
                 premium = (activePremium && w >= 5) ? Number(activePremium.premium_amount) : 0;
-                const perGram = Math.floor(((base + premium) * 0.0656 + 0.00001) * 100) / 100;
-                const withPurity = Math.floor(perGram * (p / 100) + 0.00001 * 100) / 100; // Actually better use epsilon inside the floor
-                net = Math.floor((perGram * (p / 100) * w + 0.00001) * 100) / 100;
+                const perGram = Math.floor(Number(((base + premium) * 0.0656).toFixed(10)) * 100) / 100;
+                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100) / 100;
+                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100) / 100;
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
-                const baseAfterPercent = Math.floor((base * 0.96 + 0.00001) * 100) / 100;
-                const perGram = Math.floor((baseAfterPercent * 0.0656 + 0.00001) * 100) / 100;
-                net = Math.floor((perGram * w + 0.00001) * 100) / 100;
+                const baseAfterPercent = Math.floor(Number((base * 0.96).toFixed(10)) * 100) / 100;
+                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100) / 100;
+                net = Math.floor(Number((perGram * w).toFixed(10)) * 100) / 100;
             } else if (tForm.type === 'redeem') {
                 base = gp;
-                const baseAfterPercent = Math.floor((base * 0.95 + 0.00001) * 100) / 100;
-                const perGram = Math.floor((baseAfterPercent * 0.0656 + 0.00001) * 100) / 100;
-                net = Math.floor((perGram * w + 0.00001) * 100) / 100;
+                const baseAfterPercent = Math.floor(Number((base * 0.95).toFixed(10)) * 100) / 100;
+                const perGram = Math.floor(Number((baseAfterPercent * 0.0656).toFixed(10)) * 100) / 100;
+                net = Math.floor(Number((perGram * w).toFixed(10)) * 100) / 100;
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
-                const perGram = Math.floor(((base - 300) * 0.0656 + 0.00001) * 100) / 100;
-                const withPurity = Math.floor(perGram * (p / 100) + 0.00001 * 100) / 100;
-                net = Math.floor((perGram * (p / 100) * w + 0.00001) * 100) / 100;
+                const perGram = Math.floor(Number(((base - 300) * 0.0656).toFixed(10)) * 100) / 100;
+                const withPurity = Math.floor(Number((perGram * (p / 100)).toFixed(10)) * 100) / 100;
+                net = Math.floor(Number((withPurity * w).toFixed(10)) * 100) / 100;
             } else if (tForm.type === 'silver') {
-                const deduct13 = sp; // ราคาช่อง Reference คือตัวที่หัก 13% แล้ว (มาจาก currentAssetPrice)
+                const deduct13 = sp;
                 base = deduct13;
-                const perGram = Math.floor(deduct13 / 1000); // ราคาต่อกรัม ปัดเศษทิ้ง
-                const withPercent = Math.floor(perGram * (p / 100)); // หักเปอร์เซ็นความบริสุทธิ์ ปัดเศษทิ้ง
-                net = Math.floor(withPercent * w); // คูณน้ำหนัก ปัดเศษทิ้ง
+                const perGram = Math.floor(Number((deduct13 / 1000).toFixed(10)));
+                const withPercent = Math.floor(Number((perGram * (p / 100)).toFixed(10)));
+                net = Math.floor(Number((withPercent * w).toFixed(10)));
             }
 
             return {
@@ -340,12 +349,15 @@ createApp({
                 query = query.or(`customer_name.ilike.${s},phone.ilike.${s},id_card.ilike.${s}`);
             }
 
-            if (filter.value.purityRange === 'low') {
-                query = query.lt('percent', 30);
-            } else if (filter.value.purityRange === 'mid') {
-                query = query.gte('percent', 30).lt('percent', 99);
-            } else if (filter.value.purityRange === 'high') {
-                query = query.gte('percent', 99);
+            if (filter.value.purityRange.length > 0) {
+                const orConditions = [];
+                if (filter.value.purityRange.includes('low')) orConditions.push('percent.lt.30');
+                if (filter.value.purityRange.includes('mid')) orConditions.push('and(percent.gte.30,percent.lt.99)');
+                if (filter.value.purityRange.includes('high')) orConditions.push('percent.gte.99');
+                
+                if (orConditions.length > 0) {
+                    query = query.or(orConditions.join(','));
+                }
             }
 
             const { data, error } = await query;
@@ -420,7 +432,7 @@ createApp({
         };
 
         const transactionsTotal = computed(() => {
-            return transactions.value.reduce((sum, item) => sum + (Number(item.total_price) || 0), 0);
+            return transactions.value.reduce((sum, item) => sum + (Number(item.net_price) || 0), 0);
         });
 
         const totalWeight = computed(() => {
@@ -642,6 +654,7 @@ createApp({
             exportCSV,
             selectedTransactions,
             isAllSelected,
+            togglePurity,
             toggleSelectAll,
 
             calcForm,
