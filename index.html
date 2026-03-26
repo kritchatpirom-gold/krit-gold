@@ -142,11 +142,11 @@
                                         <div class="flex justify-between items-center text-sm border-b border-gray-800/50 pb-2 mb-2">
                                             <div class="flex flex-col">
                                                 <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
-                                                <span class="text-white font-bold">{{ formatCurrency(goldPriceBid) }}</span>
+                                                <span class="text-white font-bold text-2xl">{{ formatCurrency(goldPriceBid) }}</span>
                                             </div>
                                             <div class="flex flex-col text-right">
                                                 <span class="text-xs text-gray-400">ขายออก (Sell)</span>
-                                                <span class="text-gold-400 font-bold font-mono">{{ formatCurrency(goldPriceAsk) }}</span>
+                                                <span class="text-gold-400 font-bold font-mono text-2xl">{{ formatCurrency(goldPriceAsk) }}</span>
                                             </div>
                                         </div>
 
@@ -156,11 +156,11 @@
                                         <div class="flex justify-between items-center text-sm">
                                             <div class="flex flex-col">
                                                 <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
-                                                <span class="text-white font-bold">{{ formatCurrency(goldOrnBuy) }}</span>
+                                                <span class="text-white font-bold text-2xl">{{ formatCurrency(goldOrnBuy) }}</span>
                                             </div>
                                             <div class="flex flex-col text-right">
                                                 <span class="text-xs text-gray-400">ขายออก (Sell)</span>
-                                                <span class="text-gold-400 font-bold font-mono">{{ formatCurrency(goldOrnSell) }}</span>
+                                                <span class="text-gold-400 font-bold font-mono text-2xl">{{ formatCurrency(goldOrnSell) }}</span>
                                             </div>
                                         </div>
                                         
@@ -177,11 +177,19 @@
                                         <div class="flex justify-between items-end mb-2">
                                             <span class="text-gray-300 font-medium"><i class="fa-solid fa-chart-simple mr-1"></i> ซิลเวอร์ (XAG)</span>
                                         </div>
-                                        <div class="grid grid-cols-2 gap-2 text-sm">
-                                            <div><span class="text-gray-500">Spot:</span> <span class="text-white ml-1">{{ silverPriceSpot }}</span></div>
-                                            <div><span class="text-gray-500">Exchange:</span> <span class="text-white ml-1">{{ silverPriceExchange }}</span></div>
-                                            <div class="pt-2"><span class="text-gray-400">รับซื้อ (Buy):</span> <span class="text-white font-bold ml-1">{{ formatCurrency(silverPriceBuy) }}</span></div>
-                                            <div class="pt-2"><span class="text-gray-400">ขาย (Sell):</span> <span class="text-white font-bold ml-1">{{ formatCurrency(silverPriceSell) }}</span></div>
+                                        <div class="flex justify-between items-center text-sm">
+                                            <div class="flex flex-col">
+                                                <span class="text-xs text-gray-400">รับซื้อ (Buy)</span>
+                                                <span class="text-white font-bold text-xl">{{ formatCurrency(silverPriceBuy) }}</span>
+                                            </div>
+                                            <div class="flex flex-col text-right">
+                                                <span class="text-xs text-gray-400">ขายออก (Sell)</span>
+                                                <span class="text-gold-300 font-bold font-mono text-xl">{{ formatCurrency(silverPriceSell) }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-between gap-2 text-[10px] text-gray-500 mt-2 pt-2 border-t border-gray-800/30">
+                                            <div>Spot: <span class="text-gray-300 ml-1">{{ silverPriceSpot }}</span></div>
+                                            <div>Exchange: <span class="text-gray-300 ml-1">{{ silverPriceExchange }}</span></div>
                                         </div>
                                     </div>
                                 </div>
@@ -294,6 +302,16 @@
                                                 <input type="number" step="0.01" v-model.number="calcForm.percent" class="w-full pl-4 pr-8 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none" min="0" max="100">
                                                 <span class="absolute right-3 top-3 text-gray-500">%</span>
                                             </div>
+                                            <!-- ปุ่มความบริสุทธิ์ทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นรูปพรรณ/ไถ่ถอน/เงิน) -->
+                                            <div v-show="!isLoggedIn && calcForm.type !== 'tong_roop' && calcForm.type !== 'redeem' && calcForm.type !== 'silver'" class="mt-2 flex flex-wrap gap-1">
+                                                <button type="button" @click="calcForm.percent = 37.5" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">9k</button>
+                                                <button type="button" @click="calcForm.percent = 50.0" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">12k</button>
+                                                <button type="button" @click="calcForm.percent = 58.33" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">14k</button>
+                                                <button type="button" @click="calcForm.percent = 75.0" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">18k</button>
+                                                <button type="button" @click="calcForm.percent = 91.6" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">22k</button>
+                                                <button type="button" @click="calcForm.percent = 96.5" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">23k</button>
+                                                <button type="button" @click="calcForm.percent = 99.99" class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">24k</button>
+                                            </div>
                                             <!-- โชว์ราคาบวกทองหลอมสดๆ ทันทีที่กรอกเปอร์เซ็น -->
                                             <div v-if="calcForm.type === 'tong_lom' && calcForm.percent !== null" class="mt-2 text-green-400 text-xs font-medium flex items-center bg-green-900/20 py-1 px-2 rounded w-fit border border-green-800/50 animate-pulse">
                                                 <i class="fa-solid fa-arrow-trend-up mr-1.5"></i> ได้รับราคาบวกพรีเมียม: +{{ formatCurrency(calculatedResult.premium) }} บาท
@@ -305,8 +323,8 @@
                                                 <input type="number" step="0.01" v-model.number="calcForm.weight" class="w-full pl-4 pr-10 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none" min="0">
                                                 <span class="absolute right-3 top-3 text-gray-500">ก.</span>
                                             </div>
-                                            <!-- ปุ่มน้ำหนักทางลัด -->
-                                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                            <!-- ปุ่มน้ำหนักทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นเงิน) -->
+                                            <div v-if="!isLoggedIn && calcForm.type !== 'silver'" class="mt-2 flex flex-wrap gap-1.5">
                                                 <button type="button" @click="calcForm.weight = 15.244" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1 บาท</button>
                                                 <button type="button" @click="calcForm.weight = 7.622" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">2 สลึง</button>
                                                 <button type="button" @click="calcForm.weight = 3.811" class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1 สลึง</button>

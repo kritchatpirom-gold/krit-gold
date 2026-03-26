@@ -143,7 +143,7 @@ createApp({
             if (calcForm.value.type === 'tong_lom' || calcForm.value.type === 'tong_roop' || calcForm.value.type === 'tong_tang' || calcForm.value.type === 'redeem') {
                 return Number(goldPrice.value) || 0;
             } else if (calcForm.value.type === 'silver') {
-                return Number(silverPrice.value) || 0;
+                return Math.floor((Number(silverPrice.value) || 0) * 0.87);
             }
             return 0;
         });
@@ -331,9 +331,6 @@ createApp({
 
             if (filter.value.type.length > 0 && filter.value.type.length < 5) {
                 query = query.in('type', filter.value.type);
-                transactions.value = [];
-                loadingTransactions.value = false;
-                return;
             }
 
             if (filter.value.search.trim()) {
