@@ -74,6 +74,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
     <link href="/css/style.css" rel="stylesheet">
 </head>
 
@@ -416,6 +417,52 @@
                                             เลขบัตรประชาชนไม่ถูกต้องตามฐานข้อมูลกรมการปกครอง</p>
                                     </div>
 
+                                    <!-- Product Photo for Employee Mode -->
+                                    <div v-show="isLoggedIn" class="mt-6 border-t border-gray-800 pt-6">
+                                        <label class="block text-sm font-medium text-gold-400 mb-2">
+                                            <i class="fa-solid fa-camera mr-2"></i> ภาพถ่ายสินค้า
+                                        </label>
+                                        <div class="relative group">
+                                            <!-- Upload Placeholder -->
+                                            <div v-if="!productPhoto" 
+                                                 onclick="document.getElementById('photo-input').click()"
+                                                 class="w-full h-24 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-gold-500/50 hover:bg-gold-500/5 transition-all">
+                                                <i class="fa-solid fa-plus text-xl text-gray-600 mb-1 group-hover:text-gold-500"></i>
+                                                <span class="text-[10px] text-gray-500 group-hover:text-gold-400">คลิกเพื่อถ่ายภาพ/อัปโหลด</span>
+                                            </div>
+                                            
+                                            <!-- Image Preview -->
+                                            <div v-else class="relative w-full h-32 rounded-xl overflow-hidden border border-gray-700 bg-black/50">
+                                                <img :src="productPhoto" class="w-full h-full object-contain" />
+                                                <button @click="removePhoto" type="button"
+                                                        class="absolute top-1 right-1 w-6 h-6 bg-red-600/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg transition-colors">
+                                                    <i class="fa-solid fa-xmark text-xs"></i>
+                                                </button>
+                                            </div>
+                                            
+                                            <input type="file" id="photo-input" @change="handlePhotoChange" accept="image/*" capture="environment" class="hidden">
+                                        </div>
+                                    </div>
+
+                                    <!-- Signature Pad for Employee Mode -->
+                                    <div v-show="isLoggedIn" class="mt-6 border-t border-gray-800 pt-6">
+                                        <label class="block text-sm font-medium text-gold-400 mb-2">
+                                            <i class="fa-solid fa-pen-nib mr-2"></i> ลายเซ็นพนักงาน/ผู้ขาย
+                                        </label>
+                                        <div class="bg-white rounded-xl border border-gray-700 p-1 w-1/2">
+                                            <canvas id="signature-pad"
+                                                class="w-full h-20 touch-none cursor-crosshair"></canvas>
+                                        </div>
+                                        <div class="flex justify-between mt-2">
+                                            <p class="text-[10px] text-gray-500 italic">* กรุณาเซ็นชื่อเพื่อยืนยันรายการ
+                                            </p>
+                                            <button @click="clearSignature" type="button"
+                                                class="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center">
+                                                <i class="fa-solid fa-eraser mr-1.5"></i> ล้างลายเซ็น
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label
                                             class="block text-sm font-medium text-gray-400 mb-2">ประเภทสินทรัพย์</label>
@@ -755,6 +802,7 @@
                                     <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">เปอร์เซ็นต์ /
                                         น้ำหนัก</th>
                                     <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">ยอดสุทธิ</th>
+                                    <th class="px-6 py-4 text-center font-semibold text-gray-400 text-sm">หลักฐาน</th>
                                     <th class="px-6 py-4 text-center font-semibold text-gray-400 text-sm">ลบ</th>
                                 </tr>
                             </thead>
@@ -784,6 +832,15 @@
                                         t.percent }}% / {{ t.weight }} ก.</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right">{{
                                         formatCurrency(t.net_price) }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                        <div class="flex items-center justify-center gap-3">
+                                            <i v-if="t.signature" class="fa-solid fa-signature text-blue-400 text-lg" title="มีลายเซ็น"></i>
+                                            <button v-if="t.photo" @click="viewingPhoto = t.photo" class="text-gold-400 hover:text-gold-300 transition-colors">
+                                                <i class="fa-solid fa-image text-lg"></i>
+                                            </button>
+                                            <span v-if="!t.signature && !t.photo" class="text-gray-700">-</span>
+                                        </div>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                                         <button @click="deleteTransaction(t.id)"
                                             class="text-red-500 hover:text-red-400 p-2"><i
@@ -859,7 +916,7 @@
         <!-- Receipt Print Section -->
         <div id="print-area" class="print-only">
             <div class="print-receipt-container"
-                style="width: 100%; max-width: 148mm; margin: 0 auto; padding: 5px 15px;">
+                style="width: 100%; max-width: 148mm; margin: 0 auto; padding: 10px 15px;">
                 <div class="text-center mb-3 flex flex-col items-center">
                     <img src="/images/logo.jpg" alt="Logo"
                         style="width: 55px; height: 55px; border-radius: 50%; object-fit: cover; margin-bottom: 3px; border: 1px solid #000;">
@@ -872,7 +929,8 @@
                         <span><b>วันที่:</b> {{ formatDate(new Date()) }}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 9pt;">
-                        <span><b>ลูกค้า:</b> {{ calcForm.customerName || 'เงินสด' }}{{ calcForm.phone ? ' (' + calcForm.phone + ')' : '' }}</span>
+                        <span><b>ลูกค้า:</b> {{ calcForm.customerName || 'เงินสด' }}{{ calcForm.phone ? ' (' +
+                            calcForm.phone + ')' : '' }}</span>
                         <span><b>จำนวน:</b> {{ billItems.length }} รายการ</span>
                     </div>
                 </div>
@@ -931,7 +989,7 @@
                 </div>
 
                 <div
-                    style="border: 1px solid #666; padding: 6px; border-radius: 4px; font-size: 8pt; line-height: 1.4; margin-bottom: 30px; text-align: justify;">
+                    style="border: 1px solid #666; padding: 6px; border-radius: 4px; font-size: 8pt; line-height: 1.2; margin-bottom: 5px; text-align: justify;">
                     ข้าพเจ้าขอรับรองว่าเป็นสมบัติของข้าพเจ้าโดยแท้จริง
                     และขอรับรองว่าของที่นำมาขายนั้นเป็นของที่บริสุทธิ์ ถ้าหากเป็นของทุจริตแล้ว
                     ข้าพเจ้าขอรับผิดชอบทั้งสิ้น และได้อ่านทวนเรียบร้อยแล้วจึงลงนามไว้เป็นหลักฐาน
@@ -939,12 +997,17 @@
 
                 <div
                     style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9pt; text-align: center; padding: 0 5px;">
-                    <div style="width: 48%;">
+                    <div style="width: 48%; position: relative; margin-top: 15px;">
+                        <div
+                            style="position: absolute; width: 100%; top: -12px; left: 0; display: flex; justify-content: center; pointer-events: none;">
+                            <img v-if="lastSignature" :src="lastSignature"
+                                style="max-height: 25px; max-width: 120px; object-fit: contain;" />
+                        </div>
                         <p style="margin-bottom: 4px;">
                             ลงชื่อ....................................................ผู้ขาย/ผู้รับ</p>
-                        <p>(....................................................)</p>
+                        <p>({{ calcForm.customerName || '....................................................' }})</p>
                     </div>
-                    <div style="width: 48%;">
+                    <div style="width: 48%; margin-top: 15px;">
                         <p style="margin-bottom: 4px;">
                             ลงชื่อ....................................................ผู้ซื้อ/ผู้จ่าย</p>
                         <p>(....................................................)</p>
@@ -953,6 +1016,26 @@
 
                 <div style="text-align: center; margin-top: 20px; font-size: 8pt; color: #666;">
                     <p>ขอบคุณที่ใช้บริการกฤตหลอมทองครับ</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Photo View Modal -->
+        <div v-if="viewingPhoto" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" @click.self="viewingPhoto = null">
+            <div class="relative max-w-4xl w-full bg-dark-base rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
+                <div class="flex justify-between items-center p-4 border-b border-gray-800">
+                    <h3 class="text-gold-400 font-bold">ภาพถ่ายสินค้าหลักฐาน</h3>
+                    <button @click="viewingPhoto = null" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div class="p-2 flex justify-center bg-black/40">
+                    <img :src="viewingPhoto" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-inner shadow-gold-500/10" />
+                </div>
+                <div class="p-4 text-center">
+                    <button @click="viewingPhoto = null" class="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-full text-sm font-medium transition-colors">
+                        ปิดหน้าต่าง
+                    </button>
                 </div>
             </div>
         </div>

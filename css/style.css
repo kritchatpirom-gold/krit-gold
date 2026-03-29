@@ -144,16 +144,20 @@ body {
     top: 0;
     width: 100%;
     margin: 0;
-    padding: 20px;
+    padding: 10px 20px;
     background: white;
     z-index: 9999;
   }
   
   .print-receipt-container {
-    padding: 20px;
-    max-width: 80mm; /* Standard POS Printer Width */
+    padding: 5px 20px;
+    max-width: 148mm; /* Updated to match inline style */
     margin: 0 auto;
     font-family: 'Kanit', sans-serif;
+  }
+  
+  @page {
+    margin: 0;
   }
   
   .print-title {

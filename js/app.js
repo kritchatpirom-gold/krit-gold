@@ -2,6 +2,9 @@ const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
 const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
 const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
+//const supabaseUrl = 'http://127.0.0.1:54321';
+//const supabaseUrl = 'http://192.168.1.104:54321';
+//const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
@@ -20,6 +23,10 @@ createApp({
         const authError = ref('');
         const authLoading = ref(false);
         const mobileMenuOpen = ref(false);
+        const lastSignature = ref(null);
+        const productPhoto = ref(null);
+        const viewingPhoto = ref(null);
+        let signaturePad = null;
 
         // Roles
         const isAdmin = computed(() => user.value && user.value.email === 'admin@kritgold.com');
@@ -118,7 +125,7 @@ createApp({
             filter.value.endDate = end.toLocaleDateString('en-CA');
             filter.value.startTime = '00:00';
             filter.value.endTime = '23:59';
-            
+
             loadTransactions();
         };
 
@@ -292,9 +299,9 @@ createApp({
 
         const formatPricePerGram = (val, type) => {
             const digits = type === 'silver' ? 0 : 2;
-            return Number(val || 0).toLocaleString('th-TH', { 
-                minimumFractionDigits: digits, 
-                maximumFractionDigits: digits 
+            return Number(val || 0).toLocaleString('th-TH', {
+                minimumFractionDigits: digits,
+                maximumFractionDigits: digits
             });
         };
 
@@ -307,6 +314,89 @@ createApp({
                 'redeem': 'ไถ่ถอน'
             };
             return types[type] || type;
+        };
+
+        const initSignaturePad = (retries = 0) => {
+            const canvas = document.getElementById('signature-pad');
+
+            // Check if canvas exists and is visible (width > 0)
+            if (canvas && canvas.offsetWidth > 0) {
+                // If there's an existing instance, shut it down completely
+                if (signaturePad) {
+                    signaturePad.off();
+                    signaturePad = null;
+                }
+
+                // Standard scaling for high-DPI displays
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+
+                // Create fresh instance
+                signaturePad = new SignaturePad(canvas, {
+                    backgroundColor: 'rgba(255, 255, 255, 0)',
+                    penColor: 'rgb(0, 51, 153)',
+                    velocityFilterWeight: 0.7
+                });
+            } else if (retries < 30) {
+                // Keep trying every 100ms for up to 3 seconds (to cover slow transitions)
+                setTimeout(() => initSignaturePad(retries + 1), 100);
+            }
+        };
+
+        const clearSignature = () => {
+            if (signaturePad) {
+                signaturePad.clear();
+                lastSignature.value = null;
+            }
+        };
+
+        const handlePhotoChange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Resize to keep database size low
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Store as compressed JPEG
+                    productPhoto.value = canvas.toDataURL('image/jpeg', 0.7);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        const removePhoto = () => {
+            productPhoto.value = null;
+            // Clear input
+            const input = document.getElementById('photo-input');
+            if (input) input.value = '';
         };
 
         // Auth
@@ -389,7 +479,7 @@ createApp({
                 if (filter.value.purityRange.includes('low')) orConditions.push('percent.lt.30');
                 if (filter.value.purityRange.includes('mid')) orConditions.push('and(percent.gte.30,percent.lt.99)');
                 if (filter.value.purityRange.includes('high')) orConditions.push('percent.gte.99');
-                
+
                 if (orConditions.length > 0) {
                     query = query.or(orConditions.join(','));
                 }
@@ -477,9 +567,18 @@ createApp({
         const saveAndPrint = async () => {
             if (billItems.value.length === 0) return;
 
+            // Capture signature
+            if (signaturePad && !signaturePad.isEmpty()) {
+                lastSignature.value = signaturePad.toDataURL();
+            } else {
+                lastSignature.value = null;
+            }
+
             const handleAfterPrint = () => {
                 billItems.value = [];
                 resetForm();
+                clearSignature();
+                removePhoto();
                 window.removeEventListener('afterprint', handleAfterPrint);
             };
 
@@ -515,6 +614,8 @@ createApp({
                 percent: item.percent,
                 weight: item.weight,
                 net_price: item.netPrice,
+                signature: lastSignature.value,
+                photo: productPhoto.value,
                 created_at: new Date().toISOString()
             }));
 
@@ -571,16 +672,16 @@ createApp({
                         const barSell = parseFloat(dataGold.prices.bar.sell);
                         const ornBuy = parseFloat(dataGold.prices.orn.buy);
                         const ornSell = parseFloat(dataGold.prices.orn.sell);
-                        
+
                         priceTrendGold.value = barBuy - (goldPrice.value || barBuy);
-                        
+
                         // Use bar.buy as the base for all calculations (goldPrice)
                         goldPrice.value = barBuy; // ใช้ราคารับซื้อ (Buy) เป็นฐานการคำนวณตามสั่ง
                         goldPriceBid.value = barBuy;
                         goldPriceAsk.value = barSell;
                         goldOrnBuy.value = ornBuy;
                         goldOrnSell.value = ornSell;
-                        
+
                         if (dataGold.meta) {
                             goldPriceMeta.value = dataGold.meta;
                         }
@@ -634,11 +735,20 @@ createApp({
             nextTick(() => {
                 setTimeout(() => {
                     initChart();
+                    if (isLoggedIn.value && currentTab.value === 'calculator') initSignaturePad();
                 }, 500); // 500ms delay for Chrome CSS transition
 
                 fetchPrices();
                 setInterval(fetchPrices, 30000); // 30 sec interval
             });
+        });
+
+        watch([isLoggedIn, currentTab], () => {
+            if (isLoggedIn.value && currentTab.value === 'calculator') {
+                nextTick(() => {
+                    setTimeout(initSignaturePad, 300);
+                });
+            }
         });
 
         watch(currentTab, (newTab) => {
@@ -725,7 +835,13 @@ createApp({
             saveAndPrint,
 
             formatDate,
-            getTypeName
+            getTypeName,
+            lastSignature,
+            clearSignature,
+            productPhoto,
+            handlePhotoChange,
+            removePhoto,
+            viewingPhoto
         };
     }
 }).mount('#app');
