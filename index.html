@@ -384,82 +384,142 @@
                                     ข้อมูลการประเมิน (เพิ่มเข้าบิล)</h3>
 
                                 <div class="space-y-5">
-                                    <div class="grid grid-cols-2 gap-4" v-if="isLoggedIn">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-400 mb-1">ชื่อลูกค้า
-                                                (ตัวนำบิล)</label>
-                                            <input type="text" v-model="calcForm.customerName"
-                                                class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
-                                                placeholder="ระบุชื่อลูกค้า (ห้ามเว้น)"
-                                                :class="(isLoggedIn && calcForm.customerName.trim().length <= 1) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
+                                    <div v-if="isLoggedIn">
+                                        <!-- Primary Action: Read ID Card -->
+                                        <div class="mb-6">
+                                            <button @click="readIdCard" :disabled="readCardLoading"
+                                                class="w-full px-6 py-3 bg-gold-600/20 hover:bg-gold-500/40 text-gold-400 border border-gold-500/30 rounded-xl transition-all flex items-center justify-center hover-glow shadow-sm group">
+                                                <i v-if="readCardLoading" class="fa-solid fa-circle-notch fa-spin mr-3 text-lg"></i>
+                                                <i v-else class="fa-solid fa-id-card mr-3 text-lg group-hover:scale-110 transition-transform"></i>
+                                                <span class="font-bold tracking-wider text-sm">{{ readCardLoading ? 'กำลังอ่านข้อมูลจากชิป...' : 'กดเพื่ออ่านข้อมูลจากบัตรประชาชน' }}</span>
+                                            </button>
                                         </div>
-                                        <div>
-                                            <label
-                                                class="block text-sm font-medium text-gray-400 mb-1">เบอร์ติดต่อ</label>
-                                            <input type="tel" v-model="calcForm.phone" maxlength="10"
-                                                class="w-full px-4 py-2.5 bg-dark-base border text-white rounded-lg focus:ring-1 outline-none transition-colors"
-                                                placeholder="08x-xxxxxxx (10 หลัก)"
-                                                :class="(isLoggedIn && (!isPhoneValid && calcForm.phone)) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50 text-red-400' : 'focus:ring-gold-500 focus:border-gold-500 border-gray-700'">
+
+                                        <!-- Unified Identity Block -->
+                                        <div v-if="calcForm.idCardPhoto" class="mb-8 p-5 bg-gold-400/5 border border-gold-500/20 rounded-2xl animate-fade-in relative group overflow-hidden">
+                                            <div class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+                                                <i class="fa-solid fa-id-card text-7xl text-gold-500"></i>
+                                            </div>
+                                            <div class="flex flex-col sm:flex-row gap-6 relative z-10">
+                                                <div class="flex-shrink-0 mx-auto sm:mx-0">
+                                                    <div class="relative">
+                                                        <img :src="calcForm.idCardPhoto" 
+                                                            class="w-32 h-40 object-cover rounded-xl border-2 border-gold-500/30 shadow-2xl hover:border-gold-500/60 transition-all cursor-zoom-in"
+                                                            @click="viewingPhoto = calcForm.idCardPhoto" />
+                                                        <div class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center border-2 border-dark-base shadow-lg"
+                                                            :class="isCardExpired ? 'bg-red-500' : 'bg-emerald-500'">
+                                                            <i class="fa-solid text-white text-xs" :class="isCardExpired ? 'fa-xmark' : 'fa-check'"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="flex-1 min-w-0 flex flex-col">
+                                                    <div class="flex justify-between items-start mb-4">
+                                                        <div class="min-w-0">
+                                                            <p class="text-[10px] text-gold-500/80 font-bold uppercase tracking-[0.3em] mb-1">Identity Verified</p>
+                                                            <h3 class="text-white text-xl font-bold truncate leading-tight">{{ calcForm.customerName }}</h3>
+                                                            <p class="text-gray-400 text-xs font-mono mt-1 tracking-widest">{{ calcForm.idCard }}</p>
+                                                        </div>
+                                                        <div :class="isCardExpired ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'" 
+                                                            class="px-3 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wider whitespace-nowrap shadow-sm backdrop-blur-sm">
+                                                            {{ isCardExpired ? 'Expired' : 'Valid Card' }}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="mt-auto pt-4 border-t border-gold-500/10 space-y-3">
+                                                        <div>
+                                                            <p class="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1">Residential Address</p>
+                                                            <p class="text-gray-300 text-xs leading-relaxed line-clamp-2" :title="calcForm.address">{{ calcForm.address }}</p>
+                                                        </div>
+                                                        <div class="text-[10px] text-gray-500 flex items-center gap-2">
+                                                            <i class="fa-regular fa-calendar-check text-gold-500/50"></i>
+                                                            วันหมดอายุบัตร: <span :class="isCardExpired ? 'text-red-400 font-bold' : 'text-gray-300 font-medium'">{{ formatThaiDate(calcForm.expireDate) }}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
                                     <div v-show="isLoggedIn">
-                                        <label class="block text-sm font-medium text-gray-400 mb-1">เลขบัตรประชาชน 13
-                                            หลัก <span
-                                                class="text-red-500 text-xs ml-1">*จำเป็นสำหรับการสืบค้นและจับทุจริต</span></label>
-                                        <input type="text" v-model="calcForm.idCard" maxlength="13"
-                                            class="w-full px-4 py-2.5 bg-dark-base border text-white rounded-lg focus:ring-1 outline-none transition-colors"
-                                            placeholder="ระบุเลขบัตรประชาชน 13 หลัก"
-                                            :class="(isLoggedIn && (!isIdCardValid && calcForm.idCard)) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50 text-red-400' : 'focus:ring-gold-500 focus:border-gold-500 border-gray-700'">
-                                        <p v-if="isLoggedIn && calcForm.idCard && !isIdCardValid"
-                                            class="text-red-500 text-xs mt-1"><i
-                                                class="fa-solid fa-circle-exclamation mr-1"></i>
-                                            เลขบัตรประชาชนไม่ถูกต้องตามฐานข้อมูลกรมการปกครอง</p>
+                                        <label
+                                            class="block text-sm font-medium text-gray-400 mb-1">เบอร์โทรศัพท์ <span class="text-red-500">*</span></label>
+                                        <input type="tel" v-model="calcForm.phone" maxlength="10"
+                                            class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
+                                            placeholder="0123456789"
+                                            :class="(isLoggedIn && !isPhoneValid) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
                                     </div>
 
-                                    <!-- Product Photo for Employee Mode -->
-                                    <div v-show="isLoggedIn" class="mt-6 border-t border-gray-800 pt-6">
-                                        <label class="block text-sm font-medium text-gold-400 mb-2">
-                                            <i class="fa-solid fa-camera mr-2"></i> ภาพถ่ายสินค้า
-                                        </label>
-                                        <div class="relative group">
-                                            <!-- Upload Placeholder -->
-                                            <div v-if="!productPhoto" 
-                                                 onclick="document.getElementById('photo-input').click()"
-                                                 class="w-full h-24 border-2 border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-gold-500/50 hover:bg-gold-500/5 transition-all">
-                                                <i class="fa-solid fa-plus text-xl text-gray-600 mb-1 group-hover:text-gold-500"></i>
-                                                <span class="text-[10px] text-gray-500 group-hover:text-gold-400">คลิกเพื่อถ่ายภาพ/อัปโหลด</span>
+                                    <!-- Admin Overrides: Edit Name, CID, Address -->
+                                    <div v-if="isAdmin" class="space-y-4 p-4 bg-purple-900/10 border border-purple-500/30 rounded-2xl animate-fade-in">
+                                        <div class="flex items-center gap-2 mb-2 text-purple-400">
+                                            <i class="fa-solid fa-user-gear"></i>
+                                            <span class="text-[10px] font-bold uppercase tracking-[0.2em]">โหมดแก้ไขข้อมูล (สิทธิ์ผู้ดูแลระบบ)</span>
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">ชื่อลูกค้า</label>
+                                                <input type="text" v-model="calcForm.customerName" 
+                                                    class="w-full px-3 py-2 bg-dark-base border border-gray-800 text-white rounded-lg focus:border-purple-500 outline-none text-sm transition">
                                             </div>
-                                            
-                                            <!-- Image Preview -->
-                                            <div v-else class="relative w-full h-32 rounded-xl overflow-hidden border border-gray-700 bg-black/50">
-                                                <img :src="productPhoto" class="w-full h-full object-contain" />
-                                                <button @click="removePhoto" type="button"
-                                                        class="absolute top-1 right-1 w-6 h-6 bg-red-600/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg transition-colors">
-                                                    <i class="fa-solid fa-xmark text-xs"></i>
-                                                </button>
+                                            <div>
+                                                <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">เลขบัตรประชาชน</label>
+                                                <input type="text" v-model="calcForm.idCard" maxlength="13"
+                                                    class="w-full px-3 py-2 bg-dark-base border text-white rounded-lg outline-none text-sm font-mono transition"
+                                                    :class="(!isIdCardValid && calcForm.idCard) ? 'border-red-500 text-red-400 focus:border-red-500' : 'border-gray-800 focus:border-purple-500'">
+                                                <p v-if="calcForm.idCard && !isIdCardValid" class="text-[9px] text-red-500 mt-1">
+                                                    <i class="fa-solid fa-circle-exclamation mr-1"></i>เลขบัตรประชาชนไม่ถูกต้องตามหลักการคำนวณ
+                                                </p>
                                             </div>
-                                            
-                                            <input type="file" id="photo-input" @change="handlePhotoChange" accept="image/*" capture="environment" class="hidden">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">ที่อยู่ตามบัตร</label>
+                                            <textarea v-model="calcForm.address" rows="2"
+                                                class="w-full px-3 py-2 bg-dark-base border border-gray-800 text-white rounded-lg focus:border-purple-500 outline-none text-sm transition leading-relaxed"></textarea>
                                         </div>
                                     </div>
 
-                                    <!-- Signature Pad for Employee Mode -->
+                                    <!-- Employee Identity & Proof (Side-by-Side) -->
                                     <div v-show="isLoggedIn" class="mt-6 border-t border-gray-800 pt-6">
-                                        <label class="block text-sm font-medium text-gold-400 mb-2">
-                                            <i class="fa-solid fa-pen-nib mr-2"></i> ลายเซ็นพนักงาน/ผู้ขาย
-                                        </label>
-                                        <div class="bg-white rounded-xl border border-gray-700 p-1 w-1/2">
-                                            <canvas id="signature-pad"
-                                                class="w-full h-20 touch-none cursor-crosshair"></canvas>
-                                        </div>
-                                        <div class="flex justify-between mt-2">
-                                            <p class="text-[10px] text-gray-500 italic">* กรุณาเซ็นชื่อเพื่อยืนยันรายการ
-                                            </p>
-                                            <button @click="clearSignature" type="button"
-                                                class="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center">
-                                                <i class="fa-solid fa-eraser mr-1.5"></i> ล้างลายเซ็น
-                                            </button>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <!-- Product Photo (50%) -->
+                                            <div class="space-y-2">
+                                                <label class="block text-[11px] font-bold text-gold-500 uppercase tracking-wider">
+                                                    <i class="fa-solid fa-camera mr-1.5"></i>ภาพถ่ายสินค้า <span class="text-red-500">*</span>
+                                                </label>
+                                                <div class="relative group h-24">
+                                                    <div v-if="!productPhoto" 
+                                                        class="w-full h-full border-2 border-dashed border-gray-700 hover:border-gold-500/50 rounded-xl flex flex-col items-center justify-center bg-dark-base/30 transition-all cursor-pointer overflow-hidden"
+                                                        onclick="document.getElementById('photo-input').click()">
+                                                        <i class="fa-solid fa-plus text-lg text-gray-600 group-hover:text-gold-500 transition-colors"></i>
+                                                        <span class="text-[9px] text-gray-500 group-hover:text-gray-300">แตะเพื่อถ่ายภาพ</span>
+                                                    </div>
+                                                    <div v-else class="relative h-full animate-fade-in">
+                                                        <img :src="productPhoto" class="w-full h-full object-cover rounded-xl border border-gold-500/30 shadow-lg" />
+                                                        <button @click="removePhoto" 
+                                                            class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center border-2 border-dark-base shadow-lg hover:bg-red-600 transition-colors">
+                                                            <i class="fa-solid fa-xmark text-[10px]"></i>
+                                                        </button>
+                                                    </div>
+                                                    <input type="file" id="photo-input" class="hidden" accept="image/*" @change="handlePhotoChange">
+                                                </div>
+                                            </div>
+
+                                            <!-- Employee Signature (50%) -->
+                                            <div class="space-y-2">
+                                                <div class="flex justify-between items-center">
+                                                    <label class="block text-[11px] font-bold text-gold-500 uppercase tracking-wider">
+                                                        <i class="fa-solid fa-pen-nib mr-1.5"></i>ลายเซ็นผู้ขาย <span class="text-red-500">*</span>
+                                                    </label>
+                                                    <button @click="clearSignature" class="text-[9px] text-gray-500 hover:text-red-400 font-bold uppercase transition-colors">ล้าง</button>
+                                                </div>
+                                                <div class="bg-white border border-gray-700 rounded-xl overflow-hidden h-24 relative shadow-inner">
+                                                    <canvas id="signature-pad" class="w-full h-full cursor-crosshair"></canvas>
+                                                    <div v-if="!lastSignature" class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                                        <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold opacity-40 italic">ลงนามยืนยัน</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -494,8 +554,7 @@
                                             <span class="text-xs text-gray-500"
                                                 v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice">(อิงราคาสมาคม)</span>
                                             <span class="text-xs text-yellow-500" v-else>(ราคาแบบปรับเอง)</span>
-                                            <span class="text-xs text-red-500 ml-1" v-if="isEmployee && !isAdmin"><i
-                                                    class="fa-solid fa-lock"></i> ล็อกสำหรับพนักงาน</span>
+                                            <span class="text-xs text-red-500 ml-1" v-if="isEmployee && !isAdmin"></span>
                                         </div>
                                     </div>
 
@@ -634,12 +693,16 @@
                                                 class="text-xl text-gold-500 font-normal">฿</span></span>
                                     </div>
 
-                                    <button @click="saveAndPrint" :disabled="billItems.length === 0 || saving"
-                                        :class="billItems.length === 0 || saving ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'"
+                                    <div v-if="isLoggedIn && !isPrintReady && billItems.length > 0 && !isAdmin" class="mb-3 p-2 bg-red-900/20 border border-red-500/30 rounded-lg text-[10px] text-red-400 text-center animate-pulse">
+                                        <i class="fa-solid fa-circle-exclamation mr-1.5"></i> กรุณากรอกเบอร์โทร, ถ่ายรูปสินค้า และเซ็นชื่อให้ครบถ้วน
+                                    </div>
+
+                                    <button @click="saveAndPrint" :disabled="(!isPrintReady && !isAdmin) || saving"
+                                        :class="(!isPrintReady && !isAdmin) || saving ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'"
                                         class="w-full py-4 rounded-xl font-bold text-lg transition-all flex justify-center items-center">
                                         <i v-if="saving" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
                                         <i v-else class="fa-solid fa-print mr-2"></i>
-                                        {{ isLoggedIn ? 'บันทึกและพิมพ์ใบเสนอราคา' : 'พิมพ์ใบเสนอราคา (ไม่บันทึก)' }}
+                                        {{ isAdmin ? 'บันทึกและพิมพ์ (สิทธิ์ผู้ดูแล)' : (isLoggedIn ? 'บันทึกและพิมพ์ใบเสนอราคา' : 'พิมพ์ใบเสนอราคา (ไม่บันทึก)') }}
                                     </button>
                                 </div>
                             </div>
@@ -823,8 +886,12 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{{
                                         formatDate(t.created_at) }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">{{ t.customer_name }}
-                                        <span class="text-xs text-gray-500 block">{{ t.phone }}</span>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
+                                        <div class="font-bold">{{ t.customer_name }}</div>
+                                        <div class="text-[10px] text-gray-500">{{ t.phone }}</div>
+                                        <div v-if="t.address" class="text-[10px] text-gold-500/70 italic truncate max-w-[150px]" :title="t.address">
+                                            <i class="fa-solid fa-location-dot mr-1"></i>{{ t.address }}
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gold-300">{{ getTypeName(t.type)
                                         }}</td>

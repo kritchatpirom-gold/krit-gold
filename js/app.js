@@ -26,6 +26,7 @@ createApp({
         const lastSignature = ref(null);
         const productPhoto = ref(null);
         const viewingPhoto = ref(null);
+        const readCardLoading = ref(false); // ID Card Reading State
         let signaturePad = null;
 
         // Roles
@@ -148,6 +149,9 @@ createApp({
             customerName: '',
             phone: '',
             idCard: '',
+            address: '',
+            idCardPhoto: '',
+            expireDate: '',
             manualPrice: null
         });
 
@@ -159,23 +163,48 @@ createApp({
                 customerName: '',
                 phone: '',
                 idCard: '',
+                address: '',
+                idCardPhoto: '',
+                expireDate: '',
                 manualPrice: null
             };
         };
 
+        const formatThaiDate = (dateStr) => {
+            if (!dateStr || dateStr.length !== 10) return dateStr;
+            const [y, m, d] = dateStr.split('-');
+            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            return `${parseInt(d)} ${months[parseInt(m) - 1]} ${parseInt(y) + 543}`;
+        };
+
         const isPhoneValid = computed(() => {
-            return /^0[0-9]{9}$/.test(calcForm.value.phone);
+            return /^0\d{9}$/.test(calcForm.value.phone);
         });
 
         const isIdCardValid = computed(() => {
-            let id = calcForm.value.idCard;
-            if (!id || id.length !== 13 || !/^\d{13}$/.test(id)) return false;
+            const id = calcForm.value.idCard;
+            if (!id) return true;
+            if (!/^\d{13}$/.test(id)) return false;
+
+            // Official Thai ID Checksum Verification
             let sum = 0;
             for (let i = 0; i < 12; i++) {
-                sum += parseFloat(id.charAt(i)) * (13 - i);
+                sum += parseInt(id.charAt(i)) * (13 - i);
             }
-            let checkSum = (11 - (sum % 11)) % 10;
-            return checkSum === parseFloat(id.charAt(12));
+            const checkDigit = (11 - (sum % 11)) % 10;
+            return parseInt(id.charAt(12)) === checkDigit;
+        });
+
+        const isCardExpired = computed(() => {
+            if (!calcForm.value.expireDate) return false;
+            try {
+                const cardDate = new Date(calcForm.value.expireDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Check by day
+                return cardDate < today;
+            } catch (e) {
+                return false;
+            }
         });
 
         const isFormValid = computed(() => {
@@ -274,7 +303,8 @@ createApp({
                 netPrice: calculatedResult.value.netPrice,
                 customerName: calcForm.value.customerName,
                 phone: calcForm.value.phone,
-                idCard: calcForm.value.idCard
+                idCard: calcForm.value.idCard,
+                address: calcForm.value.address
             });
             calcForm.value.weight = null;
             calcForm.value.percent = null;
@@ -286,6 +316,23 @@ createApp({
 
         const billTotal = computed(() => {
             return billItems.value.reduce((sum, item) => sum + item.netPrice, 0);
+        });
+
+        const isPrintReady = computed(() => {
+            if (billItems.value.length === 0) return false;
+
+            // Admin bypass: Admin can bypass Phone/Photo/Sign but MUST have a valid ID format if entered
+            if (isAdmin.value) return isIdCardValid.value;
+
+            // Guest mode: Only check if items exist
+            if (!isLoggedIn.value) return billItems.value.length > 0;
+
+            // Employee mode: Check Phone, Photo and Signature
+            const hasPhone = isPhoneValid.value;
+            const hasPhoto = productPhoto.value !== null;
+            const hasSignature = (signaturePad && !signaturePad.isEmpty()) || lastSignature.value !== null;
+
+            return hasPhone && hasPhoto && hasSignature;
         });
 
         const formatCurrency = (val) => {
@@ -522,7 +569,7 @@ createApp({
         const exportCSV = () => {
             if (transactions.value.length === 0) return;
 
-            let csvContent = 'วันที่,เวลา,ลูกค้า,เบอร์โทรศัพท์,ประเภทสินทรัพย์,เปอร์เซ็นต์/น้ำหนัก,ยอดสุทธิ (บาท)\n';
+            let csvContent = 'วันที่,เวลา,ลูกค้า,เบอร์โทรศัพท์,ที่อยู่,ประเภทสินทรัพย์,เปอร์เซ็นต์/น้ำหนัก,ยอดสุทธิ (บาท)\n';
 
             transactions.value.forEach(t => {
                 const dt = new Date(t.created_at);
@@ -531,13 +578,14 @@ createApp({
 
                 const name = `"${t.customer_name || 'เงินสด'}"`;
                 const phone = `"${t.phone || '-'}"`;
+                const address = `"${t.address || '-'}"`;
                 const type = `"${getTypeName(t.type)}"`;
 
                 let detail = '-';
                 if (t.type === 'tong_lom' || t.type === 'tong_roop') detail = `"${t.percent}% / ${t.weight} กรัม"`;
                 else if (t.type === 'tong_tang' || t.type === 'silver') detail = `"${t.weight} กรัม"`;
 
-                csvContent += `${dDate},${dTime},${name},${phone},${type},${detail},${t.net_price}\n`;
+                csvContent += `${dDate},${dTime},${name},${phone},${address},${type},${detail},${t.net_price}\n`;
             });
 
             // Add Total Row
@@ -565,7 +613,11 @@ createApp({
         });
 
         const saveAndPrint = async () => {
-            if (billItems.value.length === 0) return;
+            if (!isPrintReady.value) {
+                if (billItems.value.length === 0) return;
+                alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน (เบอร์โทร, รูปถ่ายสินค้า, ลายเซ็น)');
+                return;
+            }
 
             // Capture signature
             if (signaturePad && !signaturePad.isEmpty()) {
@@ -604,18 +656,21 @@ createApp({
             // Logged in (Employee or Admin): Save to DB first
             saving.value = true;
 
-            const trData = billItems.value.map(item => ({
+            const trData = billItems.value.map((item, idx) => ({
                 customer_name: item.customerName || 'เงินสด',
                 phone: item.phone || '',
                 id_card: item.idCard || '',
+                address: item.address || '',
+                // Save large base64 assets ONLY on the first row (idx === 0)
+                id_card_photo: idx === 0 ? (calcForm.value.idCardPhoto || '') : '',
                 type: item.type,
                 base_price: item.basePrice,
                 premium_amount: item.premium,
                 percent: item.percent,
                 weight: item.weight,
                 net_price: item.netPrice,
-                signature: lastSignature.value,
-                photo: productPhoto.value,
+                signature: idx === 0 ? lastSignature.value : null,
+                photo: idx === 0 ? productPhoto.value : null,
                 created_at: new Date().toISOString()
             }));
 
@@ -628,6 +683,45 @@ createApp({
                 nextTick(() => {
                     triggerPrint();
                 });
+            }
+        };
+
+        // --- Thai ID Reader Integration ---
+        const readIdCard = async () => {
+            if (readCardLoading.value) return;
+            readCardLoading.value = true;
+
+            try {
+                // Fetch from the local bridge server
+                const response = await fetch('http://localhost:8080/read', {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache'
+                });
+
+                if (!response.ok) throw new Error('ระบบเบื้องหลัง (Bridge) ไม่ตอบสนอง');
+
+                const result = await response.json();
+                console.log('Bridge Response:', result);
+
+                if (result.status === 'success' && result.data) {
+                    const data = result.data;
+                    // Populate fields
+                    calcForm.value.customerName = data.full_name || '';
+                    calcForm.value.idCard = data.cid || '';
+                    calcForm.value.address = data.address || '';
+                    calcForm.value.idCardPhoto = data.photo_base64 || '';
+                    calcForm.value.expireDate = data.expire_date || '';
+
+                    console.log('Read ID Card Success:', data.full_name);
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถอ่านข้อมูลได้'));
+                }
+            } catch (err) {
+                console.error('Bridge Connection Error:', err);
+                alert('ไม่สามารถเชื่อมต่อกับเครื่องอ่านบัตรได้ กรุณารันคำสั่งรันระบบเบื้องหลัง หรือตรวจสอบการเชื่อมต่อเครื่องอ่านบัตร');
+            } finally {
+                readCardLoading.value = false;
             }
         };
 
@@ -774,6 +868,10 @@ createApp({
             isAdmin,
             isEmployee,
             showAuth,
+            readCardLoading,
+            readIdCard,
+            isCardExpired,
+            formatThaiDate,
             authForm,
             authError,
             authLoading,
@@ -806,6 +904,8 @@ createApp({
             loadingTransactions,
             transactionsTotal,
             totalWeight,
+            billTotal,
+            isPrintReady,
             formatCurrency,
             filter,
             isFilterActive,

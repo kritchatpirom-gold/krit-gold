@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   weight NUMERIC NOT NULL,
   net_price NUMERIC NOT NULL,
   id_card TEXT,
+  address TEXT,
+  id_card_photo TEXT,
   signature TEXT,
   photo TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
