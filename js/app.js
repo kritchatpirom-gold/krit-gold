@@ -612,6 +612,50 @@ createApp({
             return transactions.value.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
         });
 
+        // Helper to convert Base64 to Blob and upload to Supabase Storage
+        const uploadToBucket = async (base64Data, filename) => {
+            if (!base64Data || !base64Data.includes('base64,')) return base64Data; // If already a URL or empty
+
+            try {
+                const parts = base64Data.split(';base64,');
+                const contentType = parts[0].split(':')[1];
+                const raw = window.atob(parts[1]);
+                const rawLength = raw.length;
+                const uInt8Array = new Uint8Array(rawLength);
+
+                for (let i = 0; i < rawLength; ++i) {
+                    uInt8Array[i] = raw.charCodeAt(i);
+                }
+
+                const blob = new Blob([uInt8Array], { type: contentType });
+                const ext = contentType.split('/')[1] || 'jpg';
+                const filePath = `assets/${Date.now()}_${filename}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+                const { data, error } = await supabase.storage
+                    .from('transaction_assets')
+                    .upload(filePath, blob, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+
+                if (error) {
+                    console.error('Supabase Storage Upload Error Details:', error);
+                    throw error;
+                }
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('transaction_assets')
+                    .getPublicUrl(filePath);
+
+                console.log(`Upload Success: ${filename} -> ${publicUrl}`);
+                return publicUrl;
+            } catch (err) {
+                console.error(`Upload Failed for ${filename}:`, err);
+                // Fallback to base64 but warn the developer
+                return base64Data;
+            }
+        };
+
         const saveAndPrint = async () => {
             if (!isPrintReady.value) {
                 if (billItems.value.length === 0) return;
@@ -656,33 +700,40 @@ createApp({
             // Logged in (Employee or Admin): Save to DB first
             saving.value = true;
 
-            const trData = billItems.value.map((item, idx) => ({
-                customer_name: item.customerName || 'เงินสด',
-                phone: item.phone || '',
-                id_card: item.idCard || '',
-                address: item.address || '',
-                // Save large base64 assets ONLY on the first row (idx === 0)
-                id_card_photo: idx === 0 ? (calcForm.value.idCardPhoto || '') : '',
-                type: item.type,
-                base_price: item.basePrice,
-                premium_amount: item.premium,
-                percent: item.percent,
-                weight: item.weight,
-                net_price: item.netPrice,
-                signature: idx === 0 ? lastSignature.value : null,
-                photo: idx === 0 ? productPhoto.value : null,
-                created_at: new Date().toISOString()
-            }));
+            try {
+                // Upload assets to Bucket first (ONLY once per bill)
+                const idCardUrl = calcForm.value.idCardPhoto ? await uploadToBucket(calcForm.value.idCardPhoto, 'id_card') : '';
+                const productUrl = productPhoto.value ? await uploadToBucket(productPhoto.value, 'product') : null;
+                const signatureUrl = lastSignature.value ? await uploadToBucket(lastSignature.value, 'signature') : null;
 
-            const { error } = await supabase.from('transactions').insert(trData);
-            saving.value = false;
+                const trData = billItems.value.map((item, idx) => ({
+                    customer_name: item.customerName || 'เงินสด',
+                    phone: item.phone || '',
+                    id_card: item.idCard || '',
+                    address: item.address || '',
+                    // Save URLs only on the first row to optimize storage
+                    id_card_photo: idx === 0 ? idCardUrl : '',
+                    type: item.type,
+                    base_price: item.basePrice,
+                    premium_amount: item.premium,
+                    percent: item.percent,
+                    weight: item.weight,
+                    net_price: item.netPrice,
+                    signature: idx === 0 ? signatureUrl : null,
+                    photo: idx === 0 ? productUrl : null,
+                    created_at: new Date().toISOString()
+                }));
 
-            if (error) {
-                alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
-            } else {
+                const { error } = await supabase.from('transactions').insert(trData);
+                if (error) throw error;
+
+                saving.value = false;
                 nextTick(() => {
                     triggerPrint();
                 });
+            } catch (error) {
+                saving.value = false;
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
             }
         };
 
@@ -906,6 +957,7 @@ createApp({
             totalWeight,
             billTotal,
             isPrintReady,
+            uploadToBucket,
             formatCurrency,
             filter,
             isFilterActive,

@@ -52,3 +52,40 @@
 127.0.0.1 - - [31/Mar/2026 02:09:23] "GET /read HTTP/1.1" 200 -
 127.0.0.1 - - [31/Mar/2026 02:10:34] "GET /read HTTP/1.1" 200 -
 127.0.0.1 - - [31/Mar/2026 02:13:53] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:24:10] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:24:17] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:24:42] "GET /read HTTP/1.1" 200 -
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 50419)
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 318, in _handle_request_noblock
+    self.process_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 349, in process_request
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 496, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 484, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/krit/.gemini/antigravity/scratch/kritgold/scripts/bridge.py", line 22, in do_GET
+    print(f"Read Result: {result.get('status')} - {result.get('message')}")
+                          ^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'get'
+----------------------------------------
+127.0.0.1 - - [31/Mar/2026 02:26:56] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:38:02] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:41:01] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:41:06] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:43:47] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:48:17] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:50:46] "GET /read HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 02:54:45] "GET /read HTTP/1.1" 200 -

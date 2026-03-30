@@ -901,11 +901,22 @@
                                         formatCurrency(t.net_price) }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                                         <div class="flex items-center justify-center gap-3">
-                                            <i v-if="t.signature" class="fa-solid fa-signature text-blue-400 text-lg" title="มีลายเซ็น"></i>
-                                            <button v-if="t.photo" @click="viewingPhoto = t.photo" class="text-gold-400 hover:text-gold-300 transition-colors">
+                                            <!-- ลายเซ็น -->
+                                            <button v-if="t.signature" @click="viewingPhoto = t.signature" 
+                                                class="text-blue-400 hover:text-blue-300 transition-colors" title="ดูโฉมลายเซ็น">
+                                                <i class="fa-solid fa-signature text-lg"></i>
+                                            </button>
+                                            <!-- รูปสินค้า -->
+                                            <button v-if="t.photo" @click="viewingPhoto = t.photo" 
+                                                class="text-gold-400 hover:text-gold-300 transition-colors" title="ดูรูปสินค้า">
                                                 <i class="fa-solid fa-image text-lg"></i>
                                             </button>
-                                            <span v-if="!t.signature && !t.photo" class="text-gray-700">-</span>
+                                            <!-- รูปบัตรประชาชน -->
+                                            <button v-if="t.id_card_photo" @click="viewingPhoto = t.id_card_photo" 
+                                                class="text-green-400 hover:text-green-300 transition-colors" title="ดูรูปบัตรประชาชน">
+                                                <i class="fa-solid fa-id-card text-lg"></i>
+                                            </button>
+                                            <span v-if="!t.signature && !t.photo && !t.id_card_photo" class="text-gray-700">-</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
@@ -1091,7 +1102,7 @@
         <div v-if="viewingPhoto" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" @click.self="viewingPhoto = null">
             <div class="relative max-w-4xl w-full bg-dark-base rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
                 <div class="flex justify-between items-center p-4 border-b border-gray-800">
-                    <h3 class="text-gold-400 font-bold">ภาพถ่ายสินค้าหลักฐาน</h3>
+                    <h3 class="text-gold-400 font-bold">ดูรายละเอียดหลักฐาน</h3>
                     <button @click="viewingPhoto = null" class="text-gray-400 hover:text-white transition-colors">
                         <i class="fa-solid fa-xmark text-xl"></i>
                     </button>
