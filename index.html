@@ -511,12 +511,20 @@
                                                     <label class="block text-[11px] font-bold text-gold-500 uppercase tracking-wider">
                                                         <i class="fa-solid fa-pen-nib mr-1.5"></i>ลายเซ็นผู้ขาย <span class="text-red-500">*</span>
                                                     </label>
-                                                    <button @click="clearSignature" class="text-[9px] text-gray-500 hover:text-red-400 font-bold uppercase transition-colors">ล้าง</button>
+                                                    <button v-if="lastSignature" @click="clearSignature" class="text-[9px] text-gray-500 hover:text-red-400 font-bold uppercase transition-colors">ล้าง</button>
                                                 </div>
-                                                <div class="bg-white border border-gray-700 rounded-xl overflow-hidden h-24 relative shadow-inner">
-                                                    <canvas id="signature-pad" class="w-full h-full cursor-crosshair"></canvas>
-                                                    <div v-if="!lastSignature" class="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                                        <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold opacity-40 italic">ลงนามยืนยัน</p>
+                                                <div class="relative group h-24">
+                                                    <div v-if="!lastSignature" 
+                                                        class="w-full h-full border-2 border-dashed border-gray-700 hover:border-gold-500/50 rounded-xl flex flex-col items-center justify-center bg-dark-base/30 transition-all cursor-pointer overflow-hidden"
+                                                        @click="openSignatureModal">
+                                                        <i class="fa-solid fa-pen text-lg text-gray-600 group-hover:text-gold-500 transition-colors"></i>
+                                                        <span class="text-[9px] text-gray-500 group-hover:text-gray-300">แตะเพื่อลงลายเซ็น</span>
+                                                    </div>
+                                                    <div v-else class="relative h-full animate-fade-in cursor-pointer group" @click="openSignatureModal">
+                                                        <img :src="lastSignature" class="w-full h-full object-contain bg-white rounded-xl border border-gold-500/30 shadow-lg" />
+                                                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
+                                                            <span class="text-white text-[10px] font-bold uppercase tracking-wider">แก้ไขลายเซ็น</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1075,19 +1083,23 @@
 
                 <div
                     style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9pt; text-align: center; padding: 0 5px;">
-                    <div style="width: 48%; position: relative; margin-top: 15px;">
-                        <div
-                            style="position: absolute; width: 100%; top: -12px; left: 0; display: flex; justify-content: center; pointer-events: none;">
-                            <img v-if="lastSignature" :src="lastSignature"
-                                style="max-height: 25px; max-width: 120px; object-fit: contain;" />
+                    <div style="width: 48%; margin-top: 35px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; position: relative;">
+                            <span>ลงชื่อ</span>
+                            <div style="flex-grow: 1; border-bottom: 1px dotted #000; margin: 0 4px; position: relative; height: 14px;">
+                                <img v-if="lastSignature" :src="lastSignature"
+                                    style="position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); max-height: 32px; max-width: 150px; object-fit: contain; pointer-events: none;" />
+                            </div>
+                            <span>ผู้ขาย/ผู้รับ</span>
                         </div>
-                        <p style="margin-bottom: 4px;">
-                            ลงชื่อ....................................................ผู้ขาย/ผู้รับ</p>
                         <p>({{ calcForm.customerName || '....................................................' }})</p>
                     </div>
-                    <div style="width: 48%; margin-top: 15px;">
-                        <p style="margin-bottom: 4px;">
-                            ลงชื่อ....................................................ผู้ซื้อ/ผู้จ่าย</p>
+                    <div style="width: 48%; margin-top: 35px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; position: relative;">
+                            <span>ลงชื่อ</span>
+                            <div style="flex-grow: 1; border-bottom: 1px dotted #000; margin: 0 4px; position: relative; height: 14px;"></div>
+                            <span>ผู้ซื้อ/ผู้จ่าย</span>
+                        </div>
                         <p>(....................................................)</p>
                     </div>
                 </div>
@@ -1113,6 +1125,45 @@
                 <div class="p-4 text-center">
                     <button @click="viewingPhoto = null" class="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-full text-sm font-medium transition-colors">
                         ปิดหน้าต่าง
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signature Pad Modal -->
+        <div v-if="showSignatureModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/90 backdrop-blur-md" @click="closeSignatureModal"></div>
+            <div class="bg-gray-900 rounded-3xl shadow-2xl z-10 w-full max-w-2xl border border-gold-500/30 overflow-hidden animate-[scale-in_0.3s_ease-out]">
+                <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-dark-surface/50">
+                    <div>
+                        <h3 class="text-xl font-bold text-gold-400">ลงลายเซ็นยืนยัน</h3>
+                        <p class="text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">Digital Signature</p>
+                    </div>
+                    <button @click="closeSignatureModal" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="p-6 bg-black/20">
+                    <div class="bg-white rounded-2xl overflow-hidden shadow-inner relative" style="height: 300px;">
+                        <canvas id="signature-pad-modal" class="w-full h-full cursor-crosshair"></canvas>
+                        <div v-if="!modalHasSignature" class="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20">
+                            <div class="text-center">
+                                <i class="fa-solid fa-pen-nib text-4xl text-gray-400 mb-2"></i>
+                                <p class="text-sm text-gray-400 font-bold uppercase tracking-widest">ลงนามในช่องนี้</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 bg-dark-surface/50 border-t border-gray-800 flex flex-col sm:flex-row gap-3">
+                    <button @click="clearModalSignature" 
+                        class="flex-1 py-3 px-6 rounded-xl border border-gray-700 bg-gray-800 text-gray-300 font-bold hover:bg-gray-700 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-eraser"></i> ล้างลายเซ็น
+                    </button>
+                    <button @click="saveModalSignature" 
+                        class="flex-[2] py-3 px-6 rounded-xl bg-gradient-to-r from-gold-600 to-gold-400 text-black font-extrabold hover:from-gold-500 hover:to-gold-300 transition-all shadow-lg hover-glow flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check-circle"></i> ยืนยันลายเซ็น
                     </button>
                 </div>
             </div>

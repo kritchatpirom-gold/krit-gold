@@ -3,7 +3,7 @@ const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
 const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 //const supabaseUrl = 'http://127.0.0.1:54321';
-//const supabaseUrl = 'http://192.168.1.104:54321';
+//const supabaseUrl = 'http://192.168.1.136:54321';
 //const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
@@ -27,6 +27,8 @@ createApp({
         const productPhoto = ref(null);
         const viewingPhoto = ref(null);
         const readCardLoading = ref(false); // ID Card Reading State
+        const showSignatureModal = ref(false);
+        const modalHasSignature = ref(false);
         let signaturePad = null;
 
         // Roles
@@ -209,6 +211,7 @@ createApp({
 
         const isFormValid = computed(() => {
             let baseValid = false;
+            // Asset type and weight are always required
             if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem') {
                 baseValid = calcForm.value.weight > 0;
             } else {
@@ -216,7 +219,15 @@ createApp({
             }
 
             if (isLoggedIn.value) {
-                return baseValid && isIdCardValid.value && calcForm.value.customerName.trim().length > 1;
+                // Must have name and valid ID format
+                const identityValid = isIdCardValid.value && calcForm.value.customerName.trim().length > 1;
+
+                // Both Admin and Employee modes must have Phone, Photo, and Signature to add to bill
+                const hasPhone = isPhoneValid.value;
+                const hasPhoto = productPhoto.value !== null;
+                const hasSignature = (signaturePad && !signaturePad.isEmpty()) || lastSignature.value !== null;
+
+                return baseValid && identityValid && hasPhone && hasPhoto && hasSignature;
             }
             return baseValid;
         });
@@ -364,7 +375,7 @@ createApp({
         };
 
         const initSignaturePad = (retries = 0) => {
-            const canvas = document.getElementById('signature-pad');
+            const canvas = document.getElementById('signature-pad-modal');
 
             // Check if canvas exists and is visible (width > 0)
             if (canvas && canvas.offsetWidth > 0) {
@@ -380,11 +391,17 @@ createApp({
                 canvas.height = canvas.offsetHeight * ratio;
                 canvas.getContext("2d").scale(ratio, ratio);
 
-                // Create fresh instance
+                // Create fresh instance with standard pen for signing
                 signaturePad = new SignaturePad(canvas, {
                     backgroundColor: 'rgba(255, 255, 255, 0)',
-                    penColor: 'rgb(0, 51, 153)',
+                    penColor: 'rgb(0, 51, 153)', // Royal Blue
+                    minWidth: 0.5,  // Standard for natural signing
+                    maxWidth: 2.5,  // Standard for natural signing
                     velocityFilterWeight: 0.7
+                });
+
+                signaturePad.addEventListener("beginStroke", () => {
+                    modalHasSignature.value = true;
                 });
             } else if (retries < 30) {
                 // Keep trying every 100ms for up to 3 seconds (to cover slow transitions)
@@ -392,10 +409,97 @@ createApp({
             }
         };
 
-        const clearSignature = () => {
+        const openSignatureModal = () => {
+            showSignatureModal.value = true;
+            modalHasSignature.value = lastSignature.value !== null;
+            nextTick(() => {
+                initSignaturePad();
+                if (lastSignature.value && signaturePad) {
+                    signaturePad.fromDataURL(lastSignature.value);
+                }
+            });
+        };
+
+        const closeSignatureModal = () => {
+            showSignatureModal.value = false;
+        };
+
+        const saveModalSignature = () => {
+            if (signaturePad && !signaturePad.isEmpty()) {
+                // Auto-scale to fill the box if requested
+                try {
+                    const data = signaturePad.toData();
+                    if (data && data.length > 0) {
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+                        // 1. Find bounding box
+                        data.forEach(stroke => {
+                            stroke.points.forEach(point => {
+                                if (point.x < minX) minX = point.x;
+                                if (point.y < minY) minY = point.y;
+                                if (point.x > maxX) maxX = point.x;
+                                if (point.y > maxY) maxY = point.y;
+                            });
+                        });
+
+                        const sigW = maxX - minX;
+                        const sigH = maxY - minY;
+
+                        // Check if signature has some size (not just a single dot)
+                        if (sigW > 5 && sigH > 5) {
+                            const canvas = signaturePad.canvas;
+                            const padding = 20; // px padding
+                            const availableW = canvas.offsetWidth - (padding * 2);
+                            const availableH = canvas.offsetHeight - (padding * 2);
+
+                            // 2. Calculate scale factors (preserve aspect ratio)
+                            const scale = Math.min(availableW / sigW, availableH / sigH);
+
+                            // Apply scaling to points
+                            const newData = data.map(stroke => {
+                                return {
+                                    ...stroke,
+                                    points: stroke.points.map(point => ({
+                                        ...point,
+                                        // Push space to the top, but slightly less than before (0.65 for a better balance)
+                                        x: (point.x - minX) * scale + (canvas.offsetWidth - sigW * scale) / 2,
+                                        y: (point.y - minY) * scale + (canvas.offsetHeight - sigH * scale) * 0.65
+                                    }))
+                                };
+                            });
+
+                            // 3. Temporarily set to BOLD settings for the final receipt output
+                            signaturePad.minWidth = 2.5;
+                            signaturePad.maxWidth = 5.5;
+
+                            // 4. Update pad with scaled data (this triggers a redraw with the bold settings)
+                            signaturePad.fromData(newData);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error scaling signature:', err);
+                    // Fallback to original if scaling fails
+                }
+
+                lastSignature.value = signaturePad.toDataURL();
+                showSignatureModal.value = false;
+            } else {
+                alert('กรุณาลงลายเซ็นก่อนยืนยัน');
+            }
+        };
+
+        const clearModalSignature = () => {
             if (signaturePad) {
                 signaturePad.clear();
-                lastSignature.value = null;
+                modalHasSignature.value = false;
+            }
+        };
+
+        const clearSignature = () => {
+            lastSignature.value = null;
+            if (signaturePad) {
+                signaturePad.clear();
+                modalHasSignature.value = false;
             }
         };
 
@@ -541,6 +645,8 @@ createApp({
 
         const deleteTransaction = async (id) => {
             if (confirm('ยืนยันการลบรายการนี้?')) {
+                // Delete assets from storage first
+                await deleteTransactionAssets(id);
                 const { error } = await supabase.from('transactions').delete().eq('id', id);
                 if (!error) loadTransactions();
                 else alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
@@ -551,6 +657,8 @@ createApp({
             if (selectedTransactions.value.length === 0) return;
             if (confirm(`ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ?`)) {
                 loadingTransactions.value = true;
+                // Delete assets from storage first
+                await deleteTransactionAssets(selectedTransactions.value);
                 const { error } = await supabase
                     .from('transactions')
                     .delete()
@@ -653,6 +761,66 @@ createApp({
                 console.error(`Upload Failed for ${filename}:`, err);
                 // Fallback to base64 but warn the developer
                 return base64Data;
+            }
+        };
+
+        const extractStoragePath = (url) => {
+            if (!url || !url.includes('transaction_assets/')) return null;
+            // Extract everything after 'transaction_assets/'
+            const parts = url.split('transaction_assets/');
+            if (parts.length < 2) return null;
+            // The path might contain query params if it's a signed URL, but here it's public
+            return parts[1].split('?')[0];
+        };
+
+        const deleteTransactionAssets = async (transactionIds) => {
+            try {
+                const ids = Array.isArray(transactionIds) ? transactionIds : [transactionIds];
+                if (ids.length === 0) return;
+
+                // Fetch the records to get asset URLs
+                const { data: records, error } = await supabase
+                    .from('transactions')
+                    .select('id_card_photo, signature, photo')
+                    .in('id', ids);
+
+                if (error) {
+                    console.error('Error fetching transactions for asset deletion:', error);
+                    return;
+                }
+
+                if (!records || records.length === 0) return;
+
+                const pathsToDelete = [];
+                records.forEach(r => {
+                    if (r.id_card_photo) {
+                        const path = extractStoragePath(r.id_card_photo);
+                        if (path) pathsToDelete.push(path);
+                    }
+                    if (r.signature) {
+                        const path = extractStoragePath(r.signature);
+                        if (path) pathsToDelete.push(path);
+                    }
+                    if (r.photo) {
+                        const path = extractStoragePath(r.photo);
+                        if (path) pathsToDelete.push(path);
+                    }
+                });
+
+                if (pathsToDelete.length > 0) {
+                    console.log('Deleting assets from storage:', pathsToDelete);
+                    const { error: storageError } = await supabase.storage
+                        .from('transaction_assets')
+                        .remove(pathsToDelete);
+
+                    if (storageError) {
+                        console.error('Error deleting assets from storage:', storageError);
+                    } else {
+                        console.log('Successfully deleted assets from storage');
+                    }
+                }
+            } catch (err) {
+                console.error('Unexpected error in deleteTransactionAssets:', err);
             }
         };
 
@@ -993,7 +1161,14 @@ createApp({
             productPhoto,
             handlePhotoChange,
             removePhoto,
-            viewingPhoto
+            viewingPhoto,
+            deleteTransactionAssets,
+            showSignatureModal,
+            modalHasSignature,
+            openSignatureModal,
+            closeSignatureModal,
+            saveModalSignature,
+            clearModalSignature
         };
     }
 }).mount('#app');
