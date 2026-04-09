@@ -1,10 +1,10 @@
 const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
-const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
-const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
+//const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
+//const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 //const supabaseUrl = 'http://127.0.0.1:54321';
-//const supabaseUrl = 'http://192.168.1.136:54321';
-//const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
+const supabaseUrl = 'http://192.168.1.136:54321';
+const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
@@ -851,10 +851,10 @@ createApp({
                 window.print();
 
                 // Fallback for mobile browsers that don't block JS execution
-                // and might not reliably fire afterprint, giving them 3 secs to render PDF.
+                // and might not reliably fire afterprint, giving them 30 secs to render PDF.
                 setTimeout(() => {
                     handleAfterPrint();
-                }, 3000);
+                }, 30000);
             };
 
             // If completely public guest (no login), just print without calling DB
