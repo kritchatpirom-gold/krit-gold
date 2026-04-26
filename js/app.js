@@ -1,10 +1,10 @@
 const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
-const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
-const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
+//const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
+//const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 //const supabaseUrl = 'http://127.0.0.1:54321';
-//const supabaseUrl = 'http://192.168.1.136:54321';
-//const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
+const supabaseUrl = 'http://192.168.1.112:54321';
+const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
@@ -824,6 +824,20 @@ createApp({
             }
         };
 
+        const openDrawer = async () => {
+            try {
+                const response = await fetch('http://localhost:8080/open_drawer', {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache'
+                });
+                const result = await response.json();
+                console.log('Drawer Trigger:', result);
+            } catch (err) {
+                console.error('Failed to open drawer:', err);
+            }
+        };
+
         const saveAndPrint = async () => {
             if (!isPrintReady.value) {
                 if (billItems.value.length === 0) return;
@@ -859,6 +873,8 @@ createApp({
 
             // If completely public guest (no login), just print without calling DB
             if (!isLoggedIn.value) {
+                // Open drawer even for guest if they print?
+                openDrawer();
                 nextTick(() => {
                     triggerPrint();
                 });
@@ -894,6 +910,9 @@ createApp({
 
                 const { error } = await supabase.from('transactions').insert(trData);
                 if (error) throw error;
+
+                // Open the drawer!
+                openDrawer();
 
                 saving.value = false;
                 nextTick(() => {
@@ -1153,6 +1172,7 @@ createApp({
             removeBillItem,
             billTotal,
             saveAndPrint,
+            openDrawer,
 
             formatDate,
             getTypeName,

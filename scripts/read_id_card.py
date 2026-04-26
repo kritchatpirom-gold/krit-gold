@@ -40,8 +40,7 @@ def read_card_data():
     all_readers = readers()
     if not all_readers:
         result["message"] = "No reader found"
-        print(json.dumps(result, ensure_ascii=False))
-        return
+        return result
 
     reader = all_readers[0]
     connection = reader.createConnection()
