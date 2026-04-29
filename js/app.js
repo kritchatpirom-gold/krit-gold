@@ -29,7 +29,9 @@ createApp({
         const readCardLoading = ref(false); // ID Card Reading State
         const showSignatureModal = ref(false);
         const modalHasSignature = ref(false);
+        const showCameraModal = ref(false);
         let signaturePad = null;
+        let cameraStream = null;
 
         // Roles
         const isAdmin = computed(() => user.value && user.value.email === 'admin@kritgold.com');
@@ -1099,6 +1101,53 @@ createApp({
             mobileMenuOpen.value = false;
         });
 
+        const openCamera = () => {
+            showCameraModal.value = true;
+            nextTick(async () => {
+                try {
+                    const constraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    };
+                    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    const video = document.getElementById('webcam-preview');
+                    if (video) {
+                        video.srcObject = cameraStream;
+                    }
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    alert('ไม่สามารถเปิดกล้องได้: ' + err.message);
+                    showCameraModal.value = false;
+                }
+            });
+        };
+
+        const closeCamera = () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+            showCameraModal.value = false;
+        };
+
+        const takeSnapshot = () => {
+            const video = document.getElementById('webcam-preview');
+            const canvas = document.getElementById('camera-canvas');
+            if (video && canvas) {
+                const ctx = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Compress and set as product photo
+                productPhoto.value = canvas.toDataURL('image/jpeg', 0.8);
+
+                closeCamera();
+            }
+        };
+
         return {
             currentTab,
             user,
@@ -1130,6 +1179,11 @@ createApp({
             silverPriceExchange,
             silverPrice,
 
+            showCameraModal,
+            openCamera,
+            closeCamera,
+            takeSnapshot,
+
             priceTrendGold,
             priceTrendSilver,
 
@@ -1142,7 +1196,6 @@ createApp({
             loadingTransactions,
             transactionsTotal,
             totalWeight,
-            billTotal,
             isPrintReady,
             uploadToBucket,
             formatCurrency,

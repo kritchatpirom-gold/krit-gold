@@ -517,9 +517,9 @@
                                                         class="text-red-500">*</span>
                                                 </label>
                                                 <div class="relative group h-24">
-                                                    <div v-if="!productPhoto"
-                                                        class="w-full h-full border-2 border-dashed border-gray-700 hover:border-gold-500/50 rounded-xl flex flex-col items-center justify-center bg-dark-base/30 transition-all cursor-pointer overflow-hidden"
-                                                        onclick="document.getElementById('photo-input').click()">
+                                                     <div v-if="!productPhoto"
+                                                         class="w-full h-full border-2 border-dashed border-gray-700 hover:border-gold-500/50 rounded-xl flex flex-col items-center justify-center bg-dark-base/30 transition-all cursor-pointer overflow-hidden"
+                                                         @click="openCamera">
                                                         <i
                                                             class="fa-solid fa-plus text-lg text-gray-600 group-hover:text-gold-500 transition-colors"></i>
                                                         <span
@@ -1237,6 +1237,34 @@
                     <button @click="saveModalSignature"
                         class="flex-[2] py-3 px-6 rounded-xl bg-gradient-to-r from-gold-600 to-gold-400 text-black font-extrabold hover:from-gold-500 hover:to-gold-300 transition-all shadow-lg hover-glow flex items-center justify-center gap-2">
                         <i class="fa-solid fa-check-circle"></i> ยืนยันลายเซ็น
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Modal -->
+        <div v-if="showCameraModal"
+            class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-fade-in">
+            <div class="glass w-full max-w-xl rounded-2xl overflow-hidden border border-gold-500/30 flex flex-col">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-dark-surface">
+                    <h3 class="text-gold-400 font-bold"><i class="fa-solid fa-camera mr-2"></i>ถ่ายภาพสินค้า</h3>
+                    <button @click="closeCamera" class="text-gray-400 hover:text-white p-2">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+                <div class="relative bg-black aspect-video flex items-center justify-center overflow-hidden">
+                    <video id="webcam-preview" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <canvas id="camera-canvas" class="hidden"></canvas>
+                    <!-- Overlay Guide -->
+                    <div
+                        class="absolute inset-0 border-2 border-gold-500/20 pointer-events-none flex items-center justify-center">
+                        <div class="w-64 h-48 border border-white/30 rounded-lg"></div>
+                    </div>
+                </div>
+                <div class="p-8 bg-dark-surface flex justify-center items-center">
+                    <button @click="takeSnapshot"
+                        class="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-110 active:scale-95 transition-all group">
+                        <div class="w-16 h-16 rounded-full border-4 border-dark-base group-hover:border-gold-500 transition-colors"></div>
                     </button>
                 </div>
             </div>
