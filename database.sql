@@ -46,3 +46,28 @@ CREATE POLICY "Allow public read-only access to gold_premiums" ON gold_premiums 
 -- Allow full access for authenticated users
 CREATE POLICY "Allow authenticated full access to gold_premiums" ON gold_premiums FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Allow authenticated full access to transactions" ON transactions FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow All Access" 
+ON storage.objects 
+FOR ALL
+TO public
+USING (bucket_id = 'transaction_assets'::text)
+WITH CHECK (bucket_id = 'transaction_assets'::text);
+
+-- Table: global_settings
+CREATE TABLE IF NOT EXISTS global_settings (
+  key TEXT PRIMARY KEY,
+  value NUMERIC NOT NULL
+);
+
+-- Insert default silver deduction (13%)
+INSERT INTO global_settings (key, value) VALUES ('silver_deduction', 13) ON CONFLICT (key) DO NOTHING;
+
+-- Setup RLS for global_settings
+ALTER TABLE global_settings ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access
+CREATE POLICY "Allow public read access to global_settings" ON global_settings FOR SELECT USING (true);
+
+-- Allow authenticated full access
+CREATE POLICY "Allow authenticated full access to global_settings" ON global_settings FOR ALL USING (auth.role() = 'authenticated');

@@ -1,0 +1,149 @@
+[Sun 05/10/2026 19:29:05.43] Starting Wrangler Pages Dev Server... 
+
+ ⛅️ wrangler 4.90.0
+───────────────────
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNo compatibility_date was specified. Using today's date: 2026-05-10.[0m
+
+  ❯❯ Add one to your Wrangler configuration file: compatibility_date = "2026-05-10", or
+  ❯❯ Pass it in your terminal: wrangler pages dev [<DIRECTORY>] --compatibility-date=2026-05-10
+  
+  See [4mhttps://developers.cloudflare.com/workers/platform/compatibility-dates/[0m for more information.
+
+
+✨ Compiled Worker successfully
+Your Worker has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CF_PAGES ("1")                                                        Environment Variable      local
+env.CF_PAGES_BRANCH ("main")                                              Environment Variable      local
+env.CF_PAGES_COMMIT_SHA ("df68aee62cc205ee35e404b4819934937cbc7...")      Environment Variable      local
+env.CF_PAGES_URL ("https://df68aee.krit-gold.pages.dev")                  Environment Variable      local
+
+⎔ Starting local server...
+[wrangler:info] Ready on http://0.0.0.0:8788
+[wrangler:info] - http://192.168.1.124:8788
+[wrangler:info] - http://127.0.0.1:8788
+[wrangler:info] - http://172.24.48.1:8788
+[Sun 05/10/2026 19:36:46.41] Starting Wrangler Pages Dev Server in C:\Users\Fischer\krit-gold 
+
+ ⛅️ wrangler 4.90.0
+───────────────────
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNo compatibility_date was specified. Using today's date: 2026-05-10.[0m
+
+  ❯❯ Add one to your Wrangler configuration file: compatibility_date = "2026-05-10", or
+  ❯❯ Pass it in your terminal: wrangler pages dev [<DIRECTORY>] --compatibility-date=2026-05-10
+  
+  See [4mhttps://developers.cloudflare.com/workers/platform/compatibility-dates/[0m for more information.
+
+
+✨ Compiled Worker successfully
+Your Worker has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CF_PAGES ("1")                                                        Environment Variable      local
+env.CF_PAGES_BRANCH ("main")                                              Environment Variable      local
+env.CF_PAGES_COMMIT_SHA ("df68aee62cc205ee35e404b4819934937cbc7...")      Environment Variable      local
+env.CF_PAGES_URL ("https://df68aee.krit-gold.pages.dev")                  Environment Variable      local
+
+⎔ Starting local server...
+[wrangler:info] Ready on http://0.0.0.0:8788
+[wrangler:info] - http://192.168.1.124:8788
+[wrangler:info] - http://127.0.0.1:8788
+[wrangler:info] - http://172.24.48.1:8788
+[wrangler:info] GET / 304 Not Modified (28ms)
+[wrangler:info] GET /css/style.css 304 Not Modified (9ms)
+[wrangler:info] GET /images/logo.jpg 304 Not Modified (12ms)
+[wrangler:info] GET /js/app.js 304 Not Modified (12ms)
+[wrangler:info] GET /images/xray.png 304 Not Modified (19ms)
+[wrangler:info] GET /images/bg.png 304 Not Modified (5ms)
+[wrangler:info] GET /images/cover.jpg 304 Not Modified (72ms)
+[wrangler:info] GET /images/banner.jpg 304 Not Modified (72ms)
+[wrangler:info] GET /images/logo.jpg 304 Not Modified (12ms)
+[wrangler:info] GET /api/gold 200 OK (380ms)
+[wrangler:info] GET /api/xag 200 OK (431ms)
+[wrangler:info] GET / 304 Not Modified (9ms)
+[wrangler:info] GET /css/style.css 304 Not Modified (9ms)
+[wrangler:info] GET /js/app.js 304 Not Modified (16ms)
+[wrangler:info] GET /images/xray.png 304 Not Modified (22ms)
+[wrangler:info] GET /images/logo.jpg 304 Not Modified (13ms)
+[wrangler:info] GET /images/bg.png 304 Not Modified (8ms)
+[wrangler:info] GET /images/cover.jpg 304 Not Modified (5ms)
+[wrangler:info] GET /images/banner.jpg 304 Not Modified (7ms)
+[wrangler:info] GET /api/gold 200 OK (284ms)
+[wrangler:info] GET /api/xag 200 OK (341ms)
+^C[Sun 05/10/2026 19:38:32.04] Starting Wrangler Pages Dev Server in c:\Users\Fischer\krit-gold 
+
+ ⛅️ wrangler 4.90.0
+───────────────────
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNo compatibility_date was specified. Using today's date: 2026-05-10.[0m
+
+  ❯❯ Add one to your Wrangler configuration file: compatibility_date = "2026-05-10", or
+  ❯❯ Pass it in your terminal: wrangler pages dev [<DIRECTORY>] --compatibility-date=2026-05-10
+  
+  See [4mhttps://developers.cloudflare.com/workers/platform/compatibility-dates/[0m for more information.
+
+
+✨ Compiled Worker successfully
+Your Worker has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CF_PAGES ("1")                                                        Environment Variable      local
+env.CF_PAGES_BRANCH ("main")                                              Environment Variable      local
+env.CF_PAGES_COMMIT_SHA ("df68aee62cc205ee35e404b4819934937cbc7...")      Environment Variable      local
+env.CF_PAGES_URL ("https://df68aee.krit-gold.pages.dev")                  Environment Variable      local
+
+⎔ Starting local server...
+[wrangler:info] Ready on http://0.0.0.0:8788
+[wrangler:info] - http://192.168.1.124:8788
+[wrangler:info] - http://127.0.0.1:8788
+[wrangler:info] - http://172.24.48.1:8788
+[wrangler:info] GET / 304 Not Modified (26ms)
+[wrangler:info] GET /css/style.css 304 Not Modified (10ms)
+[wrangler:info] GET /images/logo.jpg 304 Not Modified (13ms)
+[wrangler:info] GET /js/app.js 304 Not Modified (12ms)
+[wrangler:info] GET /images/xray.png 304 Not Modified (22ms)
+[wrangler:info] GET /images/bg.png 304 Not Modified (5ms)
+[wrangler:info] GET /images/cover.jpg 304 Not Modified (10ms)
+[wrangler:info] GET /images/banner.jpg 304 Not Modified (12ms)
+[wrangler:info] GET /api/gold 200 OK (246ms)
+[wrangler:info] GET /api/xag 200 OK (293ms)
+[Sun 05/10/2026 19:41:42.78] Starting Wrangler Pages Dev Server in c:\Users\Fischer\krit-gold 
+
+ ⛅️ wrangler 4.90.0
+───────────────────
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mNo compatibility_date was specified. Using today's date: 2026-05-10.[0m
+
+  ❯❯ Add one to your Wrangler configuration file: compatibility_date = "2026-05-10", or
+  ❯❯ Pass it in your terminal: wrangler pages dev [<DIRECTORY>] --compatibility-date=2026-05-10
+  
+  See [4mhttps://developers.cloudflare.com/workers/platform/compatibility-dates/[0m for more information.
+
+
+✨ Compiled Worker successfully
+Your Worker has access to the following bindings:
+Binding                                                                   Resource                  Mode
+env.CF_PAGES ("1")                                                        Environment Variable      local
+env.CF_PAGES_BRANCH ("main")                                              Environment Variable      local
+env.CF_PAGES_COMMIT_SHA ("df68aee62cc205ee35e404b4819934937cbc7...")      Environment Variable      local
+env.CF_PAGES_URL ("https://df68aee.krit-gold.pages.dev")                  Environment Variable      local
+
+⎔ Starting local server...
+[wrangler:info] Ready on http://0.0.0.0:8788
+[wrangler:info] - http://192.168.1.124:8788
+[wrangler:info] - http://127.0.0.1:8788
+[wrangler:info] - http://172.24.48.1:8788
+[wrangler:info] GET / 304 Not Modified (15ms)
+[wrangler:info] GET /css/style.css 304 Not Modified (9ms)
+[wrangler:info] GET /images/logo.jpg 304 Not Modified (9ms)
+[wrangler:info] GET /js/app.js 304 Not Modified (11ms)
+[wrangler:info] GET /images/xray.png 304 Not Modified (15ms)
+[wrangler:info] GET /images/bg.png 304 Not Modified (4ms)
+[wrangler:info] GET /images/cover.jpg 304 Not Modified (5ms)
+[wrangler:info] GET /images/banner.jpg 304 Not Modified (6ms)
+[wrangler:info] GET /api/gold 200 OK (187ms)
+[wrangler:info] GET /api/xag 200 OK (285ms)
+[wrangler:info] GET /api/gold 200 OK (175ms)
+[wrangler:info] GET /api/xag 200 OK (342ms)
+[wrangler:info] GET /api/gold 200 OK (188ms)
+[wrangler:info] GET /api/xag 200 OK (311ms)
+[wrangler:info] GET /api/gold 200 OK (237ms)
+[wrangler:info] GET /api/xag 200 OK (294ms)
+[wrangler:info] GET /api/gold 200 OK (280ms)
+[wrangler:info] GET /api/xag 200 OK (507ms)

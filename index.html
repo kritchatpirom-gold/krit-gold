@@ -612,11 +612,11 @@
 
                                     <div
                                         class="grid grid-cols-2 gap-4 bg-dark-base/50 p-4 rounded-xl border border-gray-800">
-                                        <div v-show="calcForm.type !== 'tong_roop' && calcForm.type !== 'redeem'">
+                                        <div v-show="calcForm.type !== 'tong_roop' && calcForm.type !== 'redeem' && calcForm.type !== 'tong_tang'">
                                             <label class="block text-sm font-medium text-gray-400 mb-1">ความบริสุทธิ์
                                                 (%)</label>
                                             <div class="relative">
-                                                <input type="number" step="0.01" v-model.number="calcForm.percent"
+                                                <input type="number" step="1" v-model.number="calcForm.percent"
                                                     class="w-full pl-4 pr-8 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none"
                                                     min="0" max="100">
                                                 <span class="absolute right-3 top-3 text-gray-500">%</span>
@@ -624,19 +624,19 @@
                                             <!-- ปุ่มความบริสุทธิ์ทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นรูปพรรณ/ไถ่ถอน/เงิน) -->
                                             <div v-show="!isLoggedIn && calcForm.type !== 'tong_roop' && calcForm.type !== 'redeem' && calcForm.type !== 'silver'"
                                                 class="mt-2 flex flex-wrap gap-1">
-                                                <button type="button" @click="calcForm.percent = 37.5"
+                                                <button type="button" @click="calcForm.percent = 37"
                                                     class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">9k</button>
-                                                <button type="button" @click="calcForm.percent = 50.0"
+                                                <button type="button" @click="calcForm.percent = 50"
                                                     class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">12k</button>
-                                                <button type="button" @click="calcForm.percent = 58.33"
+                                                <button type="button" @click="calcForm.percent = 58"
                                                     class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">14k</button>
-                                                <button type="button" @click="calcForm.percent = 75.0"
+                                                <button type="button" @click="calcForm.percent = 75"
                                                     class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">18k</button>
-                                                <button type="button" @click="calcForm.percent = 91.6"
+                                                <button type="button" @click="calcForm.percent = 91"
                                                     class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">22k</button>
-                                                <button type="button" @click="calcForm.percent = 96.5"
+                                                <button type="button" @click="calcForm.percent = 96"
                                                     class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">23k</button>
-                                                <button type="button" @click="calcForm.percent = 99.99"
+                                                <button type="button" @click="calcForm.percent = 99"
                                                     class="px-2 py-0.5 text-[10px] bg-dark-surface border border-gray-700 text-gray-400 rounded hover:border-gold-500 hover:text-gold-400 transition-colors font-medium">24k</button>
                                             </div>
                                             <!-- โชว์ราคาบวกทองหลอมสดๆ ทันทีที่กรอกเปอร์เซ็น -->
@@ -659,16 +659,16 @@
                                             <!-- ปุ่มน้ำหนักทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นเงิน) -->
                                             <div v-if="!isLoggedIn && calcForm.type !== 'silver'"
                                                 class="mt-2 flex flex-wrap gap-1.5">
-                                                <button type="button" @click="calcForm.weight = 15.244"
+                                                <button type="button" @click="calcForm.weight = 15.24"
                                                     class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1
                                                     บาท</button>
-                                                <button type="button" @click="calcForm.weight = 7.622"
+                                                <button type="button" @click="calcForm.weight = 7.62"
                                                     class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">2
                                                     สลึง</button>
-                                                <button type="button" @click="calcForm.weight = 3.811"
+                                                <button type="button" @click="calcForm.weight = 3.81"
                                                     class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">1
                                                     สลึง</button>
-                                                <button type="button" @click="calcForm.weight = 1.905"
+                                                <button type="button" @click="calcForm.weight = 1.90"
                                                     class="px-2.5 py-1 text-[11px] bg-dark-surface border border-gray-700 text-gray-400 rounded shadow-sm hover:border-gold-500 hover:text-gold-400 transition-all font-medium active:scale-95">ครึ่งสลึง</button>
                                             </div>
                                         </div>
@@ -1019,6 +1019,23 @@
                                     <span class="text-sm text-gray-500">฿</span>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+                            <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-flask mr-2 text-gray-400"></i> ตั้งค่าราคาเงิน (Silver Settings)</h3>
+                            <button @click="savePremiums" :disabled="saving"
+                                class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
+                        </div>
+                        <div class="bg-dark-base p-6 rounded-xl border border-gray-800">
+                            <label class="block text-sm font-medium text-gray-400 mb-2">เปอร์เซ็นต์การหักราคาเงิน (Silver Deduction %)</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" v-model.number="silverDeduction" 
+                                    class="w-full max-w-[200px] px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none text-xl font-bold">
+                                <span class="text-xl text-gray-500">%</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-3">ระบบจะนำราคากลางมาหัก {{ silverDeduction }}% เพื่อใช้เป็นราคาอ้างอิงในการรับซื้อ</p>
                         </div>
                     </div>
                 </div>

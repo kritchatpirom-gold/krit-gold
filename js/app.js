@@ -2,9 +2,11 @@ const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
 const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
 const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
-//const supabaseUrl = 'http://127.0.0.1:54321';
+
 //const supabaseUrl = 'http://192.168.1.112:54321';
 //const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
+//const supabaseUrl = 'http://192.168.1.124:54321';
+//const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
@@ -54,6 +56,7 @@ createApp({
 
         const priceTrendGold = ref(0);
         const priceTrendSilver = ref(0);
+        const silverDeduction = ref(13); // Default 13%
         let priceChart = null;
 
         // DB Data
@@ -214,7 +217,7 @@ createApp({
         const isFormValid = computed(() => {
             let baseValid = false;
             // Asset type and weight are always required
-            if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem') {
+            if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') {
                 baseValid = calcForm.value.weight > 0;
             } else {
                 baseValid = calcForm.value.weight > 0 && calcForm.value.percent !== null;
@@ -238,7 +241,8 @@ createApp({
             if (calcForm.value.type === 'tong_lom' || calcForm.value.type === 'tong_roop' || calcForm.value.type === 'tong_tang' || calcForm.value.type === 'redeem') {
                 return Number(goldPrice.value) || 0;
             } else if (calcForm.value.type === 'silver') {
-                return Math.floor((Number(silverPrice.value) || 0) * 0.87);
+                const multiplier = (100 - (Number(silverDeduction.value) || 0)) / 100;
+                return Math.floor((Number(silverPrice.value) || 0) * multiplier);
             }
             return 0;
         });
@@ -250,6 +254,23 @@ createApp({
         watch(currentAssetPrice, (newVal) => {
             if (!calcForm.value.manualPrice || calcForm.value.manualPrice === 0) {
                 calcForm.value.manualPrice = newVal;
+            }
+        });
+
+        // Enforce integer for percent (all types) and 2 decimals for weight (all types)
+        watch(() => calcForm.value.percent, (val) => {
+            if (val !== null && val !== undefined) {
+                const truncated = Math.floor(val);
+                if (val !== truncated) calcForm.value.percent = truncated;
+            }
+        });
+
+        watch([() => calcForm.value.weight, () => calcForm.value.type], ([w, t]) => {
+            if (w !== null && w !== undefined) {
+                // ทองหลอมเอา 2 ตำแหน่ง, ประเภทอื่นเอา 1 ตำแหน่ง
+                const decimals = t === 'tong_lom' ? 100 : 10;
+                const fixed = Math.floor(w * decimals) / decimals;
+                if (w !== fixed) calcForm.value.weight = fixed;
             }
         });
 
@@ -287,8 +308,7 @@ createApp({
             } else if (tForm.type === 'tong_tang') {
                 base = gp;
                 const perGram = floor2((base - 300) * 0.0656);
-                const withPurity = floor2(perGram * (p / 100));
-                net = floor2(withPurity * w);
+                net = floor2(perGram * w);
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp;
                 base = deduct13;
@@ -309,7 +329,7 @@ createApp({
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
-                percent: (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem') ? 96.5 : calcForm.value.percent,
+                percent: (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') ? 96.5 : calcForm.value.percent,
                 weight: calcForm.value.weight,
                 basePrice: calculatedResult.value.basePrice,
                 premium: calculatedResult.value.premium,
@@ -588,18 +608,46 @@ createApp({
         // DB Data
         const loadPremiums = async () => {
             loadingPremiums.value = true;
-            const { data, error } = await supabase.from('gold_premiums').select('*').order('range_min', { ascending: true });
-            if (data && data.length) premiums.value = data;
-            loadingPremiums.value = false;
+            console.log("Loading settings and premiums...");
+            try {
+                // Load Gold Premiums
+                const { data: goldData, error: goldError } = await supabase.from('gold_premiums').select('*').order('range_min', { ascending: true });
+                if (goldError) {
+                    console.error("Gold premiums fetch error:", goldError.message);
+                } else if (goldData && goldData.length) {
+                    premiums.value = goldData;
+                    console.log("Gold premiums loaded:", goldData.length, "rows");
+                }
+
+                // Load Global Settings (Silver Deduction)
+                const { data: settingsData, error: settingsError } = await supabase.from('global_settings').select('*');
+                if (settingsError) {
+                    console.error("Global settings fetch error:", settingsError.message);
+                } else if (settingsData) {
+                    const silverSetting = settingsData.find(s => s.key === 'silver_deduction');
+                    if (silverSetting) {
+                        silverDeduction.value = Number(silverSetting.value);
+                        console.log("Silver deduction setting loaded:", silverDeduction.value);
+                    }
+                }
+            } catch (err) {
+                console.error("Critical error loading premiums/settings:", err);
+            } finally {
+                loadingPremiums.value = false;
+            }
         };
 
         const savePremiums = async () => {
             saving.value = true;
+            // Save Gold Premiums
             for (const p of premiums.value) {
                 if (p.id) {
                     await supabase.from('gold_premiums').update({ premium_amount: p.premium_amount }).eq('id', p.id);
                 }
             }
+            // Save Silver Deduction
+            await supabase.from('global_settings').upsert({ key: 'silver_deduction', value: silverDeduction.value });
+
             saving.value = false;
             alert('บันทึกการตั้งค่าสำเร็จ');
         };
@@ -1186,6 +1234,7 @@ createApp({
 
             priceTrendGold,
             priceTrendSilver,
+            silverDeduction,
 
             premiums,
             loadingPremiums,
