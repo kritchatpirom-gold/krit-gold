@@ -259,17 +259,29 @@ createApp({
 
         // Enforce integer for percent (all types) and 2 decimals for weight (all types)
         watch(() => calcForm.value.percent, (val) => {
-            if (val !== null && val !== undefined) {
-                const truncated = Math.floor(val);
-                if (val !== truncated) calcForm.value.percent = truncated;
+            if (val !== null && val !== undefined && val !== '') {
+                let v = val;
+                // หากกรอกเกิน 99 ให้เอาแค่ 2 หลักแรก (เช่น 333 กลายเป็น 33) แทนที่จะปรับเป็น 99
+                if (v > 99) {
+                    v = parseInt(String(v).substring(0, 2));
+                }
+                if (v < 1) v = 1;
+                v = Math.floor(v);
+
+                if (val !== v) calcForm.value.percent = v;
             }
         });
 
         watch([() => calcForm.value.weight, () => calcForm.value.type], ([w, t]) => {
-            if (w !== null && w !== undefined) {
+            if (w !== null && w !== undefined && w !== '') {
                 // ทองหลอมเอา 2 ตำแหน่ง, ประเภทอื่นเอา 1 ตำแหน่ง
-                const decimals = t === 'tong_lom' ? 100 : 10;
-                const fixed = Math.floor(w * decimals) / decimals;
+                const decimalPoints = t === 'tong_lom' ? 2 : 1;
+                const multiplier = Math.pow(10, decimalPoints);
+
+                // Clean up binary ghost bits (e.g. 2.3 * 100 becoming 229.999...) 
+                // by rounding slightly before floor
+                const fixed = Math.floor(Math.round(w * multiplier * 1e6) / 1e6) / multiplier;
+
                 if (w !== fixed) calcForm.value.weight = fixed;
             }
         });
@@ -923,8 +935,6 @@ createApp({
 
             // If completely public guest (no login), just print without calling DB
             if (!isLoggedIn.value) {
-                // Open drawer even for guest if they print?
-                openDrawer();
                 nextTick(() => {
                     triggerPrint();
                 });
