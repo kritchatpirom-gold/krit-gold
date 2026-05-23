@@ -70,4 +70,47 @@ ALTER TABLE global_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read access to global_settings" ON global_settings FOR SELECT USING (true);
 
 -- Allow authenticated full access
-CREATE POLICY "Allow authenticated full access to global_settings" ON global_settings FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated full access to global_settings" ON global_settings FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: drawer_balance
+CREATE TABLE IF NOT EXISTS drawer_balance (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  b1000 INTEGER DEFAULT 0,
+  b500 INTEGER DEFAULT 0,
+  b100 INTEGER DEFAULT 0,
+  b50 INTEGER DEFAULT 0,
+  b20 INTEGER DEFAULT 0,
+  c10 INTEGER DEFAULT 0,
+  c5 INTEGER DEFAULT 0,
+  c2 INTEGER DEFAULT 0,
+  c1 INTEGER DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Insert initial balance record
+INSERT INTO drawer_balance (id, b1000, b500, b100, b50, b20, c10, c5, c2, c1) 
+VALUES (1, 0, 0, 0, 0, 0, 0, 0, 0, 0) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Setup RLS
+ALTER TABLE drawer_balance ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated full access to drawer_balance
+CREATE POLICY "Allow authenticated full access to drawer_balance" ON drawer_balance FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: drawer_logs
+CREATE TABLE IF NOT EXISTS drawer_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  action TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  old_balance JSONB,
+  new_balance JSONB,
+  reference_id TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Setup RLS
+ALTER TABLE drawer_logs ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated full access to drawer_logs
+CREATE POLICY "Allow authenticated full access to drawer_logs" ON drawer_logs FOR ALL USING (auth.role() = 'authenticated');

@@ -1,0 +1,12 @@
+{
+  "name": "krit-gold",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"wrangler pages dev .\" \"python scripts/bridge.py\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "wrangler": "^4.94.0"
+  }
+}

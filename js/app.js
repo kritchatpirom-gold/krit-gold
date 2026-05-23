@@ -1,12 +1,12 @@
 const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
-const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
-const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
+//const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
+//const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 
 //const supabaseUrl = 'http://192.168.1.112:54321';
 //const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
-//const supabaseUrl = 'http://192.168.1.124:54321';
-//const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
+const supabaseUrl = 'http://192.168.1.124:54321';
+const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
@@ -58,6 +58,241 @@ createApp({
         const priceTrendSilver = ref(0);
         const silverDeduction = ref(13); // Default 13%
         let priceChart = null;
+
+        // Drawer Balance
+        const drawerBalance = ref({
+            b1000: 0, b500: 0, b100: 0, b50: 0, b20: 0,
+            c10: 0, c5: 0, c1: 0
+        });
+        const savingDrawer = ref(false);
+        const drawerLogs = ref([]);
+        const loadingDrawerLogs = ref(false);
+        const showDrawerLogsModal = ref(false);
+
+        const drawerTotal = computed(() => {
+            return (drawerBalance.value.b1000 * 1000) +
+                   (drawerBalance.value.b500 * 500) +
+                   (drawerBalance.value.b100 * 100) +
+                   (drawerBalance.value.b50 * 50) +
+                   (drawerBalance.value.b20 * 20) +
+                   (drawerBalance.value.c10 * 10) +
+                   (drawerBalance.value.c5 * 5) +
+                   (drawerBalance.value.c1 * 1);
+        });
+
+        const loadDrawerLogs = async () => {
+            loadingDrawerLogs.value = true;
+            try {
+                const { data, error } = await supabase.from('drawer_logs').select('*').order('created_at', { ascending: false }).limit(100);
+                if (error) throw error;
+                drawerLogs.value = data || [];
+            } catch (err) {
+                console.error("Error loading drawer logs:", err);
+            } finally {
+                loadingDrawerLogs.value = false;
+            }
+        };
+
+        const openDrawerLogsModal = () => {
+            showDrawerLogsModal.value = true;
+            loadDrawerLogs();
+        };
+
+        const loadDrawerBalance = async () => {
+            try {
+                const { data, error } = await supabase.from('drawer_balance').select('*').eq('id', 1).maybeSingle();
+                if (data && !error) {
+                    drawerBalance.value = {
+                        b1000: data.b1000 || 0,
+                        b500: data.b500 || 0,
+                        b100: data.b100 || 0,
+                        b50: data.b50 || 0,
+                        b20: data.b20 || 0,
+                        c10: data.c10 || 0,
+                        c5: data.c5 || 0,
+                        c1: data.c1 || 0
+                    };
+                }
+            } catch (err) {
+                console.error("Error loading drawer balance:", err);
+            }
+        };
+
+        const logDrawerAction = async (action, amount, oldBalanceObj, newBalanceObj, referenceId = null) => {
+            try {
+                // Ensure no unneeded properties are saved to jsonb
+                const cleanOld = oldBalanceObj ? { ...oldBalanceObj } : null;
+                const cleanNew = newBalanceObj ? { ...newBalanceObj } : null;
+                if (cleanOld) { delete cleanOld.id; delete cleanOld.updated_at; }
+                if (cleanNew) { delete cleanNew.id; delete cleanNew.updated_at; }
+
+                await supabase.from('drawer_logs').insert([{
+                    action: action,
+                    amount: amount,
+                    old_balance: cleanOld,
+                    new_balance: cleanNew,
+                    reference_id: referenceId
+                }]);
+            } catch (err) {
+                console.error("Error logging drawer action:", err);
+            }
+        };
+
+        const saveDrawerBalance = async () => {
+            if (!isAdmin.value) return;
+            savingDrawer.value = true;
+            try {
+                const { data: oldData } = await supabase.from('drawer_balance').select('*').eq('id', 1).single();
+                const oldBalance = oldData ? { ...oldData } : null;
+                const newBalance = { ...drawerBalance.value };
+                
+                let oldTotal = 0;
+                if (oldBalance) {
+                    oldTotal = (oldBalance.b1000||0)*1000 + (oldBalance.b500||0)*500 + (oldBalance.b100||0)*100 + (oldBalance.b50||0)*50 + (oldBalance.b20||0)*20 + (oldBalance.c10||0)*10 + (oldBalance.c5||0)*5 + (oldBalance.c1||0)*1;
+                }
+                const newTotal = (newBalance.b1000||0)*1000 + (newBalance.b500||0)*500 + (newBalance.b100||0)*100 + (newBalance.b50||0)*50 + (newBalance.b20||0)*20 + (newBalance.c10||0)*10 + (newBalance.c5||0)*5 + (newBalance.c1||0)*1;
+                const diffAmount = newTotal - oldTotal;
+
+                const { error } = await supabase.from('drawer_balance').update({
+                    b1000: newBalance.b1000,
+                    b500: newBalance.b500,
+                    b100: newBalance.b100,
+                    b50: newBalance.b50,
+                    b20: newBalance.b20,
+                    c10: newBalance.c10,
+                    c5: newBalance.c5,
+                    c1: newBalance.c1,
+                    updated_at: new Date().toISOString()
+                }).eq('id', 1);
+                
+                if (error) throw error;
+                
+                await logDrawerAction('MANUAL_UPDATE', diffAmount, oldBalance, newBalance);
+                
+                alert('บันทึกยอดเงินในลิ้นชักเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error("Error saving drawer balance:", err);
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + err.message);
+            } finally {
+                savingDrawer.value = false;
+            }
+        };
+
+        const deductDrawerBalance = async (totalAmount, transactionId = null) => {
+            let amount = Math.ceil(totalAmount);
+            if (amount <= 0) return;
+            
+            // Reload fresh balance before deduction
+            await loadDrawerBalance();
+            const oldBalance = { ...drawerBalance.value };
+            
+            // Greedy deduction
+            const denoms = [
+                { key: 'b1000', val: 1000 },
+                { key: 'b500', val: 500 },
+                { key: 'b100', val: 100 },
+                { key: 'b50', val: 50 },
+                { key: 'b20', val: 20 },
+                { key: 'c10', val: 10 },
+                { key: 'c5', val: 5 },
+                { key: 'c1', val: 1 }
+            ];
+            
+            const newBalance = { ...drawerBalance.value };
+            let amountDeducted = 0;
+            
+            for (const d of denoms) {
+                if (amount >= d.val && newBalance[d.key] > 0) {
+                    const needed = Math.floor(amount / d.val);
+                    const take = Math.min(needed, newBalance[d.key]);
+                    newBalance[d.key] -= take;
+                    amount -= (take * d.val);
+                    amountDeducted += (take * d.val);
+                }
+            }
+            
+            // Update DB with new balance
+            try {
+                const { error } = await supabase.from('drawer_balance').update({
+                    b1000: newBalance.b1000,
+                    b500: newBalance.b500,
+                    b100: newBalance.b100,
+                    b50: newBalance.b50,
+                    b20: newBalance.b20,
+                    c10: newBalance.c10,
+                    c5: newBalance.c5,
+                    c1: newBalance.c1,
+                    updated_at: new Date().toISOString()
+                }).eq('id', 1);
+                
+                if (!error) {
+                    drawerBalance.value = newBalance;
+                    await logDrawerAction('TRANSACTION_DEDUCT', -amountDeducted, oldBalance, newBalance, transactionId);
+                }
+            } catch (err) {
+                 console.error("Exception deducting drawer balance:", err);
+            }
+        };
+
+        const restoreDrawerBalance = async (totalAmount, transactionId = null) => {
+            let amount = Math.ceil(totalAmount);
+            if (amount <= 0) return;
+            
+            // Reload fresh balance before adding
+            await loadDrawerBalance();
+            const oldBalance = { ...drawerBalance.value };
+            
+            // Greedy addition
+            const denoms = [
+                { key: 'b1000', val: 1000 },
+                { key: 'b500', val: 500 },
+                { key: 'b100', val: 100 },
+                { key: 'b50', val: 50 },
+                { key: 'b20', val: 20 },
+                { key: 'c10', val: 10 },
+                { key: 'c5', val: 5 },
+                { key: 'c1', val: 1 }
+            ];
+            
+            const newBalance = { ...drawerBalance.value };
+            let amountRestored = 0;
+            
+            for (const d of denoms) {
+                // ข้ามแบงก์/เหรียญที่มีจำนวนเป็น 0 ในลิ้นชักปัจจุบัน (ยกเว้นเหรียญ 1 บาทที่เป็นตัวสุดท้าย ต้องรับเศษเสมอ)
+                if (d.key !== 'c1' && newBalance[d.key] === 0) {
+                    continue;
+                }
+                
+                if (amount >= d.val) {
+                    const addNotes = Math.floor(amount / d.val);
+                    newBalance[d.key] += addNotes;
+                    amount -= (addNotes * d.val);
+                    amountRestored += (addNotes * d.val);
+                }
+            }
+            
+            // Update DB with new balance
+            try {
+                const { error } = await supabase.from('drawer_balance').update({
+                    b1000: newBalance.b1000,
+                    b500: newBalance.b500,
+                    b100: newBalance.b100,
+                    b50: newBalance.b50,
+                    b20: newBalance.b20,
+                    c10: newBalance.c10,
+                    c5: newBalance.c5,
+                    c1: newBalance.c1,
+                    updated_at: new Date().toISOString()
+                }).eq('id', 1);
+                
+                if (!error) {
+                    drawerBalance.value = newBalance;
+                    await logDrawerAction('TRANSACTION_RESTORE', amountRestored, oldBalance, newBalance, transactionId);
+                }
+            } catch (err) {
+                 console.error("Exception restoring drawer balance:", err);
+            }
+        };
 
         // DB Data
         const premiums = ref([
@@ -147,6 +382,7 @@ createApp({
 
         // Bill / Cart System
         const billItems = ref([]);
+        const transferAmount = ref(0);
 
         // Calculator Form
         const calcForm = ref({
@@ -175,6 +411,8 @@ createApp({
                 expireDate: '',
                 manualPrice: null
             };
+            transferAmount.value = 0;
+            clearSignature();
         };
 
         const formatThaiDate = (dateStr) => {
@@ -182,6 +420,21 @@ createApp({
             const [y, m, d] = dateStr.split('-');
             const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
             return `${parseInt(d)} ${months[parseInt(m) - 1]} ${parseInt(y) + 543}`;
+        };
+
+        const formatThaiDateTime = (dateStr) => {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear() + 543;
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${day}/${month}/${year} ${hours}:${minutes}`;
+            } catch (e) {
+                return dateStr;
+            }
         };
 
         const isPhoneValid = computed(() => {
@@ -214,20 +467,27 @@ createApp({
             }
         });
 
-        const isFormValid = computed(() => {
-            let baseValid = false;
-            // Asset type and weight are always required
+        const isBaseValid = computed(() => {
             if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') {
-                baseValid = calcForm.value.weight > 0;
+                return calcForm.value.weight > 0;
             } else {
-                baseValid = calcForm.value.weight > 0 && calcForm.value.percent !== null;
+                return calcForm.value.weight > 0 && calcForm.value.percent !== null && calcForm.value.percent !== '';
             }
+        });
+
+        const isFormValid = computed(() => {
+            const baseValid = isBaseValid.value;
 
             if (isLoggedIn.value) {
+                // Admin bypass: can evaluate and add to bill even if incomplete
+                if (isAdmin.value) {
+                    return baseValid && isIdCardValid.value;
+                }
+
                 // Must have name and valid ID format
                 const identityValid = isIdCardValid.value && calcForm.value.customerName.trim().length > 1;
 
-                // Both Admin and Employee modes must have Phone, Photo, and Signature to add to bill
+                // Employee mode must have Phone, Photo, and Signature to add to bill
                 const hasPhone = isPhoneValid.value;
                 const hasPhoto = productPhoto.value !== null;
                 const hasSignature = (signaturePad && !signaturePad.isEmpty()) || lastSignature.value !== null;
@@ -286,6 +546,12 @@ createApp({
             }
         });
 
+        const accumulatedGoldWeight = computed(() => {
+            return billItems.value
+                .filter(item => item.type !== 'silver')
+                .reduce((sum, item) => sum + Number(item.weight), 0);
+        });
+
         const calculatedResult = computed(() => {
             let base = 0;
             let premium = 0;
@@ -302,8 +568,9 @@ createApp({
             if (tForm.type === 'tong_lom') {
                 base = gp;
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
-                // ทองหลอมถ้าน้ำหนักน้อยกว่า 5 กรัม ไม่บวกพรีเมียม
-                premium = (activePremium && w >= 5) ? Number(activePremium.premium_amount) : 0;
+                // ทองหลอมถ้าน้ำหนักรวม (ในบิล + ที่กำลังกรอก) >= 5 กรัม ให้บวกพรีเมียม
+                const totalWeightForPremium = accumulatedGoldWeight.value + w;
+                premium = (activePremium && totalWeightForPremium >= 5) ? Number(activePremium.premium_amount) : 0;
                 const perGram = floor2((base + premium) * 0.0656);
                 const withPurity = floor2(perGram * (p / 100));
                 net = floor2(withPurity * w);
@@ -338,6 +605,8 @@ createApp({
 
         const addToBill = () => {
             if (!isFormValid.value) return;
+            const isEditing = false; // We can add edit logic later if needed
+            
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
@@ -361,6 +630,10 @@ createApp({
 
         const billTotal = computed(() => {
             return billItems.value.reduce((sum, item) => sum + item.netPrice, 0);
+        });
+
+        const cashAmountToPay = computed(() => {
+            return Math.max(0, billTotal.value - (transferAmount.value || 0));
         });
 
         const isPrintReady = computed(() => {
@@ -707,10 +980,16 @@ createApp({
 
         const deleteTransaction = async (id) => {
             if (confirm('ยืนยันการลบรายการนี้?')) {
+                // Fetch the transaction to get net_price
+                const { data: trx } = await supabase.from('transactions').select('net_price').eq('id', id).single();
+                
                 // Delete assets from storage first
                 await deleteTransactionAssets(id);
                 const { error } = await supabase.from('transactions').delete().eq('id', id);
-                if (!error) loadTransactions();
+                if (!error) {
+                    if (trx && trx.net_price) await restoreDrawerBalance(trx.net_price);
+                    loadTransactions();
+                }
                 else alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
             }
         };
@@ -719,6 +998,11 @@ createApp({
             if (selectedTransactions.value.length === 0) return;
             if (confirm(`ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ?`)) {
                 loadingTransactions.value = true;
+                
+                // Fetch to get net prices
+                const { data: trxs } = await supabase.from('transactions').select('net_price').in('id', selectedTransactions.value);
+                const totalRefund = trxs ? trxs.reduce((sum, t) => sum + (Number(t.net_price) || 0), 0) : 0;
+
                 // Delete assets from storage first
                 await deleteTransactionAssets(selectedTransactions.value);
                 const { error } = await supabase
@@ -727,6 +1011,7 @@ createApp({
                     .in('id', selectedTransactions.value);
 
                 if (!error) {
+                    if (totalRefund > 0) await restoreDrawerBalance(totalRefund);
                     selectedTransactions.value = [];
                     await loadTransactions();
                 } else {
@@ -916,6 +1201,7 @@ createApp({
 
             const handleAfterPrint = () => {
                 billItems.value = [];
+                transferAmount.value = 0;
                 resetForm();
                 clearSignature();
                 removePhoto();
@@ -968,8 +1254,12 @@ createApp({
                     created_at: new Date().toISOString()
                 }));
 
-                const { error } = await supabase.from('transactions').insert(trData);
+                const { data: insertedTrxs, error } = await supabase.from('transactions').insert(trData).select();
                 if (error) throw error;
+                const transactionId = insertedTrxs && insertedTrxs.length > 0 ? insertedTrxs[0].id : null;
+
+                // Deduct drawer balance
+                await deductDrawerBalance(cashAmountToPay.value, transactionId);
 
                 // Open the drawer!
                 openDrawer();
@@ -1122,6 +1412,7 @@ createApp({
             window.addEventListener('hashchange', syncHashToTab);
 
             loadPremiums();
+            loadDrawerBalance();
             checkAuth();
 
             nextTick(() => {
@@ -1155,6 +1446,8 @@ createApp({
                 }, 400); // 400ms delay passing CSS fade transition
             } else if (newTab === 'history') {
                 loadTransactions();
+            } else if (newTab === 'drawer') {
+                loadDrawerBalance();
             }
             mobileMenuOpen.value = false;
         });
@@ -1163,6 +1456,9 @@ createApp({
             showCameraModal.value = true;
             nextTick(async () => {
                 try {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('เบราว์เซอร์ไม่รองรับการเข้าถึงกล้อง หรือไม่ได้ใช้งานผ่าน HTTPS/localhost');
+                    }
                     const constraints = {
                         video: {
                             facingMode: 'environment',
@@ -1255,9 +1551,18 @@ createApp({
             loadingTransactions,
             transactionsTotal,
             totalWeight,
+            drawerBalance,
+            drawerTotal,
+            savingDrawer,
+            drawerLogs,
+            loadingDrawerLogs,
+            showDrawerLogsModal,
+            openDrawerLogsModal,
+            saveDrawerBalance,
             isPrintReady,
             uploadToBucket,
             formatCurrency,
+            formatThaiDateTime,
             filter,
             isFilterActive,
             deleteTransaction,
@@ -1273,6 +1578,7 @@ createApp({
             calcForm,
             resetForm,
             isFormValid,
+            isBaseValid,
             currentAssetPrice,
             calculatedResult,
             isPhoneValid,
@@ -1283,6 +1589,8 @@ createApp({
             addToBill,
             removeBillItem,
             billTotal,
+            transferAmount,
+            cashAmountToPay,
             saveAndPrint,
             openDrawer,
 

@@ -105,6 +105,9 @@
                         <button v-if="isAdmin" @click="currentTab = 'settings'"
                             :class="currentTab === 'settings' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ตั้งค่า</button>
+                        <button v-if="isLoggedIn" @click="currentTab = 'drawer'"
+                            :class="currentTab === 'drawer' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">ลิ้นชักเงิน</button>
 
                         <button v-if="isLoggedIn" @click="logout"
                             class="ml-4 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition-all-custom">
@@ -134,6 +137,8 @@
                         / ลบ</button>
                     <button v-if="isAdmin" @click="currentTab = 'settings'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
+                    <button v-if="isLoggedIn" @click="currentTab = 'drawer'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ลิ้นชักเงิน</button>
                     <button v-if="!isLoggedIn" @click="showAuth = true; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gold-400 mt-2 border-t border-gray-800 pt-3">เข้าสู่ระบบพนักงาน</button>
                     <button v-if="isLoggedIn" @click="logout(); mobileMenuOpen = false"
@@ -364,6 +369,177 @@
             </transition>
 
             <transition name="slide-fade" mode="out-in">
+                <!-- Drawer Management -->
+                <div v-if="currentTab === 'drawer' && isLoggedIn" key="drawer" class="max-w-4xl mx-auto space-y-6">
+                    <div class="glass p-6 rounded-2xl border border-gray-800 relative">
+                        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+                            <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-cash-register mr-2"></i> ระบบจัดการเงินในลิ้นชัก</h2>
+                            <span v-if="isAdmin" class="px-3 py-1 bg-purple-900/50 text-purple-300 border border-purple-700/50 rounded-full text-xs font-bold">สิทธิ์ผู้ดูแลระบบ (แก้ไขได้)</span>
+                            <span v-else class="px-3 py-1 bg-green-900/50 text-green-300 border border-green-700/50 rounded-full text-xs font-bold">สิทธิ์พนักงาน (ดูอย่างเดียว)</span>
+                        </div>
+
+                        <!-- Summary -->
+                        <div class="bg-dark-surface/50 p-6 rounded-xl border border-gold-500/30 text-center mb-8 relative overflow-hidden">
+                            <div class="absolute -right-10 -top-10 text-gold-500/5 rotate-12 pointer-events-none">
+                                <i class="fa-solid fa-sack-dollar text-9xl"></i>
+                            </div>
+                            <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-2">ยอดเงินคงเหลือในลิ้นชักสุทธิ</h3>
+                            <div class="text-4xl sm:text-5xl font-bold text-white tracking-tight">
+                                {{ formatCurrency(drawerTotal) }} <span class="text-gold-400 text-2xl">บาท</span>
+                            </div>
+                        </div>
+
+                        <!-- Input Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Banknotes -->
+                            <div class="space-y-4">
+                                <h3 class="text-lg font-bold text-gray-200 border-b border-gray-800 pb-2 flex items-center"><i class="fa-solid fa-money-bill-wave mr-2 text-green-500"></i> ธนบัตร</h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">แบงค์ 1,000</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.b1000" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">ใบ</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">แบงค์ 500</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.b500" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">ใบ</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">แบงค์ 100</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.b100" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">ใบ</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">แบงค์ 50</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.b50" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">ใบ</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">แบงค์ 20</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.b20" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">ใบ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Coins -->
+                            <div class="space-y-4">
+                                <h3 class="text-lg font-bold text-gray-200 border-b border-gray-800 pb-2 flex items-center"><i class="fa-solid fa-coins mr-2 text-yellow-500"></i> เหรียญ</h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">เหรียญ 10</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.c10" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">เหรียญ</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">เหรียญ 5</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.c5" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">เหรียญ</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-3 rounded-lg border border-gray-800">
+                                        <span class="text-gray-300 font-medium">เหรียญ 1</span>
+                                        <div class="flex items-center gap-3">
+                                            <input type="number" min="0" v-model="drawerBalance.c1" :disabled="!isAdmin" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center disabled:opacity-50">
+                                            <span class="text-gray-500 text-sm w-8">เหรียญ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Admin Actions -->
+                        <div v-if="isAdmin" class="mt-8 pt-6 border-t border-gray-800 flex flex-wrap justify-end gap-3">
+                            <button @click="openDrawerLogsModal" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="ดูประวัติเข้า-ออก">
+                                <i class="fa-solid fa-clock-rotate-left mr-2"></i>
+                                ประวัติลิ้นชัก
+                            </button>
+                            <button @click="openDrawer" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gold-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="สั่งเปิดลิ้นชักทันที">
+                                <i class="fa-solid fa-vault mr-2"></i>
+                                เปิดลิ้นชัก
+                            </button>
+                            <button @click="saveDrawerBalance" :disabled="savingDrawer"
+                                :class="savingDrawer ? 'opacity-50 cursor-not-allowed bg-gray-700' : 'bg-gold-500 hover:bg-gold-400 hover-glow'"
+                                class="px-8 py-3 rounded-lg text-black font-bold transition-all shadow-lg flex items-center">
+                                <i v-if="savingDrawer" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
+                                <i v-else class="fa-solid fa-save mr-2"></i>
+                                บันทึกยอดเงินในลิ้นชัก
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+
+            <!-- Drawer Logs Modal -->
+            <transition name="fade">
+                <div v-if="showDrawerLogsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div class="glass border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+                        <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-dark-surface/80 rounded-t-2xl">
+                            <h2 class="text-xl font-bold text-gold-400 flex items-center">
+                                <i class="fa-solid fa-clock-rotate-left mr-3"></i> ประวัติการเข้า-ออกของเงินในลิ้นชัก
+                            </h2>
+                            <button @click="showDrawerLogsModal = false" class="text-gray-400 hover:text-white transition-colors">
+                                <i class="fa-solid fa-xmark text-2xl"></i>
+                            </button>
+                        </div>
+                        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                            <div v-if="loadingDrawerLogs" class="py-12 text-center text-gray-500">
+                                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-gold-500/50 mb-3"></i>
+                                <p>กำลังโหลดข้อมูล...</p>
+                            </div>
+                            <div v-else-if="drawerLogs.length === 0" class="py-12 text-center text-gray-500">
+                                <i class="fa-solid fa-folder-open text-4xl mb-3 text-gray-700"></i>
+                                <p>ไม่มีประวัติการเข้า-ออกของเงิน</p>
+                            </div>
+                            <div v-else class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="border-b border-gray-700 bg-gray-800/30">
+                                            <th class="p-3 text-sm font-semibold text-gray-300">วันเวลา</th>
+                                            <th class="p-3 text-sm font-semibold text-gray-300">ประเภทรายการ</th>
+                                            <th class="p-3 text-sm font-semibold text-gray-300 text-right">ยอดเงิน (+/-)</th>
+                                            <th class="p-3 text-sm font-semibold text-gray-300">รายละเอียด</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-800 text-sm">
+                                        <tr v-for="log in drawerLogs" :key="log.id" class="hover:bg-white/5 transition-colors">
+                                            <td class="p-3 text-gray-400 whitespace-nowrap">{{ formatThaiDateTime(log.created_at) }}</td>
+                                            <td class="p-3">
+                                                <span v-if="log.action === 'MANUAL_UPDATE'" class="text-yellow-400"><i class="fa-solid fa-pen-to-square mr-1"></i> อัพเดทด้วยมือ</span>
+                                                <span v-else-if="log.action === 'TRANSACTION_DEDUCT'" class="text-red-400"><i class="fa-solid fa-money-bill-transfer mr-1"></i> จ่ายเงินซื้อของ</span>
+                                                <span v-else-if="log.action === 'TRANSACTION_RESTORE'" class="text-emerald-400"><i class="fa-solid fa-rotate-left mr-1"></i> คืนเงินเข้าลิ้นชัก (ลบบิล)</span>
+                                                <span v-else class="text-gray-400">{{ log.action }}</span>
+                                            </td>
+                                            <td class="p-3 text-right font-bold font-mono whitespace-nowrap" :class="log.amount >= 0 ? 'text-emerald-400' : 'text-red-400'">
+                                                {{ log.amount > 0 ? '+' : '' }}{{ formatCurrency(log.amount) }}
+                                            </td>
+                                            <td class="p-3 text-gray-500 text-xs">
+                                                <div class="truncate max-w-[200px]" :title="JSON.stringify(log.new_balance)">
+                                                    รหัสอ้างอิง: {{ log.reference_id || '-' }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </transition>
                 <!-- Calculator POS / Cart -->
                 <div v-if="currentTab === 'calculator'" key="calculator" class="max-w-6xl mx-auto">
 
@@ -400,7 +576,7 @@
                                         </div>
 
                                         <!-- Unified Identity Block -->
-                                        <div v-if="calcForm.idCardPhoto"
+                                        <div v-if="calcForm.idCard"
                                             class="mb-8 p-5 bg-gold-400/5 border border-gold-500/20 rounded-2xl animate-fade-in relative group overflow-hidden">
                                             <div
                                                 class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
@@ -409,9 +585,13 @@
                                             <div class="flex flex-col sm:flex-row gap-6 relative z-10">
                                                 <div class="flex-shrink-0 mx-auto sm:mx-0">
                                                     <div class="relative">
-                                                        <img :src="calcForm.idCardPhoto"
+                                                        <img v-if="calcForm.idCardPhoto" :src="calcForm.idCardPhoto"
                                                             class="w-32 h-40 object-cover rounded-xl border-2 border-gold-500/30 shadow-2xl hover:border-gold-500/60 transition-all cursor-zoom-in"
                                                             @click="viewingPhoto = calcForm.idCardPhoto" />
+                                                        <div v-else class="w-32 h-40 bg-dark-surface rounded-xl border-2 border-gray-700 shadow-2xl flex items-center justify-center flex-col text-gray-500">
+                                                            <i class="fa-solid fa-user text-4xl mb-2"></i>
+                                                            <span class="text-[10px]">ไม่มีรูปถ่าย</span>
+                                                        </div>
                                                         <div class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center border-2 border-dark-base shadow-lg"
                                                             :class="isCardExpired ? 'bg-red-500' : 'bg-emerald-500'">
                                                             <i class="fa-solid text-white text-xs"
@@ -674,7 +854,7 @@
                                         </div>
                                     </div>
 
-                                    <div v-if="isFormValid"
+                                    <div v-if="isBaseValid"
                                         class="p-4 bg-gold-900/20 rounded-xl border border-gold-500/30 flex justify-between items-center transition-all">
                                         <div>
                                             <div class="text-sm text-gray-400">มูลค่าต่อชิ้น (อ้างอิง: {{
@@ -682,9 +862,11 @@
                                             <div class="text-2xl font-bold text-gold-400 mt-1">{{
                                                 formatCurrency(calculatedResult.netPrice) }} ฿</div>
                                         </div>
-                                        <button @click="addToBill"
-                                            class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-white rounded-lg font-bold shadow-md hover-glow transition-all">
-                                            <i class="fa-solid fa-plus mr-2"></i>เพิ่มเข้ารายการบิล
+                                        <button @click="addToBill" :disabled="!isFormValid"
+                                            :class="isFormValid ? 'bg-gold-600 hover:bg-gold-500 text-white hover-glow shadow-md' : 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-60'"
+                                            class="px-6 py-2 rounded-lg font-bold transition-all flex flex-col items-center">
+                                            <div><i class="fa-solid fa-plus mr-2"></i>เพิ่มเข้ารายการบิล</div>
+                                            <span v-if="!isFormValid && isLoggedIn && !isAdmin" class="text-[9px] text-red-400 mt-1 font-normal">* กรอกข้อมูลให้ครบถ้วน</span>
                                         </button>
                                     </div>
                                 </div>
@@ -745,6 +927,43 @@
                                                 class="text-xl text-gold-500 font-normal">฿</span></span>
                                     </div>
 
+                                    <!-- Transfer amount section -->
+                                    <div v-if="billTotal > 0 && isLoggedIn" class="mb-4 space-y-2 border-t border-gray-800 pt-4">
+                                        <div class="flex justify-between items-center">
+                                            <label class="text-gray-400 text-sm">ยอดเงินโอน (ถ้ามี):</label>
+                                            <div class="flex items-center gap-2">
+                                                <input type="number" min="0" :max="billTotal" v-model="transferAmount" class="w-32 px-3 py-1.5 bg-dark-base border border-gray-700 text-white rounded outline-none focus:border-gold-500 text-right transition-colors">
+                                                <span class="text-gray-500">฿</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-400 text-sm">ยอดเงินสดที่ต้องจ่าย:</span>
+                                            <span class="font-bold text-gold-400 text-lg">{{ formatCurrency(cashAmountToPay) }} ฿</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Insufficient Drawer Alert -->
+                                    <div v-if="isLoggedIn && cashAmountToPay > drawerTotal"
+                                        class="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg text-sm text-red-400 flex items-start animate-fade-in shadow-lg">
+                                        <i class="fa-solid fa-triangle-exclamation text-xl mr-3 mt-0.5"></i> 
+                                        <div class="flex-1">
+                                            <div class="font-bold">เงินในลิ้นชักไม่พอ! (มีเงินสด {{formatCurrency(drawerTotal)}} ฿)</div>
+                                            <div class="text-[11px] mt-1 text-red-400/80 leading-relaxed">
+                                                กรุณาระบุยอดเงินโอนอย่างน้อย <span class="font-bold text-red-300">{{formatCurrency(billTotal - drawerTotal)}} ฿</span> เพื่อให้ยอดเงินสดที่ต้องจ่ายไม่เกินเงินในลิ้นชัก
+                                            </div>
+                                            <div v-if="drawerTotal > 0" class="mt-2 text-xs border-t border-red-500/30 pt-2 grid grid-cols-2 gap-x-2 gap-y-1">
+                                                <div v-if="drawerBalance.b1000 > 0">• แบงค์ 1,000: {{drawerBalance.b1000}} ใบ</div>
+                                                <div v-if="drawerBalance.b500 > 0">• แบงค์ 500: {{drawerBalance.b500}} ใบ</div>
+                                                <div v-if="drawerBalance.b100 > 0">• แบงค์ 100: {{drawerBalance.b100}} ใบ</div>
+                                                <div v-if="drawerBalance.b50 > 0">• แบงค์ 50: {{drawerBalance.b50}} ใบ</div>
+                                                <div v-if="drawerBalance.b20 > 0">• แบงค์ 20: {{drawerBalance.b20}} ใบ</div>
+                                                <div v-if="drawerBalance.c10 > 0">• เหรียญ 10: {{drawerBalance.c10}} เหรียญ</div>
+                                                <div v-if="drawerBalance.c5 > 0">• เหรียญ 5: {{drawerBalance.c5}} เหรียญ</div>
+                                                <div v-if="drawerBalance.c1 > 0">• เหรียญ 1: {{drawerBalance.c1}} เหรียญ</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div v-if="isLoggedIn && !isPrintReady && billItems.length > 0 && !isAdmin"
                                         class="mb-3 p-2 bg-red-900/20 border border-red-500/30 rounded-lg text-[10px] text-red-400 text-center animate-pulse">
                                         <i class="fa-solid fa-circle-exclamation mr-1.5"></i> กรุณากรอกเบอร์โทร,
@@ -757,8 +976,8 @@
                                             title="เปิดลิ้นชักเก็บเงิน (สิทธิ์ผู้จัดการ)">
                                             <i class="fa-solid fa-vault text-xl group-hover:scale-110 transition-transform"></i>
                                         </button>
-                                        <button @click="saveAndPrint" :disabled="(!isPrintReady && !isAdmin) || saving"
-                                            :class="(!isPrintReady && !isAdmin) || saving ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'"
+                                        <button @click="saveAndPrint" :disabled="(!isPrintReady && !isAdmin) || saving || (isLoggedIn && cashAmountToPay > drawerTotal)"
+                                            :class="(!isPrintReady && !isAdmin) || saving || (isLoggedIn && cashAmountToPay > drawerTotal) ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'"
                                             class="flex-1 py-4 rounded-xl font-bold text-lg transition-all flex justify-center items-center">
                                             <i v-if="saving" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
                                             <i v-else class="fa-solid fa-print mr-2"></i>
@@ -924,6 +1143,7 @@
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">วันที่</th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">ลูกค้า</th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">ประเภท</th>
+                                    <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">ราคาทอง</th>
                                     <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">เปอร์เซ็นต์ /
                                         น้ำหนัก</th>
                                     <th class="px-6 py-4 text-right font-semibold text-gray-400 text-sm">ยอดสุทธิ</th>
@@ -959,6 +1179,7 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gold-300">{{ getTypeName(t.type)
                                         }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">{{ t.base_price ? formatCurrency(t.base_price) : '-' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">{{
                                         t.percent }}% / {{ t.weight }} ก.</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right">{{
@@ -1091,10 +1312,14 @@
                     <div style="display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 3px;">
                         <span><b>วันที่:</b> {{ formatDate(new Date()) }}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 9pt;">
+                    <div style="display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 3px;">
                         <span><b>ลูกค้า:</b> {{ calcForm.customerName || 'เงินสด' }}{{ calcForm.phone ? ' (' +
                             calcForm.phone + ')' : '' }}</span>
                         <span><b>จำนวน:</b> {{ billItems.length }} รายการ</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 9pt;">
+                        <span><b>รับเงินสด:</b> {{ formatCurrency(cashAmountToPay) }} ฿</span>
+                        <span v-if="transferAmount > 0"><b>ยอดเงินโอน:</b> {{ formatCurrency(transferAmount) }} ฿</span>
                     </div>
                 </div>
 
