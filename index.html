@@ -68,6 +68,16 @@
             filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(360deg) brightness(118%) contrast(119%);
             cursor: pointer;
         }
+
+        /* ซ่อนลูกศรขึ้นลงในช่องกรอกตัวเลข */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -529,12 +539,22 @@
                                                 <span v-else-if="log.action === 'TRANSACTION_RESTORE'" class="text-emerald-400"><i class="fa-solid fa-rotate-left mr-1"></i> คืนเงินเข้าลิ้นชัก (ลบบิล)</span>
                                                 <span v-else class="text-gray-400">{{ log.action }}</span>
                                             </td>
-                                            <td class="p-3 text-right font-bold font-mono whitespace-nowrap" :class="log.amount >= 0 ? 'text-emerald-400' : 'text-red-400'">
+                                            <td class="p-3 text-right font-bold font-mono whitespace-nowrap align-top" :class="log.amount >= 0 ? 'text-emerald-400' : 'text-red-400'">
                                                 {{ log.amount > 0 ? '+' : '' }}{{ formatCurrency(log.amount) }}
+                                                <div class="text-[10px] text-gray-500 font-normal mt-1">
+                                                    คงเหลือ: {{ formatCurrency(getDrawerTotalFromObj(log.new_balance)) }} ฿
+                                                </div>
                                             </td>
-                                            <td class="p-3 text-gray-500 text-xs">
-                                                <div class="truncate max-w-[200px]" :title="JSON.stringify(log.new_balance)">
-                                                    รหัสอ้างอิง: {{ log.reference_id || '-' }}
+                                            <td class="p-3 text-gray-400 text-xs align-top">
+                                                <div class="truncate max-w-[200px]" :title="'รหัสอ้างอิง: ' + (log.reference_id || '-')">
+                                                    อ้างอิง: {{ log.reference_id || '-' }}
+                                                </div>
+                                                <div v-if="log.old_balance && log.new_balance" class="mt-2 flex flex-wrap gap-1 max-w-[300px]">
+                                                    <span v-for="d in getDrawerDiff(log.old_balance, log.new_balance)" :key="d.label" 
+                                                        class="px-1.5 py-0.5 rounded bg-gray-800/50 border text-[10px]" 
+                                                        :class="d.diff > 0 ? 'border-emerald-500/30 text-emerald-400' : 'border-red-500/30 text-red-400'">
+                                                        {{d.label}} <span class="font-bold">{{d.diff > 0 ? '+' : '-'}}{{d.absDiff}}</span>
+                                                    </span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -788,6 +808,89 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- 4. Extra Profits -->
+                    <div v-if="isAdmin" class="glass p-6 rounded-2xl border border-gray-800 relative">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-gray-800 pb-4 gap-4">
+                            <div>
+                                <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-coins mr-2"></i> รายได้/กำไรเพิ่มเติม</h2>
+                                <div class="text-sm text-gray-400 mt-1">ระบุรายได้อื่น ๆ นอกเหนือจากการส่งทองสมาคมเพื่อคำนวณกำไรสุทธิ</div>
+                            </div>
+                            
+                            <!-- Date Filter -->
+                            <div class="flex items-center gap-3 bg-dark-surface/50 p-2 rounded-xl border border-gray-700 flex-wrap">
+                                <label class="text-sm text-gray-400 whitespace-nowrap"><i class="fa-regular fa-calendar mr-1"></i> แสดงผล:</label>
+                                <select v-model="extraProfitDateFilterMode" class="bg-dark-base border border-gray-600 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm font-bold shadow-sm">
+                                    <option value="all">ล่าสุด (30 รายการ)</option>
+                                    <option value="today">วันนี้</option>
+                                    <option value="yesterday">เมื่อวาน</option>
+                                    <option value="week">สัปดาห์นี้</option>
+                                    <option value="month">เดือนนี้</option>
+                                    <option value="year">ปีนี้</option>
+                                    <option value="range">กำหนดเอง...</option>
+                                </select>
+                                <div v-if="extraProfitDateFilterMode === 'range'" class="flex items-center gap-2 animate-fade-in">
+                                    <input type="date" v-model="extraProfitStartDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto shadow-sm">
+                                    <span class="text-gray-500">-</span>
+                                    <input type="date" v-model="extraProfitEndDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto shadow-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <!-- Left: Form Input -->
+                            <div class="lg:col-span-1 bg-black/30 p-5 rounded-xl border border-gray-800 space-y-4">
+                                <h3 class="font-bold text-white text-base"><i class="fa-solid fa-plus-circle text-gold-500 mr-2"></i> เพิ่มกำไรเพิ่มเติม</h3>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">วันที่รับรู้รายได้</label>
+                                    <input type="date" v-model="newExtraProfit.profit_date" class="w-full bg-dark-base border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">จำนวนเงิน (บาท)</label>
+                                    <input type="number" v-model="newExtraProfit.amount" placeholder="ระบุจำนวนเงิน" class="w-full bg-dark-base border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">หมายเหตุ / รายละเอียด</label>
+                                    <textarea v-model="newExtraProfit.note" rows="3" placeholder="ระบุรายละเอียด (เช่น กำไรจากจิวเวลรี่, ดอกเบี้ย, ฯลฯ)" class="w-full bg-dark-base border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 focus:outline-none resize-none"></textarea>
+                                </div>
+                                <button @click="addExtraProfit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-lg transition-colors shadow-lg shadow-emerald-600/20 flex justify-center items-center gap-2">
+                                    <i class="fa-solid fa-save"></i> บันทึกรายการ
+                                </button>
+                            </div>
+
+                            <!-- Right: List/Table -->
+                            <div class="lg:col-span-2 space-y-4">
+                                <h3 class="font-bold text-white text-base"><i class="fa-solid fa-list text-gold-500 mr-2"></i> รายการกำไรเพิ่มเติม <span v-if="historyDateFilterMode === 'all'">(30 รายการล่าสุด)</span><span v-else>(ตามช่วงเวลาที่เลือก)</span></h3>
+                                <div class="overflow-x-auto bg-black/20 rounded-xl border border-gray-800">
+                                    <table class="min-w-full divide-y divide-gray-800 text-sm">
+                                        <thead class="bg-dark-base">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left font-semibold text-gray-400 text-xs">วันที่</th>
+                                                <th class="px-4 py-3 text-left font-semibold text-gray-400 text-xs">รายการ / หมายเหตุ</th>
+                                                <th class="px-4 py-3 text-right font-semibold text-gray-400 text-xs">จำนวนเงิน</th>
+                                                <th class="px-4 py-3 text-center font-semibold text-gray-400 text-xs">ลบ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-800">
+                                            <tr v-if="extraProfits.length === 0">
+                                                <td colspan="4" class="px-4 py-8 text-center text-gray-500">ไม่มีข้อมูลกำไรเพิ่มเติม</td>
+                                            </tr>
+                                            <tr v-for="ep in extraProfits" :key="ep.id" class="hover:bg-gray-800/20 transition-colors">
+                                                <td class="px-4 py-3 whitespace-nowrap text-gray-300 font-mono">{{ new Date(ep.profit_date).toLocaleDateString('th-TH') }}</td>
+                                                <td class="px-4 py-3 text-gray-300">{{ ep.note || '-' }}</td>
+                                                <td class="px-4 py-3 text-right text-emerald-400 font-mono font-bold">{{ formatCurrency(ep.amount) }}฿</td>
+                                                <td class="px-4 py-3 text-center">
+                                                    <button @click="deleteExtraProfit(ep.id)" class="p-1.5 text-gray-500 hover:text-red-400 rounded transition-colors" title="ลบรายการ">
+                                                        <i class="fa-solid fa-trash text-xs"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </transition>
             
@@ -1026,19 +1129,29 @@
                                                 :class="calcForm.type === 'silver' ? 'bg-gray-700/50 text-gray-300 border-gray-500' : 'bg-dark-base text-gray-400 border-gray-700 hover:border-gray-500'"
                                                 class="py-2.5 rounded-lg border text-sm font-medium transition-all-custom">เงิน</button>
                                         </div>
-                                        <div class="mt-3 flex items-center gap-2">
-                                            <label class="text-sm font-medium text-gray-400 whitespace-nowrap"><i
-                                                    class="fa-solid fa-edit mr-1"></i> ราคาอ้างอิง:</label>
-                                            <input type="number" :placeholder="currentAssetPrice"
-                                                v-model.number="calcForm.manualPrice" :disabled="isEmployee && !isAdmin"
-                                                :title="isEmployee && !isAdmin ? 'ไม่อนุญาตให้พนักงานแก้ไขราคาอ้างอิง' : ''"
-                                                :class="(isEmployee && !isAdmin) ? 'bg-dark-surface text-gray-500 border-gray-800 cursor-not-allowed' : 'bg-dark-base text-gold-400 border-gray-600 focus:border-gold-500'"
-                                                class="w-32 px-3 py-1.5 border rounded-lg outline-none text-sm transition-colors text-right font-bold">
-                                            <span class="text-xs text-gray-500"
-                                                v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice">(อิงราคาสมาคม)</span>
-                                            <span class="text-xs text-yellow-500" v-else>(ราคาแบบปรับเอง)</span>
-                                            <span class="text-xs text-red-500 ml-1"
-                                                v-if="isEmployee && !isAdmin"></span>
+                                        <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+                                            <div class="flex items-center gap-2">
+                                                <label class="text-sm font-medium text-gray-400 whitespace-nowrap"><i
+                                                        class="fa-solid fa-edit mr-1"></i> ราคาอ้างอิง:</label>
+                                                <input type="number" :placeholder="currentAssetPrice"
+                                                    v-model.number="calcForm.manualPrice" :disabled="isEmployee && !isAdmin"
+                                                    :title="isEmployee && !isAdmin ? 'ไม่อนุญาตให้พนักงานแก้ไขราคาอ้างอิง' : ''"
+                                                    :class="(isEmployee && !isAdmin) ? 'bg-dark-surface text-gray-500 border-gray-800 cursor-not-allowed' : 'bg-dark-base text-gold-400 border-gray-600 focus:border-gold-500'"
+                                                    class="w-28 px-3 py-1.5 border rounded-lg outline-none text-sm transition-colors text-right font-bold">
+                                                <span class="text-xs text-gray-500"
+                                                    v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice">(อิงสมาคม)</span>
+                                                <span class="text-xs text-yellow-500" v-else>(ปรับเอง)</span>
+                                            </div>
+                                            
+                                            <div v-if="isAdmin && calcForm.type === 'tong_lom'" class="flex items-center gap-2">
+                                                <label class="text-sm font-medium text-green-400 whitespace-nowrap"><i
+                                                        class="fa-solid fa-plus-circle mr-1"></i> ราคาบวก (แอดมิน):</label>
+                                                <input type="number" placeholder="ออโต้"
+                                                    v-model.number="calcForm.manualPremium"
+                                                    class="w-24 px-3 py-1.5 bg-dark-base border border-green-800/50 text-green-400 focus:border-green-500 rounded-lg outline-none text-sm transition-colors text-right font-bold">
+                                                <span class="text-xs text-gray-500" v-if="!calcForm.manualPremium && calcForm.manualPremium !== 0">(อิงระบบ)</span>
+                                                <span class="text-xs text-green-500" v-else>(ปรับเอง)</span>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1192,6 +1305,27 @@
                                             <span class="text-gray-400 text-sm">ยอดเงินสดที่ต้องจ่าย:</span>
                                             <span class="font-bold text-gold-400 text-lg">{{ formatCurrency(cashAmountToPay) }} ฿</span>
                                         </div>
+
+                                        <!-- Drawer Balance Always Visible -->
+                                        <div class="mt-3 pt-3 border-t border-gray-800">
+                                            <div class="text-xs text-gray-400 mb-2 flex justify-between">
+                                                <span><i class="fa-solid fa-vault mr-1"></i> เงินสดในลิ้นชัก:</span>
+                                                <span :class="cashAmountToPay > drawerTotal ? 'text-red-400 font-bold' : 'text-green-500'">{{ formatCurrency(drawerTotal) }} ฿</span>
+                                            </div>
+                                            <div v-if="drawerTotal > 0" class="text-[10px] grid grid-cols-2 md:grid-cols-4 gap-1 text-gray-400">
+                                                <div v-if="drawerBalance.b1000 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>แบงค์ 1,000</span> <span class="text-white font-bold">{{drawerBalance.b1000}}</span></div>
+                                                <div v-if="drawerBalance.b500 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>แบงค์ 500</span> <span class="text-white font-bold">{{drawerBalance.b500}}</span></div>
+                                                <div v-if="drawerBalance.b100 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>แบงค์ 100</span> <span class="text-white font-bold">{{drawerBalance.b100}}</span></div>
+                                                <div v-if="drawerBalance.b50 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>แบงค์ 50</span> <span class="text-white font-bold">{{drawerBalance.b50}}</span></div>
+                                                <div v-if="drawerBalance.b20 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>แบงค์ 20</span> <span class="text-white font-bold">{{drawerBalance.b20}}</span></div>
+                                                <div v-if="drawerBalance.c10 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>เหรียญ 10</span> <span class="text-white font-bold">{{drawerBalance.c10}}</span></div>
+                                                <div v-if="drawerBalance.c5 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>เหรียญ 5</span> <span class="text-white font-bold">{{drawerBalance.c5}}</span></div>
+                                                <div v-if="drawerBalance.c1 > 0" class="bg-gray-800/30 px-1.5 py-1 rounded border border-gray-700/50 flex justify-between"><span>เหรียญ 1</span> <span class="text-white font-bold">{{drawerBalance.c1}}</span></div>
+                                            </div>
+                                            <div v-else class="text-center text-[10px] text-gray-600 py-1 border border-dashed border-gray-800 rounded">
+                                                ไม่มีเงินสดในลิ้นชัก
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <!-- Insufficient Drawer Alert -->
@@ -1199,19 +1333,9 @@
                                         class="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded-lg text-sm text-red-400 flex items-start animate-fade-in shadow-lg">
                                         <i class="fa-solid fa-triangle-exclamation text-xl mr-3 mt-0.5"></i> 
                                         <div class="flex-1">
-                                            <div class="font-bold">เงินในลิ้นชักไม่พอ! (มีเงินสด {{formatCurrency(drawerTotal)}} ฿)</div>
+                                            <div class="font-bold">เงินในลิ้นชักไม่พอจ่าย!</div>
                                             <div class="text-[11px] mt-1 text-red-400/80 leading-relaxed">
-                                                กรุณาระบุยอดเงินโอนอย่างน้อย <span class="font-bold text-red-300">{{formatCurrency(billTotal - drawerTotal)}} ฿</span> เพื่อให้ยอดเงินสดที่ต้องจ่ายไม่เกินเงินในลิ้นชัก
-                                            </div>
-                                            <div v-if="drawerTotal > 0" class="mt-2 text-xs border-t border-red-500/30 pt-2 grid grid-cols-2 gap-x-2 gap-y-1">
-                                                <div v-if="drawerBalance.b1000 > 0">• แบงค์ 1,000: {{drawerBalance.b1000}} ใบ</div>
-                                                <div v-if="drawerBalance.b500 > 0">• แบงค์ 500: {{drawerBalance.b500}} ใบ</div>
-                                                <div v-if="drawerBalance.b100 > 0">• แบงค์ 100: {{drawerBalance.b100}} ใบ</div>
-                                                <div v-if="drawerBalance.b50 > 0">• แบงค์ 50: {{drawerBalance.b50}} ใบ</div>
-                                                <div v-if="drawerBalance.b20 > 0">• แบงค์ 20: {{drawerBalance.b20}} ใบ</div>
-                                                <div v-if="drawerBalance.c10 > 0">• เหรียญ 10: {{drawerBalance.c10}} เหรียญ</div>
-                                                <div v-if="drawerBalance.c5 > 0">• เหรียญ 5: {{drawerBalance.c5}} เหรียญ</div>
-                                                <div v-if="drawerBalance.c1 > 0">• เหรียญ 1: {{drawerBalance.c1}} เหรียญ</div>
+                                                กรุณาระบุยอดเงินโอนอย่างน้อย <span class="font-bold text-red-300">{{formatCurrency(cashAmountToPay - drawerTotal)}} ฿</span> เพื่อให้ยอดเงินสดที่ต้องจ่ายไม่เกินเงินในลิ้นชัก
                                             </div>
                                         </div>
                                     </div>
@@ -1412,58 +1536,75 @@
                                     <td colspan="7" class="px-6 py-10 text-center text-gray-500">ไม่พบรายการของวันนี้
                                     </td>
                                 </tr>
-                                <tr v-for="t in transactions" :key="t.id" class="hover:bg-gray-800/30 transition-colors"
-                                    :class="selectedTransactions.includes(t.id) ? 'bg-gold-900/10' : ''">
-                                    <td class="px-4 py-4 whitespace-nowrap text-sm">
-                                        <input type="checkbox" :value="t.id" v-model="selectedTransactions"
+                                <tr v-for="g in groupedTransactions" :key="g.key" class="hover:bg-gray-800/30 transition-colors"
+                                    :class="g.ids.some(id => selectedTransactions.includes(id)) ? 'bg-gold-900/10' : ''">
+                                    <td class="px-4 py-4 whitespace-nowrap text-sm align-top pt-5">
+                                        <input type="checkbox" :checked="g.ids.every(id => selectedTransactions.includes(id))" @change="toggleGroupSelection(g, $event.target.checked)"
                                             class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{{
-                                        formatDate(t.created_at) }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white">
-                                        <div class="font-bold">{{ t.customer_name }}</div>
-                                        <div class="text-[10px] text-gray-500">{{ t.phone }}</div>
-                                        <div v-if="t.address"
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 align-top pt-5">{{
+                                        formatDate(g.created_at) }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white align-top pt-5">
+                                        <div class="font-bold">{{ g.customer_name }}</div>
+                                        <div class="text-[10px] text-gray-500">{{ g.phone }}</div>
+                                        <div v-if="g.address"
                                             class="text-[10px] text-gold-500/70 italic truncate max-w-[150px]"
-                                            :title="t.address">
-                                            <i class="fa-solid fa-location-dot mr-1"></i>{{ t.address }}
+                                            :title="g.address">
+                                            <i class="fa-solid fa-location-dot mr-1"></i>{{ g.address }}
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gold-300">{{ getTypeName(t.type)
-                                        }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">{{ t.base_price ? formatCurrency(t.base_price) : '-' }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">{{
-                                        t.percent }}% / {{ t.weight }} ก.</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right">{{
-                                        formatCurrency(t.net_price) }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gold-300 align-top pt-5">
+                                        <div v-for="(t, idx) in g.items" :key="t.id" :class="idx !== g.items.length - 1 ? 'mb-2' : ''" style="height: 40px;">
+                                            {{ getTypeName(t.type) }}
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right align-top pt-5">
+                                        <div v-for="(t, idx) in g.items" :key="t.id" :class="idx !== g.items.length - 1 ? 'mb-2' : ''" style="height: 40px;">
+                                            <div class="text-gray-400">{{ t.base_price ? formatCurrency(t.base_price) : '-' }}</div>
+                                            <div v-if="t.premium_amount > 0" class="text-[10px] text-green-500 font-medium leading-none">(+{{ formatCurrency(t.premium_amount) }})</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400 align-top pt-5">
+                                        <div v-for="(t, idx) in g.items" :key="t.id" :class="idx !== g.items.length - 1 ? 'mb-2' : ''" style="height: 40px; display: flex; align-items: center; justify-content: flex-end;">
+                                            {{ t.percent }}% / {{ t.weight }} ก.
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right align-top pt-5">
+                                        {{ formatCurrency(g.net_price) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm align-top pt-5">
                                         <div class="flex items-center justify-center gap-3">
                                             <!-- ลายเซ็น -->
-                                            <button v-if="t.signature" @click="viewingPhoto = t.signature"
+                                            <button v-if="g.signature" @click="viewingPhoto = g.signature"
                                                 class="text-blue-400 hover:text-blue-300 transition-colors"
                                                 title="ดูโฉมลายเซ็น">
                                                 <i class="fa-solid fa-signature text-lg"></i>
                                             </button>
                                             <!-- รูปสินค้า -->
-                                            <button v-if="t.photo" @click="viewingPhoto = t.photo"
+                                            <button v-if="g.photo" @click="viewingPhoto = g.photo"
                                                 class="text-gold-400 hover:text-gold-300 transition-colors"
                                                 title="ดูรูปสินค้า">
                                                 <i class="fa-solid fa-image text-lg"></i>
                                             </button>
                                             <!-- รูปบัตรประชาชน -->
-                                            <button v-if="t.id_card_photo" @click="viewingPhoto = t.id_card_photo"
+                                            <button v-if="g.id_card_photo" @click="viewingPhoto = g.id_card_photo"
                                                 class="text-green-400 hover:text-green-300 transition-colors"
                                                 title="ดูรูปบัตรประชาชน">
                                                 <i class="fa-solid fa-id-card text-lg"></i>
                                             </button>
-                                            <span v-if="!t.signature && !t.photo && !t.id_card_photo"
+                                            <span v-if="!g.signature && !g.photo && !g.id_card_photo"
                                                 class="text-gray-700">-</span>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                        <button @click="deleteTransaction(t.id)"
-                                            class="text-red-500 hover:text-red-400 p-2"><i
-                                                class="fa-solid fa-trash"></i></button>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm align-top pt-3">
+                                        <div v-for="(t, idx) in g.items" :key="t.id" :class="idx !== g.items.length - 1 ? 'mb-2' : ''" class="flex items-center justify-center gap-2" style="height: 40px;">
+                                            <button @click="editTransaction(t)"
+                                                class="text-blue-500 hover:text-blue-400 p-1" title="แก้ไขรายการ"><i
+                                                    class="fa-solid fa-pen-to-square"></i></button>
+                                            <button @click="deleteTransaction(t.id)"
+                                                class="text-red-500 hover:text-red-400 p-1" title="ลบรายการ"><i
+                                                    class="fa-solid fa-trash"></i></button>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>

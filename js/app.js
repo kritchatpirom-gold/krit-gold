@@ -98,6 +98,31 @@ createApp({
             loadDrawerLogs();
         };
 
+        const getDrawerTotalFromObj = (obj) => {
+            if (!obj) return 0;
+            return (obj.b1000 || 0) * 1000 +
+                   (obj.b500 || 0) * 500 +
+                   (obj.b100 || 0) * 100 +
+                   (obj.b50 || 0) * 50 +
+                   (obj.b20 || 0) * 20 +
+                   (obj.c10 || 0) * 10 +
+                   (obj.c5 || 0) * 5 +
+                   (obj.c1 || 0) * 1;
+        };
+
+        const getDrawerDiff = (oldB, newB) => {
+            if (!oldB || !newB) return [];
+            const diffs = [];
+            const keys = { b1000: 'แบงค์ 1,000', b500: 'แบงค์ 500', b100: 'แบงค์ 100', b50: 'แบงค์ 50', b20: 'แบงค์ 20', c10: 'เหรียญ 10', c5: 'เหรียญ 5', c1: 'เหรียญ 1' };
+            for (const [k, label] of Object.entries(keys)) {
+                const diff = (newB[k] || 0) - (oldB[k] || 0);
+                if (diff !== 0) {
+                    diffs.push({ label, diff, absDiff: Math.abs(diff) });
+                }
+            }
+            return diffs;
+        };
+
         const loadDrawerBalance = async () => {
             try {
                 const { data, error } = await supabase.from('drawer_balance').select('*').eq('id', 1).maybeSingle();
@@ -423,7 +448,8 @@ createApp({
             address: '',
             idCardPhoto: '',
             expireDate: '',
-            manualPrice: null
+            manualPrice: null,
+            manualPremium: null
         });
 
         const resetForm = () => {
@@ -437,7 +463,8 @@ createApp({
                 address: '',
                 idCardPhoto: '',
                 expireDate: '',
-                manualPrice: null
+                manualPrice: null,
+                manualPremium: null
             };
             transferAmount.value = 0;
             clearSignature();
@@ -549,8 +576,8 @@ createApp({
         watch(() => calcForm.value.percent, (val) => {
             if (val !== null && val !== undefined && val !== '') {
                 let v = val;
-                // หากกรอกเกิน 99 ให้เอาแค่ 2 หลักแรก (เช่น 333 กลายเป็น 33) แทนที่จะปรับเป็น 99
-                if (v > 99) {
+                // หากกรอกเกิน 100 ให้เอาแค่ 2 หลักแรก (เช่น 333 กลายเป็น 33) แทนที่จะปรับเป็น 99
+                if (v > 100) {
                     v = parseInt(String(v).substring(0, 2));
                 }
                 if (v < 1) v = 1;
@@ -599,6 +626,11 @@ createApp({
                 // ทองหลอมถ้าน้ำหนักรวม (ในบิล + ที่กำลังกรอก) >= 5 กรัม ให้บวกพรีเมียม
                 const totalWeightForPremium = accumulatedGoldWeight.value + w;
                 premium = (activePremium && totalWeightForPremium >= 5) ? Number(activePremium.premium_amount) : 0;
+                
+                if (isAdmin.value && tForm.manualPremium !== null && tForm.manualPremium !== '') {
+                    premium = Number(tForm.manualPremium);
+                }
+
                 const perGram = floor2((base + premium) * 0.0656);
                 const withPurity = floor2(perGram * (p / 100));
                 net = floor2(withPurity * w);
@@ -1006,6 +1038,44 @@ createApp({
             loadingTransactions.value = false;
         };
 
+        const editTransaction = async (t) => {
+            const inputs = await showAppModal('prompt', 'แก้ไขข้อมูลรายการ', 'โปรดแก้ไขข้อมูลที่ต้องการแล้วกดตกลง', [
+                { label: 'ชื่อลูกค้า', type: 'text', defaultValue: t.customer_name || '' },
+                { label: 'เบอร์โทร', type: 'text', defaultValue: t.phone || '' },
+                { label: 'น้ำหนัก (กรัม)', type: 'number', defaultValue: t.weight || '' },
+                { label: 'เปอร์เซ็นต์ (%)', type: 'number', defaultValue: t.percent || '' },
+                { label: 'ราคาสุทธิ (บาท)', type: 'number', defaultValue: t.net_price || '' }
+            ]);
+            
+            if (!inputs) return;
+            
+            const newName = inputs[0];
+            const newPhone = inputs[1];
+            const newWeight = parseFloat(inputs[2]) || 0;
+            const newPercent = parseFloat(inputs[3]) || 0;
+            const newNetPrice = parseFloat(inputs[4]) || 0;
+            
+            const diffAmount = t.net_price - newNetPrice; 
+
+            const { error } = await supabase.from('transactions').update({
+                customer_name: newName,
+                phone: newPhone,
+                weight: newWeight,
+                percent: newPercent,
+                net_price: newNetPrice
+            }).eq('id', t.id);
+            
+            if (!error) {
+                if (diffAmount !== 0) {
+                    await restoreDrawerBalance(diffAmount, t.id);
+                }
+                loadTransactions();
+                loadDeliveryData(); // Refresh stock
+            } else {
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', error.message);
+            }
+        };
+
         const deleteTransaction = async (id) => {
             if (confirm('ยืนยันการลบรายการนี้?')) {
                 // Fetch the transaction to get net_price
@@ -1085,6 +1155,51 @@ createApp({
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        };
+
+        const groupedTransactions = computed(() => {
+            const groups = {};
+            transactions.value.forEach(t => {
+                const dateKey = t.created_at ? t.created_at.substring(0, 16) : 'unknown';
+                const key = `${dateKey}_${t.customer_name || 'noname'}_${t.phone || 'nophone'}`;
+                
+                if (!groups[key]) {
+                    groups[key] = {
+                        key: key,
+                        ids: [],
+                        created_at: t.created_at,
+                        customer_name: t.customer_name,
+                        phone: t.phone,
+                        address: t.address,
+                        signature: t.signature,
+                        photo: t.photo,
+                        id_card_photo: t.id_card_photo,
+                        items: [],
+                        net_price: 0
+                    };
+                } else {
+                    if (t.signature) groups[key].signature = t.signature;
+                    if (t.photo) groups[key].photo = t.photo;
+                    if (t.id_card_photo) groups[key].id_card_photo = t.id_card_photo;
+                }
+                groups[key].ids.push(t.id);
+                groups[key].items.push(t);
+                groups[key].net_price += (Number(t.net_price) || 0);
+            });
+            // Sort by created_at descending
+            return Object.values(groups).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        });
+
+        const toggleGroupSelection = (g, checked) => {
+            if (checked) {
+                g.ids.forEach(id => {
+                    if (!selectedTransactions.value.includes(id)) {
+                        selectedTransactions.value.push(id);
+                    }
+                });
+            } else {
+                selectedTransactions.value = selectedTransactions.value.filter(id => !g.ids.includes(id));
+            }
         };
 
         const transactionsTotal = computed(() => {
@@ -1553,6 +1668,19 @@ createApp({
         
         const selectedTransactionIds = ref([]);
 
+        const extraProfits = ref([]);
+        const newExtraProfit = ref({
+            profit_date: new Date().toLocaleDateString('en-CA'),
+            amount: '',
+            note: ''
+        });
+
+        const extraProfitDateFilterMode = ref('all');
+        const extraProfitStartDate = ref(new Date().toLocaleDateString('en-CA'));
+        const extraProfitEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        
+        const extraProfitSumForHistoryPeriod = ref(0);
+
         const loadDeliveryData = async () => {
             loadingDeliveryData.value = true;
             try {
@@ -1614,6 +1742,8 @@ createApp({
                         roundsQuery = roundsQuery.eq('status', historyStatusFilter.value);
                     }
                     
+                    let epQuery = supabase.from('extra_profits').select('amount');
+                    
                     if (historyDateFilterMode.value !== 'all') {
                         let start = new Date();
                         let end = new Date();
@@ -1637,11 +1767,18 @@ createApp({
                         }
                         
                         roundsQuery = roundsQuery.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+                        
+                        const startStr = start.toLocaleDateString('en-CA');
+                        const endStr = end.toLocaleDateString('en-CA');
+                        epQuery = epQuery.gte('profit_date', startStr).lte('profit_date', endStr);
                     } else {
                         roundsQuery = roundsQuery.limit(30);
+                        epQuery = epQuery.limit(1000);
                     }
                     
-                    const { data: rounds } = await roundsQuery;
+                    const [roundsRes, epRes] = await Promise.all([roundsQuery, epQuery]);
+                    
+                    const rounds = roundsRes.data;
                     if (rounds) {
                         rounds.forEach(r => {
                             let totalCost = 0;
@@ -1663,25 +1800,116 @@ createApp({
                         });
                     }
                     deliveryRoundsHistory.value = rounds || [];
+                    
+                    const epData = epRes.data;
+                    extraProfitSumForHistoryPeriod.value = epData ? epData.reduce((sum, item) => sum + Number(item.amount || 0), 0) : 0;
                 } else {
                     deliveryRoundsHistory.value = [];
+                    extraProfitSumForHistoryPeriod.value = 0;
                 }
+
+                await loadExtraProfits();
             } catch (err) {
                 console.error("Error loading delivery data:", err);
             } finally {
                 loadingDeliveryData.value = false;
             }
         };
+
+        const loadExtraProfits = async () => {
+            try {
+                let query = supabase.from('extra_profits')
+                    .select('*')
+                    .order('profit_date', { ascending: false });
+
+                if (extraProfitDateFilterMode.value !== 'all') {
+                    let start = new Date();
+                    let end = new Date();
+                    start.setHours(0, 0, 0, 0);
+                    end.setHours(23, 59, 59, 999);
+
+                    if (extraProfitDateFilterMode.value === 'yesterday') {
+                        start.setDate(start.getDate() - 1);
+                        end.setDate(end.getDate() - 1);
+                    } else if (extraProfitDateFilterMode.value === 'week') {
+                        const day = start.getDay();
+                        const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Monday
+                        start.setDate(diff);
+                    } else if (extraProfitDateFilterMode.value === 'month') {
+                        start.setDate(1);
+                    } else if (extraProfitDateFilterMode.value === 'year') {
+                        start.setMonth(0, 1);
+                    } else if (extraProfitDateFilterMode.value === 'range') {
+                        start = new Date(extraProfitStartDate.value + 'T00:00:00+07:00');
+                        end = new Date(extraProfitEndDate.value + 'T23:59:59+07:00');
+                    }
+                    
+                    const startStr = start.toLocaleDateString('en-CA');
+                    const endStr = end.toLocaleDateString('en-CA');
+                    query = query.gte('profit_date', startStr).lte('profit_date', endStr);
+                } else {
+                    query = query.limit(30);
+                }
+
+                const { data, error } = await query;
+                if (error) throw error;
+                extraProfits.value = data || [];
+            } catch (err) {
+                console.error('Error loading extra profits:', err);
+            }
+        };
+
+        const addExtraProfit = async () => {
+            if (!newExtraProfit.value.profit_date || !newExtraProfit.value.amount) {
+                alert('กรุณากรอกวันที่และจำนวนเงินให้ครบถ้วน');
+                return;
+            }
+            try {
+                const { data, error } = await supabase
+                    .from('extra_profits')
+                    .insert([{
+                        profit_date: newExtraProfit.value.profit_date,
+                        amount: parseFloat(newExtraProfit.value.amount),
+                        note: newExtraProfit.value.note || ''
+                    }])
+                    .select();
+                if (error) throw error;
+                
+                newExtraProfit.value.amount = '';
+                newExtraProfit.value.note = '';
+                await loadExtraProfits();
+            } catch (err) {
+                console.error('Error adding extra profit:', err);
+                alert('เกิดข้อผิดพลาดในการบันทึกกำไรเพิ่มเติม: ' + err.message);
+            }
+        };
+
+        const deleteExtraProfit = async (id) => {
+            const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ต้องการลบรายการกำไรเพิ่มเติมนี้ใช่หรือไม่?');
+            if (!confirmed) return;
+            try {
+                const { error } = await supabase
+                    .from('extra_profits')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+                await loadExtraProfits();
+            } catch (err) {
+                console.error('Error deleting extra profit:', err);
+                alert('เกิดข้อผิดพลาดในการลบ: ' + err.message);
+            }
+        };
         
-        watch([stockDateFilterMode, stockStartDate, stockEndDate, historyDateFilterMode, historyStartDate, historyEndDate, historyStatusFilter], () => {
+        watch([stockDateFilterMode, stockStartDate, stockEndDate, historyDateFilterMode, historyStartDate, historyEndDate, historyStatusFilter, extraProfitDateFilterMode, extraProfitStartDate, extraProfitEndDate], () => {
             loadDeliveryData();
         });
 
         const historyTotalProfit = computed(() => {
-            return deliveryRoundsHistory.value.reduce((sum, r) => {
+            const roundsProfit = deliveryRoundsHistory.value.reduce((sum, r) => {
                 if (r.status === 'completed') return sum + (r.net_profit || 0);
                 return sum;
             }, 0);
+            return roundsProfit + extraProfitSumForHistoryPeriod.value;
         });
 
         const selectedStats = computed(() => {
@@ -1925,6 +2153,8 @@ createApp({
             saving,
 
             transactions,
+            groupedTransactions,
+            toggleGroupSelection,
             loadingTransactions,
             transactionsTotal,
             totalWeight,
@@ -1935,6 +2165,8 @@ createApp({
             loadingDrawerLogs,
             showDrawerLogsModal,
             openDrawerLogsModal,
+            getDrawerTotalFromObj,
+            getDrawerDiff,
             saveDrawerBalance,
             isPrintReady,
             uploadToBucket,
@@ -1943,6 +2175,7 @@ createApp({
             filter,
             isFilterActive,
             deleteTransaction,
+            editTransaction,
             loadTransactions,
             deleteSelected,
             exportCSV,
@@ -2007,7 +2240,16 @@ createApp({
             deleteIngot,
             createDeliveryRound,
             savePayment,
-            deleteDeliveryRound
+            deleteDeliveryRound,
+
+            extraProfits,
+            newExtraProfit,
+            loadExtraProfits,
+            addExtraProfit,
+            deleteExtraProfit,
+            extraProfitDateFilterMode,
+            extraProfitStartDate,
+            extraProfitEndDate
         };
     }
 }).mount('#app');

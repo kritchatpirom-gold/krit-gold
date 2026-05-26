@@ -172,4 +172,16 @@ ALTER TABLE delivery_ingots ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated full access to delivery_ingots" ON delivery_ingots FOR ALL USING (auth.role() = 'authenticated');
 
 -- Add ingot_id to transactions table
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ingot_id UUID REFERENCES delivery_ingots(id) ON DELETE SET NULL;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ingot_id UUID REFERENCES delivery_ingots(id) ON DELETE SET NULL;
+-- Table: extra_profits
+CREATE TABLE IF NOT EXISTS extra_profits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profit_date DATE NOT NULL,
+  amount NUMERIC NOT NULL,
+  note TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE extra_profits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to extra_profits" ON extra_profits FOR ALL USING (auth.role() = 'authenticated');
+
