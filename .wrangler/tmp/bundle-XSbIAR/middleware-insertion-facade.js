@@ -1,8 +1,8 @@
-				import worker, * as OTHER_EXPORTS from "c:\\Users\\Fischer\\krit-gold\\.wrangler\\tmp\\pages-lCTxGK\\functionsWorker-0.1798987734136106.mjs";
+				import worker, * as OTHER_EXPORTS from "c:\\Users\\Fischer\\krit-gold\\.wrangler\\tmp\\pages-gIIkJF\\functionsWorker-0.5915760798309273.mjs";
 				import * as __MIDDLEWARE_0__ from "c:\\Users\\Fischer\\krit-gold\\node_modules\\wrangler\\templates\\middleware\\middleware-ensure-req-body-drained.ts";
 import * as __MIDDLEWARE_1__ from "c:\\Users\\Fischer\\krit-gold\\node_modules\\wrangler\\templates\\middleware\\middleware-miniflare3-json-error.ts";
 
-				export * from "c:\\Users\\Fischer\\krit-gold\\.wrangler\\tmp\\pages-lCTxGK\\functionsWorker-0.1798987734136106.mjs";
+				export * from "c:\\Users\\Fischer\\krit-gold\\.wrangler\\tmp\\pages-gIIkJF\\functionsWorker-0.5915760798309273.mjs";
 				const MIDDLEWARE_TEST_INJECT = "__INJECT_FOR_TESTING_WRANGLER_MIDDLEWARE__";
 				export const __INTERNAL_WRANGLER_MIDDLEWARE__ = [
 					

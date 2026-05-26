@@ -118,6 +118,34 @@ createApp({
             }
         };
 
+        // Custom Global Modal System
+        const appModal = ref({ show: false, type: 'alert', title: '', message: '', fields: [], resolveFn: null });
+
+        const showAppModal = (type, title, message, fields = []) => {
+            return new Promise((resolve) => {
+                appModal.value = {
+                    show: true,
+                    type,
+                    title,
+                    message,
+                    fields: fields.map(f => ({ ...f, value: f.defaultValue || '' })),
+                    resolveFn: resolve
+                };
+            });
+        };
+
+        const resolveModal = (confirmResult) => {
+            appModal.value.show = false;
+            if (appModal.value.resolveFn) {
+                if (appModal.value.type === 'prompt' && confirmResult) {
+                    const result = appModal.value.fields.length === 1 ? appModal.value.fields[0].value : appModal.value.fields.map(f => f.value);
+                    appModal.value.resolveFn(result);
+                } else {
+                    appModal.value.resolveFn(confirmResult);
+                }
+            }
+        };
+
         const logDrawerAction = async (action, amount, oldBalanceObj, newBalanceObj, referenceId = null) => {
             try {
                 // Ensure no unneeded properties are saved to jsonb
@@ -1502,6 +1530,352 @@ createApp({
             }
         };
 
+        // --- New Delivery Rounds & Profit Feature ---
+        const unsentTransactions = ref([]);
+        const groupedUnsent = ref({
+            'gold_60_100': { label: 'ทอง (60-100%)', items: [], selectedIds: [] },
+            'gold_30_59': { label: 'ทอง (30-59%)', items: [], selectedIds: [] },
+            'gold_20_29': { label: 'ทอง (20-29%)', items: [], selectedIds: [] },
+            'silver': { label: 'เงิน', items: [], selectedIds: [] }
+        });
+
+        const pendingIngots = ref([]);
+        const deliveryRoundsHistory = ref([]);
+        const loadingDeliveryData = ref(false);
+        const stockDateFilterMode = ref('all');
+        const stockStartDate = ref(new Date().toLocaleDateString('en-CA'));
+        const stockEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        
+        const historyDateFilterMode = ref('all');
+        const historyStartDate = ref(new Date().toLocaleDateString('en-CA'));
+        const historyEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        const historyStatusFilter = ref('all');
+        
+        const selectedTransactionIds = ref([]);
+
+        const loadDeliveryData = async () => {
+            loadingDeliveryData.value = true;
+            try {
+                let query = supabase.from('transactions')
+                    .select('*')
+                    .is('ingot_id', null)
+                    .order('created_at', { ascending: false });
+
+                if (stockDateFilterMode.value === 'range') {
+                    const startOfDay = new Date(stockStartDate.value + 'T00:00:00+07:00');
+                    const endOfDay = new Date(stockEndDate.value + 'T23:59:59+07:00');
+                    query = query.gte('created_at', startOfDay.toISOString()).lte('created_at', endOfDay.toISOString());
+                }
+
+                const { data: unsent } = await query;
+                unsentTransactions.value = unsent || [];
+
+                selectedTransactionIds.value = [];
+
+                // Reset groups
+                const groups = {
+                    'gold_60_100': { label: 'ทอง (60-100%)', items: [] },
+                    'gold_30_59': { label: 'ทอง (30-59%)', items: [] },
+                    'gold_20_29': { label: 'ทอง (20-29%)', items: [] },
+                    'silver': { label: 'เงิน', items: [] }
+                };
+                
+                unsentTransactions.value.forEach(t => {
+                    let key = '';
+                    if (t.type === 'silver') {
+                        key = 'silver';
+                    } else {
+                        const p = parseFloat(t.percent || 0);
+                        if (p >= 60) key = 'gold_60_100';
+                        else if (p >= 30 && p < 60) key = 'gold_30_59';
+                        else if (p >= 0 && p < 30) key = 'gold_20_29';
+                    }
+                    if (key) {
+                        groups[key].items.push(t);
+                    }
+                });
+                groupedUnsent.value = groups;
+
+                // 2. Fetch pending ingots
+                const { data: pending } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight)').is('round_id', null).order('created_at', { ascending: true });
+                if (pending) {
+                    pending.forEach(ing => {
+                        ing.total_cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
+                        ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
+                    });
+                }
+                pendingIngots.value = pending || [];
+
+                // 3. Fetch rounds history (Admin ONLY)
+                if (isAdmin.value) {
+                    let roundsQuery = supabase.from('delivery_rounds').select('*, delivery_ingots(*, transactions(net_price, weight))').order('created_at', { ascending: false });
+                    
+                    if (historyStatusFilter.value !== 'all') {
+                        roundsQuery = roundsQuery.eq('status', historyStatusFilter.value);
+                    }
+                    
+                    if (historyDateFilterMode.value !== 'all') {
+                        let start = new Date();
+                        let end = new Date();
+                        start.setHours(0, 0, 0, 0);
+                        end.setHours(23, 59, 59, 999);
+
+                        if (historyDateFilterMode.value === 'yesterday') {
+                            start.setDate(start.getDate() - 1);
+                            end.setDate(end.getDate() - 1);
+                        } else if (historyDateFilterMode.value === 'week') {
+                            const day = start.getDay();
+                            const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Monday
+                            start.setDate(diff);
+                        } else if (historyDateFilterMode.value === 'month') {
+                            start.setDate(1);
+                        } else if (historyDateFilterMode.value === 'year') {
+                            start.setMonth(0, 1);
+                        } else if (historyDateFilterMode.value === 'range') {
+                            start = new Date(historyStartDate.value + 'T00:00:00+07:00');
+                            end = new Date(historyEndDate.value + 'T23:59:59+07:00');
+                        }
+                        
+                        roundsQuery = roundsQuery.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+                    } else {
+                        roundsQuery = roundsQuery.limit(30);
+                    }
+                    
+                    const { data: rounds } = await roundsQuery;
+                    if (rounds) {
+                        rounds.forEach(r => {
+                            let totalCost = 0;
+                            let goldCost = 0;
+                            let silverCost = 0;
+                            r.delivery_ingots.forEach(ing => {
+                                const cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
+                                ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
+                                totalCost += cost;
+                                if (ing.category === 'silver') silverCost += cost;
+                                else goldCost += cost;
+                            });
+                            r.total_cost = totalCost;
+                            r.gold_cost = goldCost;
+                            r.silver_cost = silverCost;
+                            r.net_profit = (Number(r.gold_payment || 0) + Number(r.silver_payment || 0)) - totalCost;
+                            r.inputGold = r.gold_payment > 0 ? r.gold_payment : '';
+                            r.inputSilver = r.silver_payment > 0 ? r.silver_payment : '';
+                        });
+                    }
+                    deliveryRoundsHistory.value = rounds || [];
+                } else {
+                    deliveryRoundsHistory.value = [];
+                }
+            } catch (err) {
+                console.error("Error loading delivery data:", err);
+            } finally {
+                loadingDeliveryData.value = false;
+            }
+        };
+        
+        watch([stockDateFilterMode, stockStartDate, stockEndDate, historyDateFilterMode, historyStartDate, historyEndDate, historyStatusFilter], () => {
+            loadDeliveryData();
+        });
+
+        const historyTotalProfit = computed(() => {
+            return deliveryRoundsHistory.value.reduce((sum, r) => {
+                if (r.status === 'completed') return sum + (r.net_profit || 0);
+                return sum;
+            }, 0);
+        });
+
+        const selectedStats = computed(() => {
+            const selected = unsentTransactions.value.filter(i => selectedTransactionIds.value.includes(i.id));
+            return {
+                count: selected.length,
+                weight: selected.reduce((s, i) => s + Number(i.weight), 0),
+                cost: selected.reduce((s, i) => s + Number(i.net_price), 0)
+            };
+        });
+
+        const toggleSelectAllCategory = (category) => {
+            const group = groupedUnsent.value[category];
+            const groupIds = group.items.map(i => i.id);
+            const allSelected = groupIds.length > 0 && groupIds.every(id => selectedTransactionIds.value.includes(id));
+            
+            if (allSelected) {
+                selectedTransactionIds.value = selectedTransactionIds.value.filter(id => !groupIds.includes(id));
+            } else {
+                groupIds.forEach(id => {
+                    if (!selectedTransactionIds.value.includes(id)) {
+                        selectedTransactionIds.value.push(id);
+                    }
+                });
+            }
+        };
+
+        const createIngot = async () => {
+            if (selectedTransactionIds.value.length === 0) {
+                await showAppModal('alert', 'แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการหลอม');
+                return;
+            }
+            
+            const selectedItems = unsentTransactions.value.filter(i => selectedTransactionIds.value.includes(i.id));
+            const hasSilver = selectedItems.some(i => i.type === 'silver');
+            const hasGold = selectedItems.some(i => i.type !== 'silver');
+
+            let type = 'gold';
+            if (hasSilver && !hasGold) type = 'silver';
+            else if (hasSilver && hasGold) {
+                const confirmed = await showAppModal('confirm', 'ยืนยัน', 'คุณเลือกทั้งเงินและทองรวมกัน ต้องการหลอมรวมกันจริงๆ ใช่หรือไม่?');
+                if (!confirmed) return;
+                
+                const userInput = await showAppModal('prompt', 'ระบุประเภท', 'กรุณาระบุประเภทก้อนหลอม (พิมพ์ gold หรือ silver):', [
+                    { label: 'ประเภท (gold/silver)', type: 'text', defaultValue: 'gold' }
+                ]);
+                if (!userInput) return;
+                type = userInput;
+            }
+            
+            const inputs = await showAppModal('prompt', 'ข้อมูลก้อนหลอม', 'กรุณาระบุน้ำหนักและเปอร์เซ็นต์ของก้อนที่หลอมเสร็จแล้ว:', [
+                { label: 'น้ำหนัก (กรัม)', type: 'number', defaultValue: '' },
+                { label: 'เปอร์เซ็นต์ (%)', type: 'number', defaultValue: '' }
+            ]);
+            
+            if (!inputs || inputs.length < 2) return;
+            const weight = inputs[0];
+            const percent = inputs[1];
+            
+            if (!weight || !percent) return;
+
+            let category = 'silver';
+            if (type === 'gold' || type === 'ทอง') {
+                const p = parseFloat(percent);
+                if (p >= 60) category = 'gold_60_100';
+                else if (p >= 30) category = 'gold_30_59';
+                else category = 'gold_20_29';
+            }
+
+            loadingDeliveryData.value = true;
+            try {
+                // Insert Ingot
+                const { data: ingotData, error: ingotError } = await supabase.from('delivery_ingots').insert([{
+                    category: category,
+                    melted_weight: parseFloat(weight),
+                    melted_percent: parseFloat(percent)
+                }]).select();
+                
+                if (ingotError) throw ingotError;
+                const newIngotId = ingotData[0].id;
+
+                // Update transactions
+                const { error: txError } = await supabase.from('transactions').update({ ingot_id: newIngotId }).in('id', selectedTransactionIds.value);
+                if (txError) throw txError;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error creating ingot:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const deleteIngot = async (ingotId) => {
+            const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ต้องการลบก้อนนี้และคืนของเข้าสต็อกใช่หรือไม่?');
+            if (!confirmed) return;
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_ingots').delete().eq('id', ingotId);
+                if (error) throw error;
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error deleting ingot:", err);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const createDeliveryRound = async () => {
+            if (pendingIngots.value.length === 0) {
+                await showAppModal('alert', 'แจ้งเตือน', 'ไม่มีก้อนหลอมให้ส่ง');
+                return;
+            }
+            
+            const dateInput = await showAppModal('prompt', 'จัดส่งรอบนี้', 'กรุณาเลือกวันที่จัดส่ง:', [
+                { label: 'วันที่จัดส่ง', type: 'date', defaultValue: new Date().toLocaleDateString('en-CA') }
+            ]);
+            
+            if (!dateInput) return; // User cancelled
+            
+            // Allow override of created_at
+            let createdAtIso = new Date().toISOString();
+            if (dateInput) {
+                const dateObj = new Date(dateInput);
+                const now = new Date();
+                dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                createdAtIso = dateObj.toISOString();
+            }
+
+            loadingDeliveryData.value = true;
+            try {
+                const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
+                    status: 'pending',
+                    created_at: createdAtIso
+                }]).select();
+                if (roundError) throw roundError;
+                const newRoundId = roundData[0].id;
+
+                const ingotIds = pendingIngots.value.map(i => i.id);
+                const { error: updateError } = await supabase.from('delivery_ingots').update({ round_id: newRoundId }).in('id', ingotIds);
+                if (updateError) throw updateError;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error creating round:", err);
+                alert('เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const savePayment = async (roundId, goldAmount, silverAmount) => {
+            const gold = parseFloat(goldAmount) || 0;
+            const silver = parseFloat(silverAmount) || 0;
+            if (gold === 0 && silver === 0) {
+                if(!confirm('ยอดเงินเป็น 0 ยืนยันการบันทึกใช่หรือไม่?')) return;
+            }
+
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_rounds').update({
+                    gold_payment: gold,
+                    silver_payment: silver,
+                    status: 'completed',
+                    completed_at: new Date().toISOString()
+                }).eq('id', roundId);
+                if (error) throw error;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error saving payment:", err);
+                alert('เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const deleteDeliveryRound = async (roundId) => {
+            const confirmed = await showAppModal('confirm', 'คำเตือน', 'การลบรอบนี้จะคืนก้อนหลอมทั้งหมดกลับไปเป็นสถานะ "รอส่ง"\nคุณแน่ใจหรือไม่?');
+            if (!confirmed) return;
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_rounds').delete().eq('id', roundId);
+                if (error) throw error;
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error deleting round:", err);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        watch(currentTab, (newTab) => {
+            if (newTab === 'delivery') {
+                loadDeliveryData();
+            }
+        });
+
         return {
             currentTab,
             user,
@@ -1540,6 +1914,9 @@ createApp({
 
             priceTrendGold,
             priceTrendSilver,
+            appModal,
+            showAppModal,
+            resolveModal,
             silverDeduction,
 
             premiums,
@@ -1607,8 +1984,30 @@ createApp({
             modalHasSignature,
             openSignatureModal,
             closeSignatureModal,
+            clearModalSignature,
             saveModalSignature,
-            clearModalSignature
+            
+            groupedUnsent,
+            pendingIngots,
+            deliveryRoundsHistory,
+            loadingDeliveryData,
+            stockDateFilterMode,
+            stockStartDate,
+            stockEndDate,
+            historyDateFilterMode,
+            historyStartDate,
+            historyEndDate,
+            historyStatusFilter,
+            historyTotalProfit,
+            selectedTransactionIds,
+            selectedStats,
+            loadDeliveryData,
+            toggleSelectAllCategory,
+            createIngot,
+            deleteIngot,
+            createDeliveryRound,
+            savePayment,
+            deleteDeliveryRound
         };
     }
 }).mount('#app');

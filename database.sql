@@ -113,4 +113,63 @@ CREATE TABLE IF NOT EXISTS drawer_logs (
 ALTER TABLE drawer_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow authenticated full access to drawer_logs
-CREATE POLICY "Allow authenticated full access to drawer_logs" ON drawer_logs FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated full access to drawer_logs" ON drawer_logs FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: delivery_items
+CREATE TABLE IF NOT EXISTS delivery_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type TEXT NOT NULL,
+  percent NUMERIC NOT NULL,
+  weight NUMERIC NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Setup RLS
+ALTER TABLE delivery_items ENABLE ROW LEVEL SECURITY;
+
+-- Allow read/write access for authenticated users
+CREATE POLICY "Allow authenticated full access to delivery_items" ON delivery_items FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: association_sales
+CREATE TABLE IF NOT EXISTS association_sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_date DATE NOT NULL,
+  gold_amount NUMERIC NOT NULL DEFAULT 0,
+  silver_amount NUMERIC NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Setup RLS
+ALTER TABLE association_sales ENABLE ROW LEVEL SECURITY;
+
+-- Allow read/write access for authenticated users
+CREATE POLICY "Allow authenticated full access to association_sales" ON association_sales FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: delivery_rounds
+CREATE TABLE IF NOT EXISTS delivery_rounds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status TEXT DEFAULT 'pending',
+  gold_payment NUMERIC DEFAULT 0,
+  silver_payment NUMERIC DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  completed_at TIMESTAMP WITH TIME ZONE
+);
+
+ALTER TABLE delivery_rounds ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to delivery_rounds" ON delivery_rounds FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: delivery_ingots
+CREATE TABLE IF NOT EXISTS delivery_ingots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  round_id UUID REFERENCES delivery_rounds(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  melted_weight NUMERIC NOT NULL,
+  melted_percent NUMERIC NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE delivery_ingots ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to delivery_ingots" ON delivery_ingots FOR ALL USING (auth.role() = 'authenticated');
+
+-- Add ingot_id to transactions table
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ingot_id UUID REFERENCES delivery_ingots(id) ON DELETE SET NULL;

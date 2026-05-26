@@ -28,11 +28,12 @@ def find_drawer_ports():
 
 def trigger_port(port):
     try:
-        ser = serial.Serial(port, 115200, timeout=0.5, write_timeout=0.5)
-        ser.write(b'\x00')
-        ser.close()
-    except Exception:
-        pass
+        with serial.Serial(port, 115200, timeout=0.5, write_timeout=0.5) as ser:
+            ser.write(b'\x00')
+            ser.flush()
+            time.sleep(0.1)
+    except Exception as e:
+        print(f"Error triggering {port}: {e}")
 
 def open_cash_drawer():
     ports = find_drawer_ports()

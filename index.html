@@ -108,6 +108,9 @@
                         <button v-if="isLoggedIn" @click="currentTab = 'drawer'"
                             :class="currentTab === 'drawer' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ลิ้นชักเงิน</button>
+                        <button v-if="isLoggedIn" @click="currentTab = 'delivery'"
+                            :class="currentTab === 'delivery' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">Delivery & Profit</button>
 
                         <button v-if="isLoggedIn" @click="logout"
                             class="ml-4 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition-all-custom">
@@ -139,6 +142,8 @@
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
                     <button v-if="isLoggedIn" @click="currentTab = 'drawer'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ลิ้นชักเงิน</button>
+                    <button v-if="isLoggedIn" @click="currentTab = 'delivery'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">รายการส่งของ</button>
                     <button v-if="!isLoggedIn" @click="showAuth = true; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gold-400 mt-2 border-t border-gray-800 pt-3">เข้าสู่ระบบพนักงาน</button>
                     <button v-if="isLoggedIn" @click="logout(); mobileMenuOpen = false"
@@ -540,6 +545,253 @@
                     </div>
                 </div>
             </transition>
+
+            <transition name="slide-fade" mode="out-in">
+                <!-- Delivery & Profit -->
+                <div v-if="currentTab === 'delivery'" key="delivery" class="max-w-6xl mx-auto space-y-6">
+                    <!-- Loading State -->
+                    <div v-if="loadingDeliveryData" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <i class="fa-solid fa-circle-notch fa-spin text-5xl text-gold-500"></i>
+                    </div>
+
+                    <!-- 1. Stock / Unsent -->
+                    <div class="glass p-6 rounded-2xl border border-gray-800 relative">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b border-gray-800 pb-4 gap-4">
+                            <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-boxes-stacked mr-2"></i> สต็อกรอหลอมประจำวัน</h2>
+                            <div class="flex items-center gap-3 bg-dark-surface/50 p-2 rounded-xl border border-gray-700 flex-wrap">
+                                <label class="text-sm text-gray-400 whitespace-nowrap"><i class="fa-regular fa-calendar mr-1"></i> แสดงผล:</label>
+                                <select v-model="stockDateFilterMode" class="bg-dark-base border border-gray-600 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm">
+                                    <option value="all">ทั้งหมดที่รอหลอม</option>
+                                    <option value="range">เลือกช่วงวันที่...</option>
+                                </select>
+                                <div v-if="stockDateFilterMode === 'range'" class="flex items-center gap-2">
+                                    <input type="date" v-model="stockStartDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto">
+                                    <span class="text-gray-400 text-sm">-</span>
+                                    <input type="date" v-model="stockEndDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div v-for="(group, key) in groupedUnsent" :key="key" class="bg-dark-surface/50 rounded-xl border border-gray-800 p-4">
+                                <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                                    <h3 class="font-bold text-lg text-white">{{ group.label }} <span class="text-xs text-gray-500 font-normal">({{ group.items.length }} ชิ้น)</span></h3>
+                                    <button @click="toggleSelectAllCategory(key)" class="text-sm px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors">
+                                        {{ group.items.length > 0 && group.items.every(i => selectedTransactionIds.includes(i.id)) ? 'เอาออกทั้งหมด' : 'เลือกทั้งหมด' }}
+                                    </button>
+                                </div>
+                                <div class="max-h-48 overflow-y-auto custom-scrollbar space-y-2 mb-4 pr-2">
+                                    <div v-if="group.items.length === 0" class="text-center text-gray-500 py-4 text-sm">ไม่มีของในสต็อก</div>
+                                    <label v-for="item in group.items" :key="item.id" class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800/50 cursor-pointer border border-transparent hover:border-gray-700 transition-colors">
+                                        <input type="checkbox" :value="item.id" v-model="selectedTransactionIds" class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-gold-500 focus:ring-gold-500 focus:ring-offset-gray-800">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-sm text-gray-300 truncate">
+                                                {{ item.details || (item.type === 'silver' ? 'เงิน' : 'ทอง') }} 
+                                                <span v-if="item.percent" class="text-gold-400 text-xs ml-1">[{{ item.percent }}%]</span>
+                                                <span class="text-xs text-gray-500 ml-1">({{ new Date(item.created_at).toLocaleDateString('th-TH') }})</span>
+                                            </div>
+                                            <div class="text-xs text-gold-400 font-mono">{{ item.weight }}g / {{ formatCurrency(item.net_price) }}฿</div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Global Selected Stats & Melt Action -->
+                        <div class="mt-6 bg-gradient-to-r from-gray-900 to-black p-4 rounded-xl border border-gold-500/30 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl relative overflow-hidden">
+                            <div class="absolute inset-0 bg-gold-500/5 pointer-events-none"></div>
+                            <div class="flex flex-wrap gap-4 text-sm relative z-10 w-full sm:w-auto justify-center sm:justify-start">
+                                <div class="bg-dark-base/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center">
+                                    <span class="text-gray-400">เลือกแล้ว:</span> <span class="text-white font-bold ml-2 text-base">{{ selectedStats.count }}</span> <span class="text-gray-500 ml-1">ชิ้น</span>
+                                </div>
+                                <div class="bg-dark-base/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center">
+                                    <span class="text-gray-400">น้ำหนักก่อนหลอม:</span> <span class="text-gold-400 font-mono ml-2 font-bold text-base">{{ selectedStats.weight.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}g</span>
+                                </div>
+                                <div class="bg-dark-base/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center">
+                                    <span class="text-gray-400">ต้นทุนรวม:</span> <span class="text-red-400 font-mono ml-2 font-bold text-base">{{ formatCurrency(selectedStats.cost) }}฿</span>
+                                </div>
+                            </div>
+                            <button @click="createIngot" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-8 py-3 bg-gold-500 hover:bg-gold-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-lg rounded-xl transition-all shadow-lg shadow-gold-500/20 flex justify-center items-center relative z-10 group">
+                                <i class="fa-solid fa-fire-burner mr-2 group-hover:scale-110 transition-transform"></i> หลอมรายการที่เลือก
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Pending Ingots & Delivery -->
+                    <div class="glass p-6 rounded-2xl border border-gray-800 relative">
+                        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+                            <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-cubes mr-2"></i> ก้อนรอส่งสมาคม</h2>
+                            <button @click="createDeliveryRound" :disabled="pendingIngots.length === 0" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-lg transition-all flex justify-center items-center shadow-lg">
+                                <i class="fa-solid fa-truck-fast mr-2"></i> จัดส่งรอบนี้ ({{ pendingIngots.length }} ก้อน)
+                            </button>
+                        </div>
+                        
+                        <div v-if="pendingIngots.length === 0" class="text-center text-gray-500 py-8 bg-dark-surface/30 rounded-xl border border-gray-800">
+                            <i class="fa-solid fa-folder-open text-4xl mb-3 text-gray-700"></i>
+                            <p>ไม่มีก้อนหลอมที่รอส่ง</p>
+                        </div>
+                        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <div v-for="ing in pendingIngots" :key="ing.id" class="bg-gradient-to-b from-gray-800/80 to-dark-base p-4 rounded-xl border border-gray-700 relative group">
+                                <button @click="deleteIngot(ing.id)" class="absolute top-2 right-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-300" title="ยกเลิกก้อนนี้">
+                                    <i class="fa-solid fa-xmark text-lg"></i>
+                                </button>
+                                <div class="text-xl text-gold-500 mb-2"><i class="fa-solid fa-cube"></i></div>
+                                <div class="font-bold text-white mb-1">{{ groupedUnsent[ing.category]?.label || ing.category }}</div>
+                                <div class="text-xs text-gray-400 mb-2">{{ new Date(ing.created_at).toLocaleString('th-TH') }}</div>
+                                <div class="space-y-1 text-sm border-t border-gray-700 pt-2">
+                                    <div class="flex justify-between"><span class="text-gray-400">น้ำหนักก้อน:</span><span class="text-gold-400 font-mono font-bold">{{ ing.melted_weight }}g</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400">เปอร์เซ็นต์:</span><span class="text-white font-mono">{{ ing.melted_percent }}%</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400">นน.ก่อนหลอม:</span><span class="text-gray-500 font-mono text-xs">{{ ing.raw_weight.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}g</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-400">ทุนก้อนนี้:</span><span class="text-red-400 font-mono">{{ formatCurrency(ing.total_cost) }}฿</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Delivery Rounds History -->
+                    <div v-if="isAdmin" class="glass p-6 rounded-2xl border border-gray-800 relative">
+                        <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 border-b border-gray-800 pb-4">
+                            <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-clock-rotate-left mr-2"></i> ประวัติการส่งและการเงิน</h2>
+                            
+                            <!-- History Filters -->
+                            <div class="flex flex-wrap items-center gap-3">
+                                <!-- Status Filter -->
+                                <select v-model="historyStatusFilter" class="bg-dark-base border border-gray-700 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm font-bold shadow-sm">
+                                    <option value="all">สถานะทั้งหมด</option>
+                                    <option value="pending">รอเงินสมาคม</option>
+                                    <option value="completed">ปิดยอดแล้ว</option>
+                                </select>
+
+                                <!-- Date Filter -->
+                                <select v-model="historyDateFilterMode" class="bg-dark-base border border-gray-700 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm font-bold shadow-sm">
+                                    <option value="all">ล่าสุด (30 รายการ)</option>
+                                    <option value="today">วันนี้</option>
+                                    <option value="yesterday">เมื่อวาน</option>
+                                    <option value="week">สัปดาห์นี้</option>
+                                    <option value="month">เดือนนี้</option>
+                                    <option value="year">ปีนี้</option>
+                                    <option value="range">กำหนดเอง...</option>
+                                </select>
+
+                                <div v-if="historyDateFilterMode === 'range'" class="flex items-center gap-2 animate-fade-in">
+                                    <input type="date" v-model="historyStartDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto shadow-sm">
+                                    <span class="text-gray-500">-</span>
+                                    <input type="date" v-model="historyEndDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto shadow-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary Banner -->
+                        <div v-if="deliveryRoundsHistory.some(r => r.status === 'completed')" class="mb-6 bg-gradient-to-r from-gray-900 to-black p-4 rounded-xl border border-emerald-500/30 flex items-center justify-between shadow-lg">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
+                                    <i class="fa-solid fa-chart-line text-emerald-400 text-xl"></i>
+                                </div>
+                                <div>
+                                    <div class="text-sm text-gray-400">ยอดรวมกำไรสุทธิ <span v-if="historyDateFilterMode === 'all'">(30 รายการล่าสุด)</span><span v-else>(ตามช่วงเวลาที่เลือก)</span></div>
+                                    <div :class="historyTotalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-2xl font-bold font-mono">{{ formatCurrency(historyTotalProfit) }} ฿</div>
+                                </div>
+                            </div>
+                            <div class="hidden sm:block text-right">
+                                <div class="text-xs text-gray-500">รอบที่ปิดยอดแล้ว</div>
+                                <div class="text-white font-bold text-lg">{{ deliveryRoundsHistory.filter(r => r.status === 'completed').length }} รอบ</div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-6">
+                            <div v-if="deliveryRoundsHistory.length === 0" class="text-center text-gray-500 py-8 bg-dark-surface/30 rounded-xl border border-gray-800">
+                                <p>ไม่มีประวัติการส่งของ</p>
+                            </div>
+                            
+                            <div v-for="(round, index) in deliveryRoundsHistory" :key="round.id" class="bg-dark-surface/50 rounded-xl border border-gray-700 overflow-hidden">
+                                <div class="bg-gray-800/50 px-6 py-4 border-b border-gray-700 flex flex-wrap justify-between items-center gap-4">
+                                    <div>
+                                        <div class="flex items-center gap-3">
+                                            <h3 class="font-bold text-lg text-white">รอบส่ง #{{ deliveryRoundsHistory.length - index }}</h3>
+                                            <span v-if="round.status === 'pending'" class="px-3 py-1 bg-yellow-900/40 text-yellow-400 border border-yellow-700/50 rounded-full text-xs font-bold animate-pulse"><i class="fa-solid fa-hourglass-half mr-1"></i> รอเงินสมาคม</span>
+                                            <span v-else class="px-3 py-1 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 rounded-full text-xs font-bold"><i class="fa-solid fa-check-circle mr-1"></i> ปิดยอดแล้ว</span>
+                                        </div>
+                                        <div class="text-sm text-gray-400 mt-1">วันที่ส่ง: {{ new Date(round.created_at).toLocaleString('th-TH') }}</div>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <div class="text-right">
+                                            <div class="text-xs text-gray-500">จำนวน</div>
+                                            <div class="text-white font-bold">{{ round.delivery_ingots.length }} ก้อน</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-xs text-gray-500">รวมทุนรอบนี้</div>
+                                            <div class="text-red-400 font-bold font-mono">{{ formatCurrency(round.total_cost) }}฿</div>
+                                        </div>
+                                        <button @click="deleteDeliveryRound(round.id)" class="ml-4 p-2 text-gray-500 hover:text-red-400 hover:bg-gray-800 rounded transition-colors" title="ลบรอบการส่ง (ก้อนจะกลับไปรอก่อนส่ง)">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <!-- Items sent list -->
+                                    <div class="lg:col-span-1 space-y-2">
+                                        <h4 class="text-sm font-bold text-gray-400 mb-3 border-b border-gray-800 pb-2">รายการก้อนที่ส่ง</h4>
+                                        <div v-for="ing in round.delivery_ingots" :key="ing.id" class="flex flex-col text-sm bg-black/20 p-2 rounded border border-gray-800 gap-1">
+                                            <div class="flex justify-between">
+                                                <span class="text-gray-300">{{ groupedUnsent[ing.category]?.label || ing.category }}</span>
+                                                <span class="text-gold-400 font-mono">{{ ing.melted_weight }}g <span class="text-gray-500 text-xs ml-1">({{ ing.melted_percent }}%)</span></span>
+                                            </div>
+                                            <div class="flex justify-between text-xs text-gray-500 border-t border-gray-700/50 pt-1 mt-1">
+                                                <span>นน.ก่อนหลอม:</span>
+                                                <span class="font-mono">{{ ing.raw_weight ? ing.raw_weight.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00' }}g</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Input & Profit -->
+                                    <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                        <!-- Inputs -->
+                                        <div class="space-y-4 bg-black/30 p-4 rounded-xl border border-gray-800">
+                                            <div>
+                                                <label class="block text-xs text-gray-400 mb-1">ยอดรับเงิน (ทอง)</label>
+                                                <input type="number" v-model="round.inputGold" placeholder="ยอดทอง" class="w-full bg-dark-base border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-400 mb-1">ยอดรับเงิน (เงิน/Silver)</label>
+                                                <input type="number" v-model="round.inputSilver" placeholder="ยอดเงิน" class="w-full bg-dark-base border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500">
+                                            </div>
+                                            <button v-if="round.status === 'pending'" @click="savePayment(round.id, round.inputGold, round.inputSilver)" class="w-full py-2 bg-gold-500 hover:bg-gold-400 text-black font-bold text-sm rounded transition-colors shadow-lg mt-2">
+                                                <i class="fa-solid fa-save mr-1"></i> บันทึกยอดสมาคม
+                                            </button>
+                                            <button v-else-if="Number(round.inputGold || 0) !== Number(round.gold_payment || 0) || Number(round.inputSilver || 0) !== Number(round.silver_payment || 0)" @click="savePayment(round.id, round.inputGold, round.inputSilver)" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded transition-colors shadow-lg mt-2 animate-pulse">
+                                                <i class="fa-solid fa-pen-to-square mr-1"></i> อัปเดตยอดใหม่
+                                            </button>
+                                            <div v-else class="text-xs text-gray-500 text-center mt-2 flex items-center justify-center gap-1 bg-dark-base/50 py-2 rounded">
+                                                <i class="fa-solid fa-check-circle text-emerald-500"></i> บันทึกแล้ว (แก้ไขตัวเลขเพื่ออัปเดต)
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Profit Info -->
+                                        <div v-if="round.status === 'completed'" class="bg-black/30 p-4 rounded-xl border border-gray-800">
+                                            <div class="space-y-3">
+                                                <div class="flex justify-between items-center pb-2 border-b border-gray-700">
+                                                    <span class="text-sm text-gray-400">เงินรับสมาคม</span>
+                                                    <span class="text-emerald-400 font-bold font-mono">{{ formatCurrency(Number(round.gold_payment || 0) + Number(round.silver_payment || 0)) }}฿</span>
+                                                </div>
+                                                <div class="flex justify-between items-center pb-2 border-b border-gray-700">
+                                                    <span class="text-sm text-gray-400">หักทุนรอบนี้</span>
+                                                    <span class="text-red-400 font-bold font-mono">-{{ formatCurrency(round.total_cost) }}฿</span>
+                                                </div>
+                                                <div class="flex justify-between items-center pt-1">
+                                                    <span class="text-sm font-bold text-gray-300">กำไรสุทธิ</span>
+                                                    <span :class="round.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-xl font-bold font-mono">{{ formatCurrency(round.net_profit) }}฿</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+            
+            <transition name="slide-fade" mode="out-in">
                 <!-- Calculator POS / Cart -->
                 <div v-if="currentTab === 'calculator'" key="calculator" class="max-w-6xl mx-auto">
 
@@ -1511,6 +1763,29 @@
                 </div>
             </div>
         </div>
+
+        <!-- Global Custom Modal -->
+        <transition name="fade">
+            <div v-if="appModal.show" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <div class="bg-dark-surface border border-gray-700 rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all scale-100 opacity-100">
+                    <h3 class="text-xl font-bold text-white mb-2" :class="appModal.type === 'alert' ? 'text-gold-400' : ''">{{ appModal.title }}</h3>
+                    <p class="text-gray-300 mb-6 whitespace-pre-line">{{ appModal.message }}</p>
+                    
+                    <div v-if="appModal.type === 'prompt'" class="mb-6 space-y-4">
+                        <div v-for="(field, index) in appModal.fields" :key="index">
+                            <label class="block text-sm text-gray-400 mb-1">{{ field.label }}</label>
+                            <input v-if="field.type !== 'date'" :type="field.type || 'text'" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                            <input v-else type="date" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3">
+                        <button v-if="appModal.type !== 'alert'" @click="resolveModal(false)" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors font-semibold">ยกเลิก</button>
+                        <button @click="resolveModal(true)" class="px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black font-bold rounded-lg transition-colors">ตกลง</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
 
     </div>
     <script src="/js/app.js" type="module"></script>

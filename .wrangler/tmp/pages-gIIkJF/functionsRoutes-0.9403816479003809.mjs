@@ -1,5 +1,5 @@
-import { onRequest as __api_gold_js_onRequest } from "C:\\Users\\Fischer\\krit-gold\\functions\\api\\gold.js"
-import { onRequest as __api_xag_js_onRequest } from "C:\\Users\\Fischer\\krit-gold\\functions\\api\\xag.js"
+import { onRequest as __api_gold_js_onRequest } from "c:\\Users\\Fischer\\krit-gold\\functions\\api\\gold.js"
+import { onRequest as __api_xag_js_onRequest } from "c:\\Users\\Fischer\\krit-gold\\functions\\api\\xag.js"
 
 export const routes = [
     {
