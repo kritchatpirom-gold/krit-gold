@@ -123,6 +123,18 @@ createApp({
             return diffs;
         };
 
+        const getDrawerBreakdown = (obj) => {
+            if (!obj) return [];
+            const keys = { b1000: 'แบงค์ 1,000', b500: 'แบงค์ 500', b100: 'แบงค์ 100', b50: 'แบงค์ 50', b20: 'แบงค์ 20', c10: 'เหรียญ 10', c5: 'เหรียญ 5', c1: 'เหรียญ 1' };
+            const breakdown = [];
+            for (const [k, label] of Object.entries(keys)) {
+                if (obj[k] > 0) {
+                    breakdown.push({ label, count: obj[k] });
+                }
+            }
+            return breakdown;
+        };
+
         const loadDrawerBalance = async () => {
             try {
                 const { data, error } = await supabase.from('drawer_balance').select('*').eq('id', 1).maybeSingle();
@@ -1078,14 +1090,20 @@ createApp({
 
         const deleteTransaction = async (id) => {
             if (confirm('ยืนยันการลบรายการนี้?')) {
-                // Fetch the transaction to get net_price
-                const { data: trx } = await supabase.from('transactions').select('net_price').eq('id', id).single();
+                // Fetch the transaction to get net_price and transfer_amount
+                const { data: trx } = await supabase.from('transactions').select('net_price, transfer_amount').eq('id', id).single();
                 
                 // Delete assets from storage first
                 await deleteTransactionAssets(id);
                 const { error } = await supabase.from('transactions').delete().eq('id', id);
                 if (!error) {
-                    if (trx && trx.net_price) await restoreDrawerBalance(trx.net_price);
+                    if (trx && trx.net_price) {
+                        const transferPart = Number(trx.transfer_amount || 0);
+                        const cashRefund = Number(trx.net_price) - transferPart;
+                        if (cashRefund > 0) {
+                            await restoreDrawerBalance(cashRefund);
+                        }
+                    }
                     loadTransactions();
                 }
                 else alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
@@ -1097,9 +1115,13 @@ createApp({
             if (confirm(`ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ?`)) {
                 loadingTransactions.value = true;
                 
-                // Fetch to get net prices
-                const { data: trxs } = await supabase.from('transactions').select('net_price').in('id', selectedTransactions.value);
-                const totalRefund = trxs ? trxs.reduce((sum, t) => sum + (Number(t.net_price) || 0), 0) : 0;
+                // Fetch to get net prices and transfer amounts
+                const { data: trxs } = await supabase.from('transactions').select('net_price, transfer_amount').in('id', selectedTransactions.value);
+                const totalRefund = trxs ? trxs.reduce((sum, t) => {
+                    const transferPart = Number(t.transfer_amount || 0);
+                    const cashPart = (Number(t.net_price) || 0) - transferPart;
+                    return sum + (cashPart > 0 ? cashPart : 0);
+                }, 0) : 0;
 
                 // Delete assets from storage first
                 await deleteTransactionAssets(selectedTransactions.value);
@@ -1379,23 +1401,36 @@ createApp({
                 const productUrl = productPhoto.value ? await uploadToBucket(productPhoto.value, 'product') : null;
                 const signatureUrl = lastSignature.value ? await uploadToBucket(lastSignature.value, 'signature') : null;
 
-                const trData = billItems.value.map((item, idx) => ({
-                    customer_name: item.customerName || 'เงินสด',
-                    phone: item.phone || '',
-                    id_card: item.idCard || '',
-                    address: item.address || '',
-                    // Save URLs only on the first row to optimize storage
-                    id_card_photo: idx === 0 ? idCardUrl : '',
-                    type: item.type,
-                    base_price: item.basePrice,
-                    premium_amount: item.premium,
-                    percent: item.percent,
-                    weight: item.weight,
-                    net_price: item.netPrice,
-                    signature: idx === 0 ? signatureUrl : null,
-                    photo: idx === 0 ? productUrl : null,
-                    created_at: new Date().toISOString()
-                }));
+                let allocatedTransfer = 0;
+                const trData = billItems.value.map((item, idx) => {
+                    let itemTransfer = 0;
+                    if (billTotal.value > 0) {
+                        if (idx === billItems.value.length - 1) {
+                            itemTransfer = Number((transferAmount.value - allocatedTransfer).toFixed(2));
+                        } else {
+                            itemTransfer = Number(((item.netPrice / billTotal.value) * transferAmount.value).toFixed(2));
+                            allocatedTransfer += itemTransfer;
+                        }
+                    }
+                    return {
+                        customer_name: item.customerName || 'เงินสด',
+                        phone: item.phone || '',
+                        id_card: item.idCard || '',
+                        address: item.address || '',
+                        // Save URLs only on the first row to optimize storage
+                        id_card_photo: idx === 0 ? idCardUrl : '',
+                        type: item.type,
+                        base_price: item.basePrice,
+                        premium_amount: item.premium,
+                        percent: item.percent,
+                        weight: item.weight,
+                        net_price: item.netPrice,
+                        transfer_amount: itemTransfer,
+                        signature: idx === 0 ? signatureUrl : null,
+                        photo: idx === 0 ? productUrl : null,
+                        created_at: new Date().toISOString()
+                    };
+                });
 
                 const { data: insertedTrxs, error } = await supabase.from('transactions').insert(trData).select();
                 if (error) throw error;
@@ -1404,8 +1439,10 @@ createApp({
                 // Deduct drawer balance
                 await deductDrawerBalance(cashAmountToPay.value, transactionId);
 
-                // Open the drawer!
-                openDrawer();
+                // Open the drawer only if cash is being paid
+                if (cashAmountToPay.value > 0) {
+                    openDrawer();
+                }
 
                 saving.value = false;
                 nextTick(() => {
@@ -1553,6 +1590,13 @@ createApp({
         onMounted(() => {
             syncHashToTab();
             window.addEventListener('hashchange', syncHashToTab);
+
+            // Prevent mouse wheel from changing focused number input values
+            document.addEventListener('wheel', (e) => {
+                if (document.activeElement && document.activeElement.type === 'number') {
+                    e.preventDefault();
+                }
+            }, { passive: false });
 
             loadPremiums();
             loadDrawerBalance();
@@ -2167,6 +2211,7 @@ createApp({
             openDrawerLogsModal,
             getDrawerTotalFromObj,
             getDrawerDiff,
+            getDrawerBreakdown,
             saveDrawerBalance,
             isPrintReady,
             uploadToBucket,

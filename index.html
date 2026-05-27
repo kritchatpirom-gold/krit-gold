@@ -556,6 +556,17 @@
                                                         {{d.label}} <span class="font-bold">{{d.diff > 0 ? '+' : '-'}}{{d.absDiff}}</span>
                                                     </span>
                                                 </div>
+                                                <div v-if="log.new_balance" class="mt-2 pt-2 border-t border-gray-800/40">
+                                                    <div class="text-[9px] text-gray-500 mb-1 font-semibold flex items-center gap-1">
+                                                        <i class="fa-solid fa-vault text-[8px] text-gold-500/75"></i> เงินคงเหลือในลิ้นชัก:
+                                                    </div>
+                                                    <div class="flex flex-wrap gap-1 max-w-[300px]">
+                                                        <span v-for="item in getDrawerBreakdown(log.new_balance)" :key="item.label" 
+                                                            class="bg-gray-900/40 border border-gray-800/60 px-1.5 py-0.5 rounded text-[9px] text-gray-300">
+                                                            {{ item.label.replace('แบงค์ ', '฿').replace('เหรียญ ', '฿') }}: <span class="text-gold-400 font-bold font-mono">{{ item.count }}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -1295,7 +1306,13 @@
                                     <!-- Transfer amount section -->
                                     <div v-if="billTotal > 0 && isLoggedIn" class="mb-4 space-y-2 border-t border-gray-800 pt-4">
                                         <div class="flex justify-between items-center">
-                                            <label class="text-gray-400 text-sm">ยอดเงินโอน (ถ้ามี):</label>
+                                            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                                                <label class="text-gray-400 text-sm">ยอดเงินโอน (ถ้ามี):</label>
+                                                <label class="flex items-center gap-1.5 text-gray-500 hover:text-gold-400 text-xs cursor-pointer select-none transition-colors">
+                                                    <input type="checkbox" :checked="transferAmount === billTotal && billTotal > 0" @change="$event.target.checked ? (transferAmount = billTotal) : (transferAmount = 0)" class="w-3.5 h-3.5 rounded bg-dark-base border-gray-700 text-gold-500 focus:ring-gold-500/20 focus:ring-offset-dark-base">
+                                                    <span>โอนทั้งหมด</span>
+                                                </label>
+                                            </div>
                                             <div class="flex items-center gap-2">
                                                 <input type="number" min="0" :max="billTotal" v-model="transferAmount" class="w-32 px-3 py-1.5 bg-dark-base border border-gray-700 text-white rounded outline-none focus:border-gold-500 text-right transition-colors">
                                                 <span class="text-gray-500">฿</span>

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   percent NUMERIC NOT NULL,
   weight NUMERIC NOT NULL,
   net_price NUMERIC NOT NULL,
+  transfer_amount NUMERIC DEFAULT 0,
   id_card TEXT,
   address TEXT,
   id_card_photo TEXT,
