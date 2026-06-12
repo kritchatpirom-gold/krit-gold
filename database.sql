@@ -6,16 +6,18 @@ CREATE TABLE IF NOT EXISTS gold_premiums (
   range_min INTEGER NOT NULL,
   range_max INTEGER NOT NULL,
   premium_amount NUMERIC NOT NULL,
+  premium_percent NUMERIC DEFAULT 0,
+  premium_type TEXT DEFAULT 'fixed',
   label TEXT NOT NULL
 );
 
 -- Insert default rows
-INSERT INTO gold_premiums (range_min, range_max, premium_amount, label) VALUES
-  (0, 29, 500, '<30%'),
-  (30, 49, 1200, '30-49%'),
-  (50, 69, 1500, '50-69%'),
-  (70, 98, 1700, '70-98%'),
-  (99, 100, 1800, '99%');
+INSERT INTO gold_premiums (range_min, range_max, premium_amount, premium_percent, premium_type, label) VALUES
+  (0, 29, 500, 0, 'fixed', '<30%'),
+  (30, 49, 1200, 0, 'fixed', '30-49%'),
+  (50, 69, 1500, 0, 'fixed', '50-69%'),
+  (70, 98, 1700, 0, 'fixed', '70-98%'),
+  (99, 100, 1800, 0, 'fixed', '99%');
 
 -- Table: transactions
 CREATE TABLE IF NOT EXISTS transactions (
@@ -29,6 +31,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   weight NUMERIC NOT NULL,
   net_price NUMERIC NOT NULL,
   transfer_amount NUMERIC DEFAULT 0,
+  in_showcase BOOLEAN DEFAULT FALSE,
   id_card TEXT,
   address TEXT,
   id_card_photo TEXT,

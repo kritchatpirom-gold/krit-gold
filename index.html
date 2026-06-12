@@ -477,17 +477,17 @@
                             </div>
                         </div>
 
-                        <!-- Admin Actions -->
-                        <div v-if="isAdmin" class="mt-8 pt-6 border-t border-gray-800 flex flex-wrap justify-end gap-3">
+                        <!-- Actions -->
+                        <div v-if="isLoggedIn" class="mt-8 pt-6 border-t border-gray-800 flex flex-wrap justify-end gap-3">
                             <button @click="openDrawerLogsModal" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="ดูประวัติเข้า-ออก">
                                 <i class="fa-solid fa-clock-rotate-left mr-2"></i>
                                 ประวัติลิ้นชัก
                             </button>
-                            <button @click="openDrawer" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gold-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="สั่งเปิดลิ้นชักทันที">
+                            <button v-if="isAdmin" @click="openDrawer" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gold-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="สั่งเปิดลิ้นชักทันที">
                                 <i class="fa-solid fa-vault mr-2"></i>
                                 เปิดลิ้นชัก
                             </button>
-                            <button @click="saveDrawerBalance" :disabled="savingDrawer"
+                            <button v-if="isAdmin" @click="saveDrawerBalance" :disabled="savingDrawer"
                                 :class="savingDrawer ? 'opacity-50 cursor-not-allowed bg-gray-700' : 'bg-gold-500 hover:bg-gold-400 hover-glow'"
                                 class="px-8 py-3 rounded-lg text-black font-bold transition-all shadow-lg flex items-center">
                                 <i v-if="savingDrawer" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
@@ -594,6 +594,7 @@
                                 <select v-model="stockDateFilterMode" class="bg-dark-base border border-gray-600 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm">
                                     <option value="all">ทั้งหมดที่รอหลอม</option>
                                     <option value="range">เลือกช่วงวันที่...</option>
+                                    <option value="showcase">💎 ของที่โชว์ในตู้</option>
                                 </select>
                                 <div v-if="stockDateFilterMode === 'range'" class="flex items-center gap-2">
                                     <input type="date" v-model="stockStartDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto">
@@ -641,9 +642,21 @@
                                     <span class="text-gray-400">ต้นทุนรวม:</span> <span class="text-red-400 font-mono ml-2 font-bold text-base">{{ formatCurrency(selectedStats.cost) }}฿</span>
                                 </div>
                             </div>
-                            <button @click="createIngot" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-8 py-3 bg-gold-500 hover:bg-gold-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-lg rounded-xl transition-all shadow-lg shadow-gold-500/20 flex justify-center items-center relative z-10 group">
-                                <i class="fa-solid fa-fire-burner mr-2 group-hover:scale-110 transition-transform"></i> หลอมรายการที่เลือก
-                            </button>
+                            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto relative z-10">
+                                <!-- Showcase Mode Action -->
+                                <button v-if="stockDateFilterMode === 'showcase'" @click="removeFromShowcase" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-base rounded-xl transition-all shadow-lg flex justify-center items-center group">
+                                    <i class="fa-solid fa-rotate-left mr-2 group-hover:scale-110 transition-transform"></i> ย้ายกลับไปคิวรอหลอม
+                                </button>
+                                <!-- Regular Mode Actions -->
+                                <template v-else>
+                                    <button @click="markAsShowcase" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-6 py-3 bg-blue-600/20 hover:bg-blue-500/35 disabled:opacity-40 disabled:cursor-not-allowed text-blue-400 border border-blue-500/20 hover:border-blue-400/40 font-bold text-base rounded-xl transition-all flex justify-center items-center shadow-md group" title="เก็บรายการที่เลือกไปโชว์ในตู้หน้าร้านโดยไม่นำไปหลอม">
+                                        <i class="fa-solid fa-gem mr-2 group-hover:scale-110 transition-transform"></i> โชว์ในตู้
+                                    </button>
+                                    <button @click="createIngot" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-8 py-3 bg-gold-500 hover:bg-gold-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-lg rounded-xl transition-all shadow-lg shadow-gold-500/20 flex justify-center items-center group">
+                                        <i class="fa-solid fa-fire-burner mr-2 group-hover:scale-110 transition-transform"></i> หลอมรายการที่เลือก
+                                    </button>
+                                </template>
+                            </div>
                         </div>
                     </div>
 
@@ -712,19 +725,35 @@
                         </div>
 
                         <!-- Summary Banner -->
-                        <div v-if="deliveryRoundsHistory.some(r => r.status === 'completed')" class="mb-6 bg-gradient-to-r from-gray-900 to-black p-4 rounded-xl border border-emerald-500/30 flex items-center justify-between shadow-lg">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30">
+                        <div v-if="deliveryRoundsHistory.some(r => r.status === 'completed')" class="mb-6 bg-gradient-to-r from-gray-900 to-black p-5 rounded-xl border border-emerald-500/30 flex flex-col md:flex-row justify-between gap-6 shadow-lg">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <div class="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/30 shrink-0">
                                     <i class="fa-solid fa-chart-line text-emerald-400 text-xl"></i>
                                 </div>
                                 <div>
-                                    <div class="text-sm text-gray-400">ยอดรวมกำไรสุทธิ <span v-if="historyDateFilterMode === 'all'">(30 รายการล่าสุด)</span><span v-else>(ตามช่วงเวลาที่เลือก)</span></div>
-                                    <div :class="historyTotalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-2xl font-bold font-mono">{{ formatCurrency(historyTotalProfit) }} ฿</div>
+                                    <div class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">ยอดรวมกำไรสุทธิ <span v-if="historyDateFilterMode === 'all'">(30 รายการล่าสุด)</span><span v-else>(ตามช่วงเวลาที่เลือก)</span></div>
+                                    <div :class="historyTotalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-3xl font-extrabold font-mono">{{ formatCurrency(historyTotalProfit) }} ฿</div>
                                 </div>
                             </div>
-                            <div class="hidden sm:block text-right">
-                                <div class="text-xs text-gray-500">รอบที่ปิดยอดแล้ว</div>
-                                <div class="text-white font-bold text-lg">{{ deliveryRoundsHistory.filter(r => r.status === 'completed').length }} รอบ</div>
+
+                            <!-- Separated Profits Details -->
+                            <div class="flex flex-wrap items-center gap-6 border-t md:border-t-0 md:border-l border-gray-800 pt-4 md:pt-0 md:pl-6">
+                                <div class="space-y-1">
+                                    <div class="text-[11px] text-gray-500 font-semibold flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-gold-400 inline-block"></span> กำไรจากทองคำ</div>
+                                    <div :class="historyGoldProfit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-base font-bold font-mono">{{ formatCurrency(historyGoldProfit) }} ฿</div>
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="text-[11px] text-gray-500 font-semibold flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block"></span> กำไรจากเงิน</div>
+                                    <div :class="historySilverProfit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-base font-bold font-mono">{{ formatCurrency(historySilverProfit) }} ฿</div>
+                                </div>
+                                <div v-if="extraProfitSumForHistoryPeriod > 0" class="space-y-1">
+                                    <div class="text-[11px] text-gray-500 font-semibold flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span> กำไรเพิ่มเติม</div>
+                                    <div class="text-purple-400 text-base font-bold font-mono">{{ formatCurrency(extraProfitSumForHistoryPeriod) }} ฿</div>
+                                </div>
+                                <div class="space-y-1">
+                                    <div class="text-[11px] text-gray-500 font-semibold flex items-center gap-1.5"><i class="fa-solid fa-truck-fast text-xs"></i> ปิดยอดแล้ว</div>
+                                    <div class="text-white text-base font-bold">{{ deliveryRoundsHistory.filter(r => r.status === 'completed').length }} รอบ</div>
+                                </div>
                             </div>
                         </div>
                         
@@ -763,9 +792,14 @@
                                     <div class="lg:col-span-1 space-y-2">
                                         <h4 class="text-sm font-bold text-gray-400 mb-3 border-b border-gray-800 pb-2">รายการก้อนที่ส่ง</h4>
                                         <div v-for="ing in round.delivery_ingots" :key="ing.id" class="flex flex-col text-sm bg-black/20 p-2 rounded border border-gray-800 gap-1">
-                                            <div class="flex justify-between">
+                                            <div class="flex justify-between items-center">
                                                 <span class="text-gray-300">{{ groupedUnsent[ing.category]?.label || ing.category }}</span>
-                                                <span class="text-gold-400 font-mono">{{ ing.melted_weight }}g <span class="text-gray-500 text-xs ml-1">({{ ing.melted_percent }}%)</span></span>
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="text-gold-400 font-mono">{{ ing.melted_weight }}g <span class="text-gray-500 text-xs ml-1">({{ ing.melted_percent }}%)</span></span>
+                                                    <button @click="returnIngotToPending(ing.id)" class="text-gray-500 hover:text-gold-400 hover:bg-gray-850 p-1 rounded transition-colors flex items-center justify-center" title="คืนก้อนนี้ไปยังก้อนรอส่งสมาคม">
+                                                        <i class="fa-solid fa-rotate-left text-xs"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div class="flex justify-between text-xs text-gray-500 border-t border-gray-700/50 pt-1 mt-1">
                                                 <span>นน.ก่อนหลอม:</span>
@@ -798,19 +832,59 @@
                                         </div>
                                         
                                         <!-- Profit Info -->
-                                        <div v-if="round.status === 'completed'" class="bg-black/30 p-4 rounded-xl border border-gray-800">
-                                            <div class="space-y-3">
-                                                <div class="flex justify-between items-center pb-2 border-b border-gray-700">
-                                                    <span class="text-sm text-gray-400">เงินรับสมาคม</span>
-                                                    <span class="text-emerald-400 font-bold font-mono">{{ formatCurrency(Number(round.gold_payment || 0) + Number(round.silver_payment || 0)) }}฿</span>
+                                        <div v-if="round.status === 'completed'" class="bg-black/30 p-4 rounded-xl border border-gray-800 space-y-4">
+                                            <!-- Gold Profit Breakdown -->
+                                            <div class="space-y-1.5 border-b border-gray-800/80 pb-3">
+                                                <h5 class="text-xs font-bold text-gold-400 flex items-center gap-1.5"><i class="fa-solid fa-coins"></i> ทองคำ (Gold)</h5>
+                                                <div class="flex justify-between text-xs text-gray-400">
+                                                    <span>รับเงินทอง:</span>
+                                                    <span class="font-mono text-emerald-400">{{ formatCurrency(round.gold_payment || 0) }}฿</span>
                                                 </div>
-                                                <div class="flex justify-between items-center pb-2 border-b border-gray-700">
-                                                    <span class="text-sm text-gray-400">หักทุนรอบนี้</span>
-                                                    <span class="text-red-400 font-bold font-mono">-{{ formatCurrency(round.total_cost) }}฿</span>
+                                                <div class="flex justify-between text-xs text-gray-400">
+                                                    <span>ต้นทุนทอง:</span>
+                                                    <span class="font-mono text-red-400">-{{ formatCurrency(round.gold_cost || 0) }}฿</span>
                                                 </div>
-                                                <div class="flex justify-between items-center pt-1">
-                                                    <span class="text-sm font-bold text-gray-300">กำไรสุทธิ</span>
-                                                    <span :class="round.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-xl font-bold font-mono">{{ formatCurrency(round.net_profit) }}฿</span>
+                                                <div class="flex justify-between text-xs font-semibold">
+                                                    <span>กำไรทอง:</span>
+                                                    <span :class="(round.gold_payment - round.gold_cost) >= 0 ? 'text-emerald-400' : 'text-red-400'" class="font-mono">
+                                                        {{ formatCurrency((round.gold_payment || 0) - (round.gold_cost || 0)) }}฿
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Silver Profit Breakdown -->
+                                            <div class="space-y-1.5 border-b border-gray-800/80 pb-3">
+                                                <h5 class="text-xs font-bold text-gray-300 flex items-center gap-1.5"><i class="fa-solid fa-sterling-sign"></i> เงิน (Silver)</h5>
+                                                <div class="flex justify-between text-xs text-gray-400">
+                                                    <span>รับเงินเงิน:</span>
+                                                    <span class="font-mono text-emerald-400">{{ formatCurrency(round.silver_payment || 0) }}฿</span>
+                                                </div>
+                                                <div class="flex justify-between text-xs text-gray-400">
+                                                    <span>ต้นทุนเงิน:</span>
+                                                    <span class="font-mono text-red-400">-{{ formatCurrency(round.silver_cost || 0) }}฿</span>
+                                                </div>
+                                                <div class="flex justify-between text-xs font-semibold">
+                                                    <span>กำไรเงิน:</span>
+                                                    <span :class="(round.silver_payment - round.silver_cost) >= 0 ? 'text-emerald-400' : 'text-red-400'" class="font-mono">
+                                                        {{ formatCurrency((round.silver_payment || 0) - (round.silver_cost || 0)) }}฿
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Total Profit Summary -->
+                                            <div class="space-y-1.5">
+                                                <h5 class="text-xs font-bold text-white flex items-center gap-1.5"><i class="fa-solid fa-square-poll-vertical"></i> รวมสุทธิ (Total)</h5>
+                                                <div class="flex justify-between text-xs text-gray-400">
+                                                    <span>รวมรับเงิน:</span>
+                                                    <span class="font-mono text-emerald-400 font-bold">{{ formatCurrency(Number(round.gold_payment || 0) + Number(round.silver_payment || 0)) }}฿</span>
+                                                </div>
+                                                <div class="flex justify-between text-xs text-gray-400">
+                                                    <span>รวมต้นทุน:</span>
+                                                    <span class="font-mono text-red-400">-{{ formatCurrency(round.total_cost) }}฿</span>
+                                                </div>
+                                                <div class="flex justify-between items-center pt-1 mt-1 border-t border-gray-800/80">
+                                                    <span class="text-sm font-bold text-gray-300">กำไรสุทธิ:</span>
+                                                    <span :class="round.net_profit >= 0 ? 'text-emerald-400' : 'text-red-400'" class="text-lg font-bold font-mono">{{ formatCurrency(round.net_profit) }}฿</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1172,9 +1246,9 @@
                                             <label class="block text-sm font-medium text-gray-400 mb-1">ความบริสุทธิ์
                                                 (%)</label>
                                             <div class="relative">
-                                                <input type="number" step="1" v-model.number="calcForm.percent"
+                                                <input type="number" :step="isAdmin ? '0.01' : '1'" v-model.number="calcForm.percent"
                                                     class="w-full pl-4 pr-8 py-2.5 bg-dark-base border border-gray-700 text-white text-lg rounded-lg focus:ring-1 focus:ring-gold-500 focus:border-gold-500 outline-none"
-                                                    min="1" max="99">
+                                                    min="1" :max="isAdmin ? '100' : '99'">
                                                 <span class="absolute right-3 top-3 text-gray-500">%</span>
                                             </div>
                                             <!-- ปุ่มความบริสุทธิ์ทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นรูปพรรณ/ไถ่ถอน/เงิน) -->
@@ -1639,15 +1713,44 @@
                                 class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
                         </div>
                         <div class="space-y-4">
+                            <!-- Global Premium Type Selector (Affects all ranges at once) -->
+                            <div class="flex justify-between items-center bg-dark-base p-4 rounded-xl border border-gray-800 shadow-lg">
+                                <span class="font-bold text-gray-300"><i class="fa-solid fa-gears mr-1.5 text-gold-400"></i> รูปแบบราคาบวก (ทุกช่วง %)</span>
+                                <div class="flex bg-gray-900 border border-gray-700 p-0.5 rounded-lg shadow-inner">
+                                    <button type="button" 
+                                        @click="setAllPremiumTypes('fixed')" 
+                                        :class="allPremiumType === 'fixed' ? 'bg-gold-500 text-black font-extrabold shadow-sm' : 'text-gray-400 hover:text-white'" 
+                                        class="px-4 py-2 rounded-md text-xs font-semibold transition-all duration-200 focus:outline-none">
+                                        ฿ (บาท)
+                                    </button>
+                                    <button type="button" 
+                                        @click="setAllPremiumTypes('percent')" 
+                                        :class="allPremiumType === 'percent' ? 'bg-gold-500 text-black font-extrabold shadow-sm' : 'text-gray-400 hover:text-white'" 
+                                        class="px-4 py-2 rounded-md text-xs font-semibold transition-all duration-200 focus:outline-none">
+                                        % (เปอร์เซ็นต์)
+                                    </button>
+                                </div>
+                            </div>
+
                             <div v-for="(p, i) in premiums" :key="p.id"
-                                class="flex gap-4 bg-dark-base p-4 rounded-xl border border-gray-800 items-center">
-                                <span class="w-1/3 px-3 py-1 font-semibold text-gray-300">ช่วง %: <span
+                                class="flex flex-col sm:flex-row gap-4 bg-dark-base p-4 rounded-xl border border-gray-800 items-start sm:items-center">
+                                <span class="w-full sm:w-1/3 px-3 py-1 font-semibold text-gray-300">ช่วง %: <span
                                         class="text-white">{{ p.label }}</span></span>
-                                <div class="w-2/3 flex items-center gap-2">
-                                    <span class="text-sm text-gray-500">+</span>
-                                    <input type="number" v-model.number="p.premium_amount"
-                                        class="w-full px-4 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none">
-                                    <span class="text-sm text-gray-500">฿</span>
+                                <div class="w-full sm:w-2/3 flex items-center gap-3">
+                                    <!-- Premium Amount Input (Fixed Baht) -->
+                                    <div v-show="p.premium_type !== 'percent'" class="relative flex-grow min-w-[120px]">
+                                        <span class="absolute left-3 top-2.5 text-sm text-gray-500 font-bold">+</span>
+                                        <input type="number" step="any" v-model.number="p.premium_amount"
+                                            class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
+                                        <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">฿</span>
+                                    </div>
+                                    <!-- Premium Percent Input (%) -->
+                                    <div v-show="p.premium_type === 'percent'" class="relative flex-grow min-w-[120px]">
+                                        <span class="absolute left-3 top-2.5 text-sm text-gray-500 font-bold">+</span>
+                                        <input type="number" step="any" v-model.number="p.premium_percent"
+                                            class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
+                                        <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">%</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1932,7 +2035,7 @@
                     <div v-if="appModal.type === 'prompt'" class="mb-6 space-y-4">
                         <div v-for="(field, index) in appModal.fields" :key="index">
                             <label class="block text-sm text-gray-400 mb-1">{{ field.label }}</label>
-                            <input v-if="field.type !== 'date'" :type="field.type || 'text'" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                            <input v-if="field.type !== 'date'" :type="field.type || 'text'" step="any" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
                             <input v-else type="date" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
                         </div>
                     </div>
