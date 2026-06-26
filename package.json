@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"wrangler pages dev .\" \"python scripts/bridge.py\""
+    "dev": "concurrently \"wrangler pages dev . --ip 0.0.0.0\" \"python scripts/bridge.py\""
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

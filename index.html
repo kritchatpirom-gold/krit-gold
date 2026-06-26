@@ -594,7 +594,7 @@
                                 <select v-model="stockDateFilterMode" class="bg-dark-base border border-gray-600 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm">
                                     <option value="all">ทั้งหมดที่รอหลอม</option>
                                     <option value="range">เลือกช่วงวันที่...</option>
-                                    <option value="showcase">💎 ของที่โชว์ในตู้</option>
+                                    <option v-if="isAdmin" value="showcase">💎 ของที่โชว์ในตู้</option>
                                 </select>
                                 <div v-if="stockDateFilterMode === 'range'" class="flex items-center gap-2">
                                     <input type="date" v-model="stockStartDate" class="bg-dark-base border border-gray-600 text-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-gold-500 text-sm w-32 sm:w-auto">
@@ -644,13 +644,16 @@
                             </div>
                             <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto relative z-10">
                                 <!-- Showcase Mode Action -->
-                                <button v-if="stockDateFilterMode === 'showcase'" @click="removeFromShowcase" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-base rounded-xl transition-all shadow-lg flex justify-center items-center group">
+                                <button v-if="stockDateFilterMode === 'showcase' && isAdmin" @click="removeFromShowcase" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-base rounded-xl transition-all shadow-lg flex justify-center items-center group">
                                     <i class="fa-solid fa-rotate-left mr-2 group-hover:scale-110 transition-transform"></i> ย้ายกลับไปคิวรอหลอม
                                 </button>
                                 <!-- Regular Mode Actions -->
                                 <template v-else>
-                                    <button @click="markAsShowcase" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-6 py-3 bg-blue-600/20 hover:bg-blue-500/35 disabled:opacity-40 disabled:cursor-not-allowed text-blue-400 border border-blue-500/20 hover:border-blue-400/40 font-bold text-base rounded-xl transition-all flex justify-center items-center shadow-md group" title="เก็บรายการที่เลือกไปโชว์ในตู้หน้าร้านโดยไม่นำไปหลอม">
+                                    <button v-if="isAdmin" @click="markAsShowcase" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-6 py-3 bg-blue-600/20 hover:bg-blue-500/35 disabled:opacity-40 disabled:cursor-not-allowed text-blue-400 border border-blue-500/20 hover:border-blue-400/40 font-bold text-base rounded-xl transition-all flex justify-center items-center shadow-md group" title="เก็บรายการที่เลือกไปโชว์ในตู้หน้าร้านโดยไม่นำไปหลอม">
                                         <i class="fa-solid fa-gem mr-2 group-hover:scale-110 transition-transform"></i> โชว์ในตู้
+                                    </button>
+                                    <button v-if="isAdmin" @click="markAsOther" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-6 py-3 bg-purple-600/20 hover:bg-purple-500/35 disabled:opacity-40 disabled:cursor-not-allowed text-purple-400 border border-purple-500/20 hover:border-purple-400/40 font-bold text-base rounded-xl transition-all flex justify-center items-center shadow-md group" title="นำทองไปใช้งานอื่นๆ พร้อมระบุรายละเอียด">
+                                        <i class="fa-solid fa-ellipsis-h mr-2 group-hover:scale-110 transition-transform"></i> อื่นๆ
                                     </button>
                                     <button @click="createIngot" :disabled="selectedTransactionIds.length === 0" class="w-full sm:w-auto px-8 py-3 bg-gold-500 hover:bg-gold-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-lg rounded-xl transition-all shadow-lg shadow-gold-500/20 flex justify-center items-center group">
                                         <i class="fa-solid fa-fire-burner mr-2 group-hover:scale-110 transition-transform"></i> หลอมรายการที่เลือก
@@ -757,16 +760,22 @@
                             </div>
                         </div>
                         
+                        <!-- History Tabs -->
+                        <div class="flex border-b border-gray-700 mb-6">
+                            <button @click="historyViewTab = 'normal'" :class="historyViewTab === 'normal' ? 'border-gold-500 text-gold-400' : 'border-transparent text-gray-400 hover:text-white'" class="px-6 py-3 border-b-2 font-bold transition-colors">ประวัติส่งสมาคม</button>
+                            <button @click="historyViewTab = 'other'" :class="historyViewTab === 'other' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-400 hover:text-white'" class="px-6 py-3 border-b-2 font-bold transition-colors">รายการอื่นๆ</button>
+                        </div>
+
                         <div class="space-y-6">
-                            <div v-if="deliveryRoundsHistory.length === 0" class="text-center text-gray-500 py-8 bg-dark-surface/30 rounded-xl border border-gray-800">
-                                <p>ไม่มีประวัติการส่งของ</p>
+                            <div v-if="(historyViewTab === 'normal' ? normalDeliveryRounds : otherDeliveryRounds).length === 0" class="text-center text-gray-500 py-8 bg-dark-surface/30 rounded-xl border border-gray-800">
+                                <p>ไม่มีประวัติ{{ historyViewTab === 'normal' ? 'การส่งสมาคม' : 'รายการอื่นๆ' }}</p>
                             </div>
                             
-                            <div v-for="(round, index) in deliveryRoundsHistory" :key="round.id" class="bg-dark-surface/50 rounded-xl border border-gray-700 overflow-hidden">
+                            <div v-for="(round, index) in (historyViewTab === 'normal' ? normalDeliveryRounds : otherDeliveryRounds)" :key="round.id" class="bg-dark-surface/50 rounded-xl border border-gray-700 overflow-hidden">
                                 <div class="bg-gray-800/50 px-6 py-4 border-b border-gray-700 flex flex-wrap justify-between items-center gap-4">
                                     <div>
                                         <div class="flex items-center gap-3">
-                                            <h3 class="font-bold text-lg text-white">รอบส่ง #{{ deliveryRoundsHistory.length - index }}</h3>
+                                            <h3 class="font-bold text-lg text-white">{{ historyViewTab === 'normal' ? 'รอบส่ง' : 'รายการอื่นๆ' }} #{{ (historyViewTab === 'normal' ? normalDeliveryRounds : otherDeliveryRounds).length - index }}</h3>
                                             <span v-if="round.status === 'pending'" class="px-3 py-1 bg-yellow-900/40 text-yellow-400 border border-yellow-700/50 rounded-full text-xs font-bold animate-pulse"><i class="fa-solid fa-hourglass-half mr-1"></i> รอเงินสมาคม</span>
                                             <span v-else class="px-3 py-1 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 rounded-full text-xs font-bold"><i class="fa-solid fa-check-circle mr-1"></i> ปิดยอดแล้ว</span>
                                         </div>
@@ -1689,12 +1698,19 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm align-top pt-3">
                                         <div v-for="(t, idx) in g.items" :key="t.id" :class="idx !== g.items.length - 1 ? 'mb-2' : ''" class="flex items-center justify-center gap-2" style="height: 40px;">
+                                            <button v-if="idx === 0" @click="reprintGroup(g)"
+                                                class="text-green-500 hover:text-green-400 p-1 w-6 h-6 flex items-center justify-center" title="พิมพ์บิลใหม่"><i
+                                                    class="fa-solid fa-print"></i></button>
+                                            <div v-else class="w-6 h-6"></div>
+
                                             <button @click="editTransaction(t)"
-                                                class="text-blue-500 hover:text-blue-400 p-1" title="แก้ไขรายการ"><i
+                                                class="text-blue-500 hover:text-blue-400 p-1 w-6 h-6 flex items-center justify-center" title="แก้ไขรายการ"><i
                                                     class="fa-solid fa-pen-to-square"></i></button>
-                                            <button @click="deleteTransaction(t.id)"
-                                                class="text-red-500 hover:text-red-400 p-1" title="ลบรายการ"><i
+
+                                            <button v-if="idx === 0" @click="deleteGroup(g)"
+                                                class="text-red-500 hover:text-red-400 p-1 w-6 h-6 flex items-center justify-center" title="ลบบิล"><i
                                                     class="fa-solid fa-trash"></i></button>
+                                            <div v-else class="w-6 h-6"></div>
                                         </div>
                                     </td>
                                 </tr>
@@ -2035,7 +2051,10 @@
                     <div v-if="appModal.type === 'prompt'" class="mb-6 space-y-4">
                         <div v-for="(field, index) in appModal.fields" :key="index">
                             <label class="block text-sm text-gray-400 mb-1">{{ field.label }}</label>
-                            <input v-if="field.type !== 'date'" :type="field.type || 'text'" step="any" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                            <select v-if="field.type === 'select'" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                                <option v-for="opt in field.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                            </select>
+                            <input v-else-if="field.type !== 'date'" :type="field.type || 'text'" step="any" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
                             <input v-else type="date" v-model="field.value" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
                         </div>
                     </div>
@@ -2043,6 +2062,67 @@
                     <div class="flex justify-end gap-3">
                         <button v-if="appModal.type !== 'alert'" @click="resolveModal(false)" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors font-semibold">ยกเลิก</button>
                         <button @click="resolveModal(true)" class="px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black font-bold rounded-lg transition-colors">ตกลง</button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Edit Transaction Modal -->
+        <transition name="fade">
+            <div v-if="editTrxModal.show" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <div class="bg-dark-surface border border-gray-700 rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all scale-100 opacity-100 max-h-[90vh] overflow-y-auto">
+                    <h3 class="text-xl font-bold text-white mb-6"><i class="fa-solid fa-pen-to-square text-gold-400 mr-2"></i> แก้ไขข้อมูลรายการ</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">ชื่อลูกค้า</label>
+                            <input type="text" v-model="editTrxModal.customer_name" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">เบอร์โทร</label>
+                            <input type="text" v-model="editTrxModal.phone" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">ประเภทสินทรัพย์</label>
+                            <select v-model="editTrxModal.type" @change="calculateEditTrxNetPrice" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                                <option value="tong_lom">ทองหลอม</option>
+                                <option value="tong_roop">ทองรูปพรรณ</option>
+                                <option value="tong_tang">ทองคำแท่ง</option>
+                                <option value="silver">เงิน (ซิลเวอร์)</option>
+                                <option value="redeem">ไถ่ถอน</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div :class="editTrxModal.type !== 'tong_lom' ? 'col-span-2' : ''">
+                                <label class="block text-sm text-gray-400 mb-1">ราคาทอง (บาท)</label>
+                                <input type="number" step="any" v-model.number="editTrxModal.base_price" @input="onEditBasePrice" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                            </div>
+                            <div v-show="editTrxModal.type === 'tong_lom'">
+                                <label class="block text-sm text-gray-400 mb-1">ราคาบวก (บาท)</label>
+                                <input type="number" step="any" v-model.number="editTrxModal.premium_amount" @input="calculateEditTrxNetPrice" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div :class="(editTrxModal.type === 'tong_roop' || editTrxModal.type === 'redeem' || editTrxModal.type === 'tong_tang') ? 'col-span-2' : ''">
+                                <label class="block text-sm text-gray-400 mb-1">น้ำหนัก (กรัม)</label>
+                                <input type="number" step="any" v-model.number="editTrxModal.weight" @input="calculateEditTrxNetPrice" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                            </div>
+                            <div v-show="editTrxModal.type !== 'tong_roop' && editTrxModal.type !== 'redeem' && editTrxModal.type !== 'tong_tang'">
+                                <label class="block text-sm text-gray-400 mb-1">ความบริสุทธิ์ (%)</label>
+                                <input type="number" step="any" v-model.number="editTrxModal.percent" @input="calculateEditTrxNetPrice" class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="block text-sm text-gold-400 font-bold">ราคาสุทธิ (บาท)</label>
+                            </div>
+                            <input type="number" step="any" v-model.number="editTrxModal.net_price" class="w-full bg-gray-900 border border-gold-500/50 rounded-lg px-4 py-3 text-gold-400 font-bold text-lg focus:border-gold-500 shadow-inner">
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-800">
+                        <button @click="editTrxModal.show = false" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors font-semibold">ยกเลิก</button>
+                        <button @click="saveEditTransaction" class="px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black font-bold rounded-lg transition-colors shadow-lg hover-glow">บันทึก</button>
                     </div>
                 </div>
             </div>

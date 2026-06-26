@@ -5,7 +5,7 @@ const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
 //const supabaseUrl = 'http://192.168.1.112:54321';
 //const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
-const supabaseUrl = 'http://192.168.1.124:54321';
+const supabaseUrl = 'http://192.168.1.125:54121';
 const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
@@ -1076,39 +1076,161 @@ createApp({
             loadingTransactions.value = false;
         };
 
-        const editTransaction = async (t) => {
-            const inputs = await showAppModal('prompt', 'แก้ไขข้อมูลรายการ', 'โปรดแก้ไขข้อมูลที่ต้องการแล้วกดตกลง', [
-                { label: 'ชื่อลูกค้า', type: 'text', defaultValue: t.customer_name || '' },
-                { label: 'เบอร์โทร', type: 'text', defaultValue: t.phone || '' },
-                { label: 'น้ำหนัก (กรัม)', type: 'number', defaultValue: t.weight || '' },
-                { label: 'เปอร์เซ็นต์ (%)', type: 'number', defaultValue: t.percent || '' },
-                { label: 'ราคาสุทธิ (บาท)', type: 'number', defaultValue: t.net_price || '' }
-            ]);
+        const reprintGroup = async (g) => {
+            const backupBillItems = [...billItems.value];
+            const backupCalcForm = { ...calcForm.value };
+            const backupTransferAmount = transferAmount.value;
+            const backupSignature = lastSignature.value;
             
-            if (!inputs) return;
+            billItems.value = g.items.map(t => ({
+                id: t.id,
+                type: t.type,
+                weight: parseFloat(t.weight) || 0,
+                percent: parseFloat(t.percent) || 0,
+                basePrice: parseFloat(t.base_price) || 0,
+                premium: parseFloat(t.premium_amount) || 0,
+                netPrice: parseFloat(t.net_price) || 0
+            }));
+
+            calcForm.value.customerName = g.customer_name || '';
+            calcForm.value.phone = g.phone || '';
+            calcForm.value.idCard = g.id_card || '';
+            calcForm.value.address = g.address || '';
             
-            const newName = inputs[0];
-            const newPhone = inputs[1];
-            const newWeight = parseFloat(inputs[2]) || 0;
-            const newPercent = parseFloat(inputs[3]) || 0;
-            const newNetPrice = parseFloat(inputs[4]) || 0;
+            transferAmount.value = g.items.reduce((sum, t) => sum + (parseFloat(t.transfer_amount) || 0), 0);
+            lastSignature.value = g.signature || null;
+
+            await nextTick();
             
-            const diffAmount = t.net_price - newNetPrice; 
+            setTimeout(() => {
+                window.print();
+                
+                setTimeout(() => {
+                    billItems.value = backupBillItems;
+                    calcForm.value = backupCalcForm;
+                    transferAmount.value = backupTransferAmount;
+                    lastSignature.value = backupSignature;
+                }, 500);
+            }, 200);
+        };
+
+        const editTrxModal = ref({
+            show: false,
+            id: null,
+            customer_name: '',
+            phone: '',
+            type: 'tong_lom',
+            base_price: 0,
+            premium_amount: 0,
+            percent: 0,
+            weight: 0,
+            net_price: 0,
+            original_net_price: 0
+        });
+
+        const calculateEditTrxNetPrice = () => {
+            const tForm = editTrxModal.value;
+            const w = Number(tForm.weight) || 0;
+            const p = Number(tForm.percent) || 0;
+            const base = Number(tForm.base_price) || 0;
+            const premium = Number(tForm.premium_amount) || 0;
+            let net = 0;
+
+            const gp = Math.floor(base);
+
+            if (tForm.type === 'tong_lom') {
+                const perGram = floor2((gp + premium) * 0.0656);
+                const withPurity = floor2(perGram * (p / 100));
+                net = floor2(withPurity * w);
+            } else if (tForm.type === 'tong_roop') {
+                const baseAfterPercent = floor2(gp * 0.96);
+                const perGram = floor2(baseAfterPercent * 0.0656);
+                net = floor2(perGram * w);
+            } else if (tForm.type === 'redeem') {
+                const baseAfterPercent = floor2(gp * 0.95);
+                const perGram = floor2(baseAfterPercent * 0.0656);
+                net = floor2(perGram * w);
+            } else if (tForm.type === 'tong_tang') {
+                const perGram = floor2((gp - 300) * 0.0656);
+                net = floor2(perGram * w);
+            } else if (tForm.type === 'silver') {
+                const sp = gp;
+                const perGram = Math.floor(sp / 1000);
+                const withPercent = Math.floor(perGram * (p / 100));
+                net = Math.floor(withPercent * w);
+            }
+
+            tForm.net_price = floor2(Math.max(0, net));
+        };
+
+        const onEditBasePrice = () => {
+            const tForm = editTrxModal.value;
+            const p = Number(tForm.percent) || 0;
+            const base = Number(tForm.base_price) || 0;
+            
+            if (tForm.type === 'tong_lom') {
+                let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
+                if (activePremium) {
+                    if (activePremium.premium_type === 'percent') {
+                        tForm.premium_amount = Math.floor(Math.floor(base) * (Number(activePremium.premium_percent) / 100));
+                    }
+                }
+            }
+            calculateEditTrxNetPrice();
+        };
+
+        const editTransaction = (t) => {
+            editTrxModal.value = {
+                show: true,
+                id: t.id,
+                customer_name: t.customer_name || '',
+                phone: t.phone || '',
+                type: t.type || 'tong_lom',
+                base_price: parseFloat(t.base_price) || 0,
+                premium_amount: parseFloat(t.premium_amount) || 0,
+                percent: parseFloat(t.percent) || 0,
+                weight: parseFloat(t.weight) || 0,
+                net_price: parseFloat(t.net_price) || 0,
+                original_net_price: parseFloat(t.net_price) || 0
+            };
+        };
+
+        const saveEditTransaction = async () => {
+            const tForm = editTrxModal.value;
+            const diffAmount = tForm.original_net_price - tForm.net_price;
+
+            let savePercent = Number(tForm.percent) || 0;
+            if (['tong_roop', 'redeem', 'tong_tang'].includes(tForm.type)) {
+                savePercent = 96.5;
+            }
+
+            let savePremium = Number(tForm.premium_amount) || 0;
+            if (tForm.type !== 'tong_lom') {
+                savePremium = 0;
+            }
+
+            const basePrice = Number(tForm.base_price) || 0;
+            const weight = Number(tForm.weight) || 0;
+            const netPrice = Number(tForm.net_price) || 0;
 
             const { error } = await supabase.from('transactions').update({
-                customer_name: newName,
-                phone: newPhone,
-                weight: newWeight,
-                percent: newPercent,
-                net_price: newNetPrice
-            }).eq('id', t.id);
-            
+                customer_name: tForm.customer_name,
+                phone: tForm.phone,
+                type: tForm.type,
+                base_price: basePrice,
+                premium_amount: savePremium,
+                weight: weight,
+                percent: savePercent,
+                net_price: netPrice
+            }).eq('id', tForm.id);
+
             if (!error) {
                 if (diffAmount !== 0) {
-                    await restoreDrawerBalance(diffAmount, t.id);
+                    await restoreDrawerBalance(diffAmount, tForm.id);
                 }
                 loadTransactions();
                 loadDeliveryData(); // Refresh stock
+                editTrxModal.value.show = false;
             } else {
                 await showAppModal('alert', 'เกิดข้อผิดพลาด', error.message);
             }
@@ -1133,6 +1255,34 @@ createApp({
                     loadTransactions();
                 }
                 else alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
+            }
+        };
+
+        const deleteGroup = async (g) => {
+            const ids = g.items.map(t => t.id);
+            if (confirm(`ยืนยันการลบบิลนี้ (${g.items.length} รายการ)?`)) {
+                // Fetch the transaction to get net_price and transfer_amount
+                const { data: trxs } = await supabase.from('transactions').select('net_price, transfer_amount').in('id', ids);
+                
+                await deleteTransactionAssets(ids);
+                const { error } = await supabase.from('transactions').delete().in('id', ids);
+                
+                if (!error) {
+                    if (trxs && trxs.length > 0) {
+                        let totalRefund = 0;
+                        trxs.forEach(trx => {
+                            const transferPart = Number(trx.transfer_amount || 0);
+                            const cashRefund = Number(trx.net_price) - transferPart;
+                            if (cashRefund > 0) totalRefund += cashRefund;
+                        });
+                        if (totalRefund > 0) {
+                            await restoreDrawerBalance(totalRefund);
+                        }
+                    }
+                    loadTransactions();
+                } else {
+                    alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
+                }
             }
         };
 
@@ -1799,6 +1949,7 @@ createApp({
         // --- New Delivery Rounds & Profit Feature ---
         const unsentTransactions = ref([]);
         const groupedUnsent = ref({
+            'tong_tang': { label: 'ทองคำแท่ง', items: [], selectedIds: [] },
             'gold_60_100': { label: 'ทอง (60-100%)', items: [], selectedIds: [] },
             'gold_30_59': { label: 'ทอง (30-59%)', items: [], selectedIds: [] },
             'gold_20_29': { label: 'ทอง (20-29%)', items: [], selectedIds: [] },
@@ -1807,6 +1958,15 @@ createApp({
 
         const pendingIngots = ref([]);
         const deliveryRoundsHistory = ref([]);
+        const historyViewTab = ref('normal');
+
+        const normalDeliveryRounds = computed(() => {
+            return deliveryRoundsHistory.value.filter(r => !r.delivery_ingots.every(ing => ing.category && String(ing.category).startsWith('อื่นๆ:')));
+        });
+
+        const otherDeliveryRounds = computed(() => {
+            return deliveryRoundsHistory.value.filter(r => r.delivery_ingots.every(ing => ing.category && String(ing.category).startsWith('อื่นๆ:')));
+        });
         const loadingDeliveryData = ref(false);
         const stockDateFilterMode = ref('all');
         const stockStartDate = ref(new Date().toLocaleDateString('en-CA'));
@@ -1859,6 +2019,7 @@ createApp({
 
                 // Reset groups
                 const groups = {
+                    'tong_tang': { label: 'ทองคำแท่ง', items: [] },
                     'gold_60_100': { label: 'ทอง (60-100%)', items: [] },
                     'gold_30_59': { label: 'ทอง (30-59%)', items: [] },
                     'gold_20_29': { label: 'ทอง (20-29%)', items: [] },
@@ -1869,6 +2030,8 @@ createApp({
                     let key = '';
                     if (t.type === 'silver') {
                         key = 'silver';
+                    } else if (t.type === 'tong_tang') {
+                        key = 'tong_tang';
                     } else {
                         const p = parseFloat(t.percent || 0);
                         if (p >= 60) key = 'gold_60_100';
@@ -2130,10 +2293,15 @@ createApp({
                 if (!userInput) return;
                 type = userInput;
             }
+            const isAllTongTang = selectedItems.every(i => i.type === 'tong_tang');
+            const totalWeight = selectedItems.reduce((sum, item) => sum + Number(item.weight || 0), 0);
+            
+            const defaultWeight = totalWeight > 0 ? parseFloat(totalWeight.toFixed(2)) : '';
+            const defaultPercent = isAllTongTang ? '96.5' : '';
             
             const inputs = await showAppModal('prompt', 'ข้อมูลก้อนหลอม', 'กรุณาระบุน้ำหนักและเปอร์เซ็นต์ของก้อนที่หลอมเสร็จแล้ว:', [
-                { label: 'น้ำหนัก (กรัม)', type: 'number', defaultValue: '' },
-                { label: 'เปอร์เซ็นต์ (%)', type: 'number', defaultValue: '' }
+                { label: 'น้ำหนัก (กรัม)', type: 'number', defaultValue: defaultWeight },
+                { label: 'เปอร์เซ็นต์ (%)', type: 'number', defaultValue: defaultPercent }
             ]);
             
             if (!inputs || inputs.length < 2) return;
@@ -2179,16 +2347,72 @@ createApp({
                 await showAppModal('alert', 'แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการเก็บโชว์ในตู้');
                 return;
             }
-            const confirmed = await showAppModal('confirm', 'ยืนยัน', `ต้องการเก็บรายการที่เลือกจำนวน ${selectedTransactionIds.value.length} รายการเข้าตู้โชว์ (ไม่นำไปหลอม) ใช่หรือไม่?`);
-            if (!confirmed) return;
+            
+            const productName = await showAppModal('prompt', 'โชว์ในตู้', `ต้องการเก็บรายการที่เลือกจำนวน ${selectedTransactionIds.value.length} รายการเข้าตู้โชว์\n\nกรุณาระบุชื่อสินค้า (สามารถเว้นว่างได้):`, [
+                { label: 'ชื่อสินค้า', type: 'text', defaultValue: '' }
+            ]);
+
+            if (typeof productName !== 'string') return;
 
             loadingDeliveryData.value = true;
             try {
-                const { error } = await supabase.from('transactions').update({ in_showcase: true }).in('id', selectedTransactionIds.value);
+                const updateData = { in_showcase: true };
+                if (productName.trim() !== '') {
+                    updateData.details = productName.trim();
+                }
+                const { error } = await supabase.from('transactions').update(updateData).in('id', selectedTransactionIds.value);
                 if (error) throw error;
                 await loadDeliveryData();
             } catch (err) {
                 console.error("Error setting showcase:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const markAsOther = async () => {
+            if (selectedTransactionIds.value.length === 0) {
+                await showAppModal('alert', 'แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการจัดการ');
+                return;
+            }
+
+            const reason = await showAppModal('prompt', 'เอาทองไปไหน?', 'โปรดระบุรายละเอียด (เช่น ส่งคืนลูกค้า, ขายออก, อื่นๆ):', [
+                { label: 'รายละเอียด', type: 'text', defaultValue: '' }
+            ]);
+
+            if (!reason || typeof reason !== 'string' || reason.trim() === '') return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const selectedItems = unsentTransactions.value.filter(i => selectedTransactionIds.value.includes(i.id));
+                const totalCost = selectedItems.reduce((sum, i) => sum + Number(i.net_price), 0);
+                const totalWeight = selectedItems.reduce((sum, i) => sum + Number(i.weight), 0);
+
+                const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
+                    status: 'completed',
+                    gold_payment: totalCost, 
+                    created_at: new Date().toISOString()
+                }]).select();
+                
+                if (roundError) throw roundError;
+                const roundId = roundData[0].id;
+
+                const { data: ingotData, error: ingotError } = await supabase.from('delivery_ingots').insert([{
+                    category: `อื่นๆ: ${reason}`,
+                    melted_weight: totalWeight,
+                    melted_percent: 0,
+                    round_id: roundId
+                }]).select();
+
+                if (ingotError) throw ingotError;
+                const ingotId = ingotData[0].id;
+
+                const { error: txError } = await supabase.from('transactions').update({ ingot_id: ingotId }).in('id', selectedTransactionIds.value);
+                if (txError) throw txError;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error setting other purpose:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
                 loadingDeliveryData.value = false;
             }
@@ -2420,11 +2644,17 @@ createApp({
             uploadToBucket,
             formatCurrency,
             formatThaiDateTime,
-            filter,
-            isFilterActive,
-            deleteTransaction,
-            editTransaction,
-            loadTransactions,
+              filter,
+              isFilterActive,
+              deleteTransaction,
+              deleteGroup,
+              editTransaction,
+              editTrxModal,
+              calculateEditTrxNetPrice,
+              onEditBasePrice,
+              saveEditTransaction,
+              reprintGroup,
+              loadTransactions,
             deleteSelected,
             exportCSV,
             selectedTransactions,
@@ -2471,6 +2701,9 @@ createApp({
             groupedUnsent,
             pendingIngots,
             deliveryRoundsHistory,
+            historyViewTab,
+            normalDeliveryRounds,
+            otherDeliveryRounds,
             loadingDeliveryData,
             stockDateFilterMode,
             stockStartDate,
@@ -2488,6 +2721,7 @@ createApp({
             toggleSelectAllCategory,
             createIngot,
             markAsShowcase,
+            markAsOther,
             removeFromShowcase,
             deleteIngot,
             createDeliveryRound,

@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id_card_photo TEXT,
   signature TEXT,
   photo TEXT,
+  details TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
