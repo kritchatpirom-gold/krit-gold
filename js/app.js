@@ -5,7 +5,7 @@ const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
 //const supabaseUrl = 'http://192.168.1.112:54321';
 //const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
-const supabaseUrl = 'http://192.168.1.125:54121';
+const supabaseUrl = 'http://192.168.1.124:54121';
 const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
@@ -57,6 +57,9 @@ createApp({
         const priceTrendGold = ref(0);
         const priceTrendSilver = ref(0);
         const silverDeduction = ref(13); // Default 13%
+        const useSilverDeduction = ref(true); // Default enabled
+        const manualSilverPrice = ref(0);
+        const useManualSilverPrice = ref(false);
         let priceChart = null;
 
         // Drawer Balance
@@ -68,6 +71,25 @@ createApp({
         const drawerLogs = ref([]);
         const loadingDrawerLogs = ref(false);
         const showDrawerLogsModal = ref(false);
+
+        // Top Up Modal State
+        const showTopUpModal = ref(false);
+        const savingTopUp = ref(false);
+        const topUpForm = ref({
+            b1000: '', b500: '', b100: '', b50: '', b20: '',
+            c10: '', c5: '', c1: ''
+        });
+        
+        const topUpTotal = computed(() => {
+            return (topUpForm.value.b1000 * 1000) +
+                   (topUpForm.value.b500 * 500) +
+                   (topUpForm.value.b100 * 100) +
+                   (topUpForm.value.b50 * 50) +
+                   (topUpForm.value.b20 * 20) +
+                   (topUpForm.value.c10 * 10) +
+                   (topUpForm.value.c5 * 5) +
+                   (topUpForm.value.c1 * 1);
+        });
 
         const drawerTotal = computed(() => {
             return (drawerBalance.value.b1000 * 1000) +
@@ -240,6 +262,126 @@ createApp({
                 await showAppModal('alert', 'เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึก: ' + err.message);
             } finally {
                 savingDrawer.value = false;
+            }
+        };
+
+
+
+        const showWithdrawModal = ref(false);
+        const savingWithdraw = ref(false);
+        const withdrawForm = ref({ b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' });
+        const withdrawTotal = computed(() => {
+            return (withdrawForm.value.b1000 || 0) * 1000 + (withdrawForm.value.b500 || 0) * 500 + 
+                   (withdrawForm.value.b100 || 0) * 100 + (withdrawForm.value.b50 || 0) * 50 + 
+                   (withdrawForm.value.b20 || 0) * 20 + (withdrawForm.value.c10 || 0) * 10 + 
+                   (withdrawForm.value.c5 || 0) * 5 + (withdrawForm.value.c1 || 0) * 1;
+        });
+
+        const openTopUpModal = () => {
+            topUpForm.value = { b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' };
+            showTopUpModal.value = true;
+        };
+
+        const openWithdrawModal = () => {
+            withdrawForm.value = { b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' };
+            showWithdrawModal.value = true;
+        };
+
+        const confirmTopUp = async () => {
+            if (!isAdmin.value) return;
+            if (topUpTotal.value <= 0) {
+                await showAppModal('alert', 'ไม่สามารถเติมเงินได้', 'กรุณาระบุจำนวนเงินที่ต้องการเติม');
+                return;
+            }
+            
+            savingTopUp.value = true;
+            try {
+                const { data: oldData } = await supabase.from('drawer_balance').select('*').eq('id', 1).single();
+                const oldBalance = oldData ? { ...oldData } : null;
+                
+                const newBalance = {
+                    b1000: (oldBalance?.b1000 || 0) + (topUpForm.value.b1000 || 0),
+                    b500: (oldBalance?.b500 || 0) + (topUpForm.value.b500 || 0),
+                    b100: (oldBalance?.b100 || 0) + (topUpForm.value.b100 || 0),
+                    b50: (oldBalance?.b50 || 0) + (topUpForm.value.b50 || 0),
+                    b20: (oldBalance?.b20 || 0) + (topUpForm.value.b20 || 0),
+                    c10: (oldBalance?.c10 || 0) + (topUpForm.value.c10 || 0),
+                    c5: (oldBalance?.c5 || 0) + (topUpForm.value.c5 || 0),
+                    c1: (oldBalance?.c1 || 0) + (topUpForm.value.c1 || 0)
+                };
+
+                const { error } = await supabase.from('drawer_balance').update({
+                    ...newBalance,
+                    updated_at: new Date().toISOString()
+                }).eq('id', 1);
+                
+                if (error) throw error;
+                
+                drawerBalance.value = newBalance;
+                
+                await logDrawerAction('TOP_UP', topUpTotal.value, oldBalance, newBalance);
+                
+                showTopUpModal.value = false;
+                await showAppModal('alert', 'สำเร็จ', `เติมเงินเข้าลิ้นชัก ${formatCurrency(topUpTotal.value)} บาท เรียบร้อยแล้ว`);
+            } catch (err) {
+                console.error("Error topping up drawer:", err);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเติมเงิน: ' + err.message);
+            } finally {
+                savingTopUp.value = false;
+            }
+        };
+
+        const confirmWithdraw = async () => {
+            if (!isAdmin.value) return;
+            if (withdrawTotal.value <= 0) {
+                await showAppModal('alert', 'ไม่สามารถนำเงินออกได้', 'กรุณาระบุจำนวนเงินที่ต้องการนำออก');
+                return;
+            }
+            
+            savingWithdraw.value = true;
+            try {
+                const { data: oldData } = await supabase.from('drawer_balance').select('*').eq('id', 1).single();
+                const oldBalance = oldData ? { ...oldData } : null;
+                
+                if (!oldBalance) throw new Error("ไม่พบข้อมูลลิ้นชักเงิน");
+
+                const newBalance = {
+                    b1000: (oldBalance.b1000 || 0) - (withdrawForm.value.b1000 || 0),
+                    b500: (oldBalance.b500 || 0) - (withdrawForm.value.b500 || 0),
+                    b100: (oldBalance.b100 || 0) - (withdrawForm.value.b100 || 0),
+                    b50: (oldBalance.b50 || 0) - (withdrawForm.value.b50 || 0),
+                    b20: (oldBalance.b20 || 0) - (withdrawForm.value.b20 || 0),
+                    c10: (oldBalance.c10 || 0) - (withdrawForm.value.c10 || 0),
+                    c5: (oldBalance.c5 || 0) - (withdrawForm.value.c5 || 0),
+                    c1: (oldBalance.c1 || 0) - (withdrawForm.value.c1 || 0)
+                };
+
+                // Check for negative balances
+                for (const key of Object.keys(newBalance)) {
+                    if (newBalance[key] < 0) {
+                        throw new Error(`จำนวนเงินคงเหลือในลิ้นชักไม่เพียงพอสำหรับประเภท ${key.replace('b', 'แบงค์ ').replace('c', 'เหรียญ ')}`);
+                    }
+                }
+
+                const { error } = await supabase.from('drawer_balance').update({
+                    ...newBalance,
+                    updated_at: new Date().toISOString()
+                }).eq('id', 1);
+                
+                if (error) throw error;
+                
+                drawerBalance.value = newBalance;
+                
+                // Note: diff amount is negative for deduction
+                await logDrawerAction('WITHDRAW', -withdrawTotal.value, oldBalance, newBalance);
+                
+                showWithdrawModal.value = false;
+                await showAppModal('alert', 'สำเร็จ', `นำเงินออกจากลิ้นชัก ${formatCurrency(withdrawTotal.value)} บาท เรียบร้อยแล้ว`);
+            } catch (err) {
+                console.error("Error withdrawing from drawer:", err);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการนำเงินออก: ' + err.message);
+            } finally {
+                savingWithdraw.value = false;
             }
         };
 
@@ -569,8 +711,8 @@ createApp({
             if (calcForm.value.type === 'tong_lom' || calcForm.value.type === 'tong_roop' || calcForm.value.type === 'tong_tang' || calcForm.value.type === 'redeem') {
                 return Number(goldPrice.value) || 0;
             } else if (calcForm.value.type === 'silver') {
-                const multiplier = (100 - (Number(silverDeduction.value) || 0)) / 100;
-                return Math.floor((Number(silverPrice.value) || 0) * multiplier);
+                const multiplier = useSilverDeduction.value ? (100 - (Number(silverDeduction.value) || 0)) / 100 : 1;
+                return Math.floor((Number(manualSilverPrice.value) || 0) * multiplier);
             }
             return 0;
         });
@@ -579,8 +721,8 @@ createApp({
             calcForm.value.manualPrice = currentAssetPrice.value;
         });
 
-        watch(currentAssetPrice, (newVal) => {
-            if (!calcForm.value.manualPrice || calcForm.value.manualPrice === 0) {
+        watch(currentAssetPrice, (newVal, oldVal) => {
+            if (!calcForm.value.manualPrice || calcForm.value.manualPrice === 0 || calcForm.value.manualPrice === oldVal) {
                 calcForm.value.manualPrice = newVal;
             }
         });
@@ -1004,9 +1146,21 @@ createApp({
                     console.error("Global settings fetch error:", settingsError.message);
                 } else if (settingsData) {
                     const silverSetting = settingsData.find(s => s.key === 'silver_deduction');
-                    if (silverSetting) {
+                    if (silverSetting && silverSetting.value !== null) {
                         silverDeduction.value = Number(silverSetting.value);
                         console.log("Silver deduction setting loaded:", silverDeduction.value);
+                    }
+                    const useDeductionSetting = settingsData.find(s => s.key === 'use_silver_deduction');
+                    if (useDeductionSetting && useDeductionSetting.value !== null) {
+                        useSilverDeduction.value = Number(useDeductionSetting.value) === 1;
+                    }
+                    const manualPriceSetting = settingsData.find(s => s.key === 'manual_silver_price');
+                    if (manualPriceSetting && manualPriceSetting.value !== null) {
+                        manualSilverPrice.value = Number(manualPriceSetting.value);
+                    }
+                    const useManualSetting = settingsData.find(s => s.key === 'use_manual_silver_price');
+                    if (useManualSetting && useManualSetting.value !== null) {
+                        useManualSilverPrice.value = Number(useManualSetting.value) === 1;
                     }
                 }
             } catch (err) {
@@ -1028,12 +1182,35 @@ createApp({
                     }).eq('id', p.id);
                 }
             }
-            // Save Silver Deduction
-            await supabase.from('global_settings').upsert({ key: 'silver_deduction', value: silverDeduction.value });
+            // Save Settings
+            await supabase.from('global_settings').upsert([
+                { key: 'silver_deduction', value: Number(silverDeduction.value) || 0 },
+                { key: 'use_silver_deduction', value: useSilverDeduction.value ? 1 : 0 },
+                { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
+                { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 }
+            ]);
 
             saving.value = false;
             alert('บันทึกการตั้งค่าสำเร็จ');
         };
+
+        const autoSaveSettings = async () => {
+            await supabase.from('global_settings').upsert([
+                { key: 'silver_deduction', value: Number(silverDeduction.value) || 0 },
+                { key: 'use_silver_deduction', value: useSilverDeduction.value ? 1 : 0 },
+                { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
+                { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 }
+            ]);
+            fetchPrices();
+        };
+
+        let autoSaveTimeout;
+        watch([silverDeduction, useSilverDeduction, manualSilverPrice, useManualSilverPrice], () => {
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(() => {
+                autoSaveSettings();
+            }, 500);
+        });
 
         const loadTransactions = async () => {
             loadingTransactions.value = true;
@@ -1071,8 +1248,27 @@ createApp({
 
             const { data, error } = await query;
 
-            if (data) transactions.value = data;
-            else transactions.value = [];
+            if (data) {
+                transactions.value = data.map(t => {
+                    const fixUrl = (url) => {
+                        if (!url) return url;
+                        try {
+                            const urlObj = new URL(url);
+                            const path = urlObj.pathname.split('/transaction_assets/')[1];
+                            if (path) {
+                                return `${supabaseUrl}/storage/v1/object/public/transaction_assets/${path}`;
+                            }
+                        } catch(e) {}
+                        return url;
+                    };
+                    t.signature = fixUrl(t.signature);
+                    t.id_card_photo = fixUrl(t.id_card_photo);
+                    t.photo = fixUrl(t.photo);
+                    return t;
+                });
+            } else {
+                transactions.value = [];
+            }
             loadingTransactions.value = false;
         };
 
@@ -1808,20 +2004,27 @@ createApp({
                 }
 
                 // Fetch XAG API
-                const resXag = await fetch('/api/xag');
-                if (resXag.ok) {
-                    const dataXag = await resXag.json();
-                    if (dataXag) {
-                        const sell = parseFloat(dataXag.sell);
-                        const buy = parseFloat(dataXag.buy);
-                        silverPriceSpot.value = parseFloat(dataXag.spot);
-                        silverPriceExchange.value = parseFloat(dataXag.exchange);
-                        priceTrendSilver.value = buy - (silverPrice.value || buy);
+                if (!useManualSilverPrice.value) {
+                    const resXag = await fetch('/api/xag');
+                    if (resXag.ok) {
+                        const dataXag = await resXag.json();
+                        if (dataXag) {
+                            const sell = parseFloat(dataXag.sell);
+                            const buy = parseFloat(dataXag.buy);
+                            silverPriceSpot.value = parseFloat(dataXag.spot);
+                            silverPriceExchange.value = parseFloat(dataXag.exchange);
+                            priceTrendSilver.value = buy - (silverPrice.value || buy);
 
-                        silverPriceSell.value = sell;
-                        silverPriceBuy.value = buy;
-                        silverPrice.value = buy; // Reference for calculation (รับซื้อ)
+                            silverPriceSell.value = sell;
+                            silverPriceBuy.value = buy;
+                            silverPrice.value = buy; // Reference for calculation (รับซื้อ)
+                        }
                     }
+                } else {
+                    silverPrice.value = manualSilverPrice.value;
+                    silverPriceSell.value = manualSilverPrice.value;
+                    silverPriceBuy.value = manualSilverPrice.value;
+                    priceTrendSilver.value = 0;
                 }
 
                 // Update graph
@@ -1950,6 +2153,7 @@ createApp({
         const unsentTransactions = ref([]);
         const groupedUnsent = ref({
             'tong_tang': { label: 'ทองคำแท่ง', items: [], selectedIds: [] },
+            'tong_roop': { label: 'ทองรูปพรรณ', items: [], selectedIds: [] },
             'gold_60_100': { label: 'ทอง (60-100%)', items: [], selectedIds: [] },
             'gold_30_59': { label: 'ทอง (30-59%)', items: [], selectedIds: [] },
             'gold_20_29': { label: 'ทอง (20-29%)', items: [], selectedIds: [] },
@@ -1957,6 +2161,8 @@ createApp({
         });
 
         const pendingIngots = ref([]);
+        const meltingIngots = computed(() => pendingIngots.value.filter(ing => ing.status === 'melting'));
+        const completedIngots = computed(() => pendingIngots.value.filter(ing => !ing.status || ing.status === 'completed'));
         const deliveryRoundsHistory = ref([]);
         const historyViewTab = ref('normal');
 
@@ -2020,6 +2226,7 @@ createApp({
                 // Reset groups
                 const groups = {
                     'tong_tang': { label: 'ทองคำแท่ง', items: [] },
+                    'tong_roop': { label: 'ทองรูปพรรณ', items: [] },
                     'gold_60_100': { label: 'ทอง (60-100%)', items: [] },
                     'gold_30_59': { label: 'ทอง (30-59%)', items: [] },
                     'gold_20_29': { label: 'ทอง (20-29%)', items: [] },
@@ -2032,6 +2239,8 @@ createApp({
                         key = 'silver';
                     } else if (t.type === 'tong_tang') {
                         key = 'tong_tang';
+                    } else if (t.type === 'tong_roop') {
+                        key = 'tong_roop';
                     } else {
                         const p = parseFloat(t.percent || 0);
                         if (p >= 60) key = 'gold_60_100';
@@ -2294,9 +2503,35 @@ createApp({
                 type = userInput;
             }
             const isAllTongTang = selectedItems.every(i => i.type === 'tong_tang');
-            const totalWeight = selectedItems.reduce((sum, item) => sum + Number(item.weight || 0), 0);
+            let category = type === 'silver' ? 'กำลังหลอม (เงิน)' : 'กำลังหลอม (ทอง)';
+
+            loadingDeliveryData.value = true;
+            try {
+                // Insert Ingot with 'melting' status
+                const { data: ingotData, error: ingotError } = await supabase.from('delivery_ingots').insert([{
+                    category: category,
+                    status: 'melting'
+                }]).select();
+                
+                if (ingotError) throw ingotError;
+                const newIngotId = ingotData[0].id;
+
+                // Update transactions
+                const { error: txError } = await supabase.from('transactions').update({ ingot_id: newIngotId }).in('id', selectedTransactionIds.value);
+                if (txError) throw txError;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error creating ingot:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const completeMelting = async (ingot) => {
+            const isAllTongTang = ingot.transactions && ingot.transactions.every(i => i.type === 'tong_tang');
             
-            const defaultWeight = totalWeight > 0 ? parseFloat(totalWeight.toFixed(2)) : '';
+            const defaultWeight = ingot.raw_weight > 0 ? parseFloat(ingot.raw_weight.toFixed(2)) : '';
             const defaultPercent = isAllTongTang ? '96.5' : '';
             
             const inputs = await showAppModal('prompt', 'ข้อมูลก้อนหลอม', 'กรุณาระบุน้ำหนักและเปอร์เซ็นต์ของก้อนที่หลอมเสร็จแล้ว:', [
@@ -2310,33 +2545,29 @@ createApp({
             
             if (!weight || !percent) return;
 
-            let category = 'silver';
-            if (type === 'gold' || type === 'ทอง') {
+            const isSilver = ingot.category && ingot.category.includes('เงิน');
+            let newCategory = 'silver';
+            if (!isSilver) {
                 const p = parseFloat(percent);
-                if (p >= 60) category = 'gold_60_100';
-                else if (p >= 30) category = 'gold_30_59';
-                else category = 'gold_20_29';
+                if (p >= 60) newCategory = 'gold_60_100';
+                else if (p >= 30) newCategory = 'gold_30_59';
+                else newCategory = 'gold_20_29';
             }
 
             loadingDeliveryData.value = true;
             try {
-                // Insert Ingot
-                const { data: ingotData, error: ingotError } = await supabase.from('delivery_ingots').insert([{
-                    category: category,
+                const { error: updateError } = await supabase.from('delivery_ingots').update({
+                    category: newCategory,
+                    status: 'completed',
                     melted_weight: parseFloat(weight),
                     melted_percent: parseFloat(percent)
-                }]).select();
+                }).eq('id', ingot.id);
                 
-                if (ingotError) throw ingotError;
-                const newIngotId = ingotData[0].id;
-
-                // Update transactions
-                const { error: txError } = await supabase.from('transactions').update({ ingot_id: newIngotId }).in('id', selectedTransactionIds.value);
-                if (txError) throw txError;
-
+                if (updateError) throw updateError;
+                
                 await loadDeliveryData();
             } catch (err) {
-                console.error("Error creating ingot:", err);
+                console.error("Error completing melting:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
                 loadingDeliveryData.value = false;
             }
@@ -2575,6 +2806,18 @@ createApp({
 
         return {
             currentTab,
+            showTopUpModal,
+            savingTopUp,
+            topUpForm,
+            topUpTotal,
+            openTopUpModal,
+            confirmTopUp,
+            showWithdrawModal,
+            savingWithdraw,
+            withdrawForm,
+            withdrawTotal,
+            openWithdrawModal,
+            confirmWithdraw,
             user,
             isLoggedIn,
             isAdmin,
@@ -2615,12 +2858,16 @@ createApp({
             showAppModal,
             resolveModal,
             silverDeduction,
+            useSilverDeduction,
+            manualSilverPrice,
+            useManualSilverPrice,
 
             premiums,
             allPremiumType,
             setAllPremiumTypes,
             loadingPremiums,
             savePremiums,
+            autoSaveSettings,
             saving,
 
             transactions,
@@ -2700,6 +2947,9 @@ createApp({
             
             groupedUnsent,
             pendingIngots,
+            meltingIngots,
+            completedIngots,
+            completeMelting,
             deliveryRoundsHistory,
             historyViewTab,
             normalDeliveryRounds,

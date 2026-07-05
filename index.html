@@ -487,6 +487,14 @@
                                 <i class="fa-solid fa-vault mr-2"></i>
                                 เปิดลิ้นชัก
                             </button>
+                            <button v-if="isAdmin" @click="openWithdrawModal" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-red-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="นำเงินออกจากลิ้นชัก">
+                                <i class="fa-solid fa-minus-circle mr-2"></i>
+                                นำเงินออก
+                            </button>
+                            <button v-if="isAdmin" @click="openTopUpModal" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="เติมเงินเข้าลิ้นชัก">
+                                <i class="fa-solid fa-plus-circle mr-2"></i>
+                                เติมเงิน
+                            </button>
                             <button v-if="isAdmin" @click="saveDrawerBalance" :disabled="savingDrawer"
                                 :class="savingDrawer ? 'opacity-50 cursor-not-allowed bg-gray-700' : 'bg-gold-500 hover:bg-gold-400 hover-glow'"
                                 class="px-8 py-3 rounded-lg text-black font-bold transition-all shadow-lg flex items-center">
@@ -535,6 +543,8 @@
                                             <td class="p-3 text-gray-400 whitespace-nowrap">{{ formatThaiDateTime(log.created_at) }}</td>
                                             <td class="p-3">
                                                 <span v-if="log.action === 'MANUAL_UPDATE'" class="text-yellow-400"><i class="fa-solid fa-pen-to-square mr-1"></i> อัพเดทด้วยมือ</span>
+                                                <span v-else-if="log.action === 'TOP_UP'" class="text-blue-400"><i class="fa-solid fa-plus-circle mr-1"></i> เติมเงินเข้าลิ้นชัก</span>
+                                                <span v-else-if="log.action === 'WITHDRAW'" class="text-red-400"><i class="fa-solid fa-minus-circle mr-1"></i> นำเงินออกจากลิ้นชัก</span>
                                                 <span v-else-if="log.action === 'TRANSACTION_DEDUCT'" class="text-red-400"><i class="fa-solid fa-money-bill-transfer mr-1"></i> จ่ายเงินซื้อของ</span>
                                                 <span v-else-if="log.action === 'TRANSACTION_RESTORE'" class="text-emerald-400"><i class="fa-solid fa-rotate-left mr-1"></i> คืนเงินเข้าลิ้นชัก (ลบบิล)</span>
                                                 <span v-else class="text-gray-400">{{ log.action }}</span>
@@ -572,6 +582,158 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+
+            <!-- Top Up Modal -->
+            <transition name="fade">
+                <div v-if="showTopUpModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div class="glass border border-gray-700 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+                        <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-dark-surface/80 rounded-t-2xl">
+                            <h2 class="text-xl font-bold text-blue-400 flex items-center">
+                                <i class="fa-solid fa-plus-circle mr-3"></i> เติมเงินเข้าลิ้นชัก
+                            </h2>
+                            <button @click="showTopUpModal = false" class="text-gray-400 hover:text-white transition-colors">
+                                <i class="fa-solid fa-xmark text-2xl"></i>
+                            </button>
+                        </div>
+                        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <!-- Banknotes -->
+                                <div class="space-y-3">
+                                    <h3 class="text-md font-bold text-gray-300 border-b border-gray-800 pb-2">ธนบัตร (ใบ)</h3>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 1,000</span>
+                                        <input type="number" min="0" v-model="topUpForm.b1000" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 500</span>
+                                        <input type="number" min="0" v-model="topUpForm.b500" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 100</span>
+                                        <input type="number" min="0" v-model="topUpForm.b100" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 50</span>
+                                        <input type="number" min="0" v-model="topUpForm.b50" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 20</span>
+                                        <input type="number" min="0" v-model="topUpForm.b20" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                </div>
+                                <!-- Coins -->
+                                <div class="space-y-3">
+                                    <h3 class="text-md font-bold text-gray-300 border-b border-gray-800 pb-2">เหรียญ (เหรียญ)</h3>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">เหรียญ 10</span>
+                                        <input type="number" min="0" v-model="topUpForm.c10" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">เหรียญ 5</span>
+                                        <input type="number" min="0" v-model="topUpForm.c5" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">เหรียญ 1</span>
+                                        <input type="number" min="0" v-model="topUpForm.c1" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl text-center">
+                                <div class="text-gray-400 text-sm mb-1">ยอดเงินรวมที่ต้องการเติม</div>
+                                <div class="text-3xl font-bold text-white">{{ formatCurrency(topUpTotal) }} <span class="text-blue-400 text-xl">บาท</span></div>
+                            </div>
+                        </div>
+                        <div class="p-4 border-t border-gray-800 flex justify-end gap-3 bg-dark-surface/80 rounded-b-2xl">
+                            <button @click="showTopUpModal = false" class="px-6 py-2 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">
+                                ยกเลิก
+                            </button>
+                            <button @click="confirmTopUp" :disabled="savingTopUp || topUpTotal <= 0"
+                                :class="(savingTopUp || topUpTotal <= 0) ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/50'"
+                                class="px-6 py-2 rounded font-bold transition-all flex items-center">
+                                <i v-if="savingTopUp" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
+                                <i v-else class="fa-solid fa-check mr-2"></i>
+                                ยืนยันการเติมเงิน
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+
+            <!-- Withdraw Modal -->
+            <transition name="fade">
+                <div v-if="showWithdrawModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div class="glass border border-gray-700 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+                        <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-dark-surface/80 rounded-t-2xl">
+                            <h2 class="text-xl font-bold text-red-400 flex items-center">
+                                <i class="fa-solid fa-minus-circle mr-3"></i> นำเงินออกจากลิ้นชัก
+                            </h2>
+                            <button @click="showWithdrawModal = false" class="text-gray-400 hover:text-white transition-colors">
+                                <i class="fa-solid fa-xmark text-2xl"></i>
+                            </button>
+                        </div>
+                        <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <!-- Banknotes -->
+                                <div class="space-y-3">
+                                    <h3 class="text-md font-bold text-gray-300 border-b border-gray-800 pb-2">ธนบัตร (ใบ)</h3>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 1,000</span>
+                                        <input type="number" min="0" v-model="withdrawForm.b1000" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 500</span>
+                                        <input type="number" min="0" v-model="withdrawForm.b500" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 100</span>
+                                        <input type="number" min="0" v-model="withdrawForm.b100" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 50</span>
+                                        <input type="number" min="0" v-model="withdrawForm.b50" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">แบงค์ 20</span>
+                                        <input type="number" min="0" v-model="withdrawForm.b20" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                </div>
+                                <!-- Coins -->
+                                <div class="space-y-3">
+                                    <h3 class="text-md font-bold text-gray-300 border-b border-gray-800 pb-2">เหรียญ (เหรียญ)</h3>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">เหรียญ 10</span>
+                                        <input type="number" min="0" v-model="withdrawForm.c10" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">เหรียญ 5</span>
+                                        <input type="number" min="0" v-model="withdrawForm.c5" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                    <div class="flex items-center justify-between bg-dark-base/50 p-2 rounded border border-gray-800">
+                                        <span class="text-gray-400 text-sm">เหรียญ 1</span>
+                                        <input type="number" min="0" v-model="withdrawForm.c1" class="w-20 px-2 py-1 bg-dark-surface border border-gray-700 text-white rounded text-center">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-6 p-4 bg-red-900/20 border border-red-500/30 rounded-xl text-center">
+                                <div class="text-gray-400 text-sm mb-1">ยอดเงินรวมที่ต้องการนำออก</div>
+                                <div class="text-3xl font-bold text-white">{{ formatCurrency(withdrawTotal) }} <span class="text-red-400 text-xl">บาท</span></div>
+                            </div>
+                        </div>
+                        <div class="p-4 border-t border-gray-800 flex justify-end gap-3 bg-dark-surface/80 rounded-b-2xl">
+                            <button @click="showWithdrawModal = false" class="px-6 py-2 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">
+                                ยกเลิก
+                            </button>
+                            <button @click="confirmWithdraw" :disabled="savingWithdraw || withdrawTotal <= 0"
+                                :class="(savingWithdraw || withdrawTotal <= 0) ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/50'"
+                                class="px-6 py-2 rounded font-bold transition-all flex items-center">
+                                <i v-if="savingWithdraw" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
+                                <i v-else class="fa-solid fa-check mr-2"></i>
+                                ยืนยันการนำเงินออก
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -663,21 +825,49 @@
                         </div>
                     </div>
 
-                    <!-- 2. Pending Ingots & Delivery -->
+                    <!-- 2. Melting In Progress -->
+                    <div class="glass p-6 rounded-2xl border border-gray-800 relative mt-6">
+                        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+                            <h2 class="text-2xl font-bold text-orange-400"><i class="fa-solid fa-fire mr-2"></i> รายการส่งหลอม (กำลังหลอม)</h2>
+                        </div>
+                        
+                        <div v-if="meltingIngots.length === 0" class="text-center text-gray-500 py-8 bg-dark-surface/30 rounded-xl border border-gray-800">
+                            <i class="fa-solid fa-fire-extinguisher text-4xl mb-3 text-gray-700"></i>
+                            <p>ไม่มีรายการที่กำลังหลอม</p>
+                        </div>
+                        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <div v-for="ing in meltingIngots" :key="ing.id" class="bg-gradient-to-b from-gray-800/80 to-dark-base p-4 rounded-xl border border-orange-700/50 relative group">
+                                <button @click="deleteIngot(ing.id)" class="absolute top-2 right-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-300" title="ยกเลิกการหลอม">
+                                    <i class="fa-solid fa-xmark text-lg"></i>
+                                </button>
+                                <div class="text-xl text-orange-500 mb-2 animate-pulse"><i class="fa-solid fa-fire"></i></div>
+                                <div class="font-bold text-white mb-1">{{ ing.category }}</div>
+                                <div class="text-xs text-gray-400 mb-2">{{ new Date(ing.created_at).toLocaleString('th-TH') }}</div>
+                                <div class="space-y-1 text-sm border-t border-gray-700 pt-2 mb-4">
+                                    <div class="flex justify-between"><span class="text-gray-400">นน.รวมก่อนหลอม:</span><span class="text-white font-mono font-bold">{{ ing.raw_weight.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}g</span></div>
+                                </div>
+                                <button @click="completeMelting(ing)" class="w-full py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-lg transition-all flex justify-center items-center shadow-lg">
+                                    <i class="fa-solid fa-check-circle mr-2"></i> หลอมเสร็จแล้ว
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Completed Ingots & Delivery -->
                     <div class="glass p-6 rounded-2xl border border-gray-800 relative">
                         <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
                             <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-cubes mr-2"></i> ก้อนรอส่งสมาคม</h2>
-                            <button @click="createDeliveryRound" :disabled="pendingIngots.length === 0" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-lg transition-all flex justify-center items-center shadow-lg">
-                                <i class="fa-solid fa-truck-fast mr-2"></i> จัดส่งรอบนี้ ({{ pendingIngots.length }} ก้อน)
+                            <button @click="createDeliveryRound" :disabled="completedIngots.length === 0" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-lg transition-all flex justify-center items-center shadow-lg">
+                                <i class="fa-solid fa-truck-fast mr-2"></i> จัดส่งรอบนี้ ({{ completedIngots.length }} ก้อน)
                             </button>
                         </div>
                         
-                        <div v-if="pendingIngots.length === 0" class="text-center text-gray-500 py-8 bg-dark-surface/30 rounded-xl border border-gray-800">
+                        <div v-if="completedIngots.length === 0" class="text-center text-gray-500 py-8 bg-dark-surface/30 rounded-xl border border-gray-800">
                             <i class="fa-solid fa-folder-open text-4xl mb-3 text-gray-700"></i>
                             <p>ไม่มีก้อนหลอมที่รอส่ง</p>
                         </div>
                         <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            <div v-for="ing in pendingIngots" :key="ing.id" class="bg-gradient-to-b from-gray-800/80 to-dark-base p-4 rounded-xl border border-gray-700 relative group">
+                            <div v-for="ing in completedIngots" :key="ing.id" class="bg-gradient-to-b from-gray-800/80 to-dark-base p-4 rounded-xl border border-gray-700 relative group">
                                 <button @click="deleteIngot(ing.id)" class="absolute top-2 right-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-300" title="ยกเลิกก้อนนี้">
                                     <i class="fa-solid fa-xmark text-lg"></i>
                                 </button>
@@ -694,8 +884,8 @@
                         </div>
                     </div>
 
-                    <!-- 3. Delivery Rounds History -->
-                    <div v-if="isAdmin" class="glass p-6 rounded-2xl border border-gray-800 relative">
+                    <!-- 4. Delivery Rounds History -->
+                    <div v-if="isAdmin" class="glass p-6 rounded-2xl border border-gray-800 relative mt-6">
                         <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 border-b border-gray-800 pb-4">
                             <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-clock-rotate-left mr-2"></i> ประวัติการส่งและการเงิน</h2>
                             
@@ -1088,13 +1278,22 @@
                                         </div>
                                     </div>
 
-                                    <div v-show="isLoggedIn">
-                                        <label class="block text-sm font-medium text-gray-400 mb-1">เบอร์โทรศัพท์ <span
-                                                class="text-red-500">*</span></label>
-                                        <input type="tel" v-model="calcForm.phone" maxlength="10"
-                                            class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
-                                            placeholder="0123456789"
-                                            :class="(isLoggedIn && !isPhoneValid) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
+                                    <div v-show="isLoggedIn" class="space-y-4">
+                                        <div v-if="!calcForm.idCard">
+                                            <label class="block text-sm font-medium text-gray-400 mb-1">ชื่อลูกค้า (กรณีไม่มีบัตร) <span class="text-red-500">*</span></label>
+                                            <input type="text" v-model="calcForm.customerName"
+                                                class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
+                                                placeholder="กรอกชื่อ-นามสกุลลูกค้า"
+                                                :class="(isLoggedIn && calcForm.customerName.trim().length <= 1) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-400 mb-1">เบอร์โทรศัพท์ <span
+                                                    class="text-red-500">*</span></label>
+                                            <input type="tel" v-model="calcForm.phone" maxlength="10"
+                                                class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
+                                                placeholder="0123456789"
+                                                :class="(isLoggedIn && !isPhoneValid) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
+                                        </div>
                                     </div>
 
                                     <!-- Admin Overrides: Edit Name, CID, Address -->
@@ -1778,14 +1977,37 @@
                             <button @click="savePremiums" :disabled="saving"
                                 class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
                         </div>
-                        <div class="bg-dark-base p-6 rounded-xl border border-gray-800">
-                            <label class="block text-sm font-medium text-gray-400 mb-2">เปอร์เซ็นต์การหักราคาเงิน (Silver Deduction %)</label>
-                            <div class="flex items-center gap-3">
-                                <input type="number" v-model.number="silverDeduction" 
-                                    class="w-full max-w-[200px] px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none text-xl font-bold">
-                                <span class="text-xl text-gray-500">%</span>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-dark-base p-6 rounded-xl border border-gray-800">
+                                <div class="flex items-center justify-between mb-4">
+                                    <label class="block text-sm font-medium text-gray-400">หักเปอร์เซ็นต์ราคาเงิน (Silver Deduction %)</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                      <input type="checkbox" v-model="useSilverDeduction" @change="autoSaveSettings" class="sr-only peer">
+                                      <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-3" :class="{ 'opacity-50 pointer-events-none': !useSilverDeduction }">
+                                    <input type="number" v-model.number="silverDeduction" @change="autoSaveSettings" :disabled="!useSilverDeduction"
+                                        class="w-full max-w-[200px] px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none text-xl font-bold">
+                                    <span class="text-xl text-gray-500">%</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-3">ระบบจะนำราคากลางมาหัก {{ silverDeduction }}% เพื่อใช้เป็นราคาอ้างอิงในการรับซื้อ</p>
                             </div>
-                            <p class="text-xs text-gray-500 mt-3">ระบบจะนำราคากลางมาหัก {{ silverDeduction }}% เพื่อใช้เป็นราคาอ้างอิงในการรับซื้อ</p>
+                            <div class="bg-dark-base p-6 rounded-xl border border-gray-800">
+                                <div class="flex items-center justify-between mb-4">
+                                    <label class="block text-sm font-medium text-gray-400">กำหนดราคาเงินเอง (Manual Price)</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                      <input type="checkbox" v-model="useManualSilverPrice" @change="autoSaveSettings" class="sr-only peer">
+                                      <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-3" :class="{ 'opacity-50 pointer-events-none': !useManualSilverPrice }">
+                                    <input type="number" v-model.number="manualSilverPrice" @change="autoSaveSettings" :disabled="!useManualSilverPrice"
+                                        class="w-full max-w-[200px] px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none text-xl font-bold">
+                                    <span class="text-xl text-gray-500">฿</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-3">หากเปิดใช้งาน ระบบจะใช้ราคานี้แทนราคาอัตโนมัติ (API) ทันที</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2129,7 +2351,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js" type="module"></script>
+    <script src="/js/app.js?v=1.0.2" type="module"></script>
 </body>
 
 </html>

@@ -168,8 +168,9 @@ CREATE TABLE IF NOT EXISTS delivery_ingots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   round_id UUID REFERENCES delivery_rounds(id) ON DELETE CASCADE,
   category TEXT NOT NULL,
-  melted_weight NUMERIC NOT NULL,
-  melted_percent NUMERIC NOT NULL,
+  status TEXT DEFAULT 'completed',
+  melted_weight NUMERIC,
+  melted_percent NUMERIC,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
