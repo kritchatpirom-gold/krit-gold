@@ -1,12 +1,12 @@
 const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
-//const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
-//const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
+const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
+const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 
-//const supabaseUrl = 'http://192.168.1.112:54321';
+//const supabaseUrl = 'http://192.168.1.151:54321';
 //const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
-const supabaseUrl = 'http://192.168.1.124:54121';
-const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
+//const supabaseUrl = 'http://192.168.1.124:54121';
+//const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
