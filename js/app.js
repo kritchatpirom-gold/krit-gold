@@ -1442,7 +1442,9 @@ createApp({
                         const transferPart = Number(trx.transfer_amount || 0);
                         const cashRefund = Number(trx.net_price) - transferPart;
                         if (cashRefund > 0) {
-                            await restoreDrawerBalance(cashRefund);
+                            if (confirm(`คุณต้องการคืนเงินสดจำนวน ${cashRefund} บาท เข้าลิ้นชักหรือไม่?\n(กด Cancel/ยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
+                                await restoreDrawerBalance(cashRefund);
+                            }
                         }
                     }
                     loadTransactions();
@@ -1469,7 +1471,9 @@ createApp({
                             if (cashRefund > 0) totalRefund += cashRefund;
                         });
                         if (totalRefund > 0) {
-                            await restoreDrawerBalance(totalRefund);
+                            if (confirm(`คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n(กด Cancel/ยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
+                                await restoreDrawerBalance(totalRefund);
+                            }
                         }
                     }
                     loadTransactions();
@@ -1500,7 +1504,11 @@ createApp({
                     .in('id', selectedTransactions.value);
 
                 if (!error) {
-                    if (totalRefund > 0) await restoreDrawerBalance(totalRefund);
+                    if (totalRefund > 0) {
+                        if (confirm(`คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n(กด Cancel/ยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
+                            await restoreDrawerBalance(totalRefund);
+                        }
+                    }
                     selectedTransactions.value = [];
                     await loadTransactions();
                 } else {

@@ -1917,7 +1917,15 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white text-right align-top pt-5">
-                                        {{ formatCurrency(g.net_price) }}
+                                        <div>{{ formatCurrency(g.net_price) }}</div>
+                                        <div class="text-[10px] font-normal mt-1 flex flex-col items-end gap-0.5">
+                                            <span v-if="(g.net_price - g.items.reduce((s,t) => s + (Number(t.transfer_amount)||0), 0)) > 0" class="text-green-500/80">
+                                                <i class="fa-solid fa-money-bill-wave mr-1"></i>เงินสด {{ formatCurrency(g.net_price - g.items.reduce((s,t) => s + (Number(t.transfer_amount)||0), 0)) }}
+                                            </span>
+                                            <span v-if="g.items.reduce((s,t) => s + (Number(t.transfer_amount)||0), 0) > 0" class="text-blue-400/80">
+                                                <i class="fa-solid fa-building-columns mr-1"></i>เงินโอน {{ formatCurrency(g.items.reduce((s,t) => s + (Number(t.transfer_amount)||0), 0)) }}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm align-top pt-5">
                                         <div class="flex items-center justify-center gap-3">
