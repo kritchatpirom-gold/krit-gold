@@ -1,0 +1,1 @@
+rclone copy :s3:transaction_assets ./my_local_files --s3-provider Other --s3-access-key-id 88bb88e02e54042491ae34c7d02a5f9e --s3-secret-access-key a3ef4e6e77aa1209327747b06600f2594c47fe445ba1454389eebe21822785c5 --s3-endpoint https://cjithgqbtwuxfxrauvax.storage.supabase.co/storage/v1/s3 --s3-force-path-style --progress

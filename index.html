@@ -212,7 +212,11 @@
                                         <div class="flex justify-between items-end mb-2">
                                             <span class="text-gold-300 font-medium"><i
                                                     class="fa-solid fa-coins mr-1"></i> ราคาทองวันนี้</span>
-                                            <span class="text-xs px-2 py-0.5 rounded"
+                                            <span v-if="goldPriceMeta.priceChangeFromPrevRow !== undefined" class="text-xs px-2 py-0.5 rounded"
+                                                :class="goldPriceMeta.priceChangeFromPrevRow >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
+                                                {{ goldPriceMeta.priceChangeFromPrevRow >= 0 ? '▲' : '▼' }} {{ Math.abs(goldPriceMeta.priceChangeFromPrevRow) }}
+                                            </span>
+                                            <span v-else class="text-xs px-2 py-0.5 rounded"
                                                 :class="priceTrendGold >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
                                                 {{ priceTrendGold >= 0 ? '▲' : '▼' }} {{ Math.abs(priceTrendGold) }}
                                             </span>
@@ -276,6 +280,12 @@
                                                 อัพเดท : {{ goldPriceMeta.date_th }} เวลา {{ goldPriceMeta.time_th
                                                 }} (รอบที่ {{
                                                 goldPriceMeta.round }})
+                                            </div>
+                                            <div class="text-[13px] font-medium mt-1.5 flex justify-center items-center space-x-3">
+                                                <span class="text-gray-400">วันนี้</span>
+                                                <span :class="goldPriceMeta.priceChangeFromPrevDayLast >= 0 ? 'text-green-400' : 'text-red-400'" class="bg-dark-base px-2 py-0.5 rounded border border-gray-800">
+                                                    {{ goldPriceMeta.priceChangeFromPrevDayLast >= 0 ? '▲' : '▼' }} {{ Math.abs(goldPriceMeta.priceChangeFromPrevDayLast || 0) }}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -1279,12 +1289,36 @@
                                     </div>
 
                                     <div v-show="isLoggedIn" class="space-y-4">
-                                        <div v-if="!calcForm.idCard">
+                                        <div v-if="!calcForm.idCard" class="relative">
                                             <label class="block text-sm font-medium text-gray-400 mb-1">ชื่อลูกค้า (กรณีไม่มีบัตร) <span class="text-red-500">*</span></label>
                                             <input type="text" v-model="calcForm.customerName"
                                                 class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
                                                 placeholder="กรอกชื่อ-นามสกุลลูกค้า"
                                                 :class="(isLoggedIn && calcForm.customerName.trim().length <= 1) ? 'focus:ring-red-500 focus:border-red-500 border-red-500/50' : 'focus:ring-gold-500 focus:border-gold-500'">
+                                                
+                                            <!-- Customer Search Dropdown -->
+                                            <div v-if="showCustomerSearch && customerSearchResults.length > 0"
+                                                class="absolute z-50 w-full mt-1 bg-dark-surface border border-gray-700 rounded-lg shadow-xl overflow-hidden animate-fade-in max-h-60 overflow-y-auto">
+                                                <div class="px-3 py-1.5 bg-dark-base border-b border-gray-700 flex justify-between items-center sticky top-0">
+                                                    <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">เลือกข้อมูลลูกค้าเก่า</span>
+                                                    <button @click="showCustomerSearch = false" class="text-gray-500 hover:text-red-400"><i class="fa-solid fa-times"></i></button>
+                                                </div>
+                                                <div v-for="cust in customerSearchResults" :key="cust.id_card || cust.phone || cust.customer_name"
+                                                    @click="selectCustomer(cust)"
+                                                    class="p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition-colors flex justify-between items-center group">
+                                                    <div>
+                                                        <div class="text-sm text-gold-400 font-medium group-hover:text-gold-300">{{ cust.customer_name }}</div>
+                                                        <div class="text-xs text-gray-400 mt-1 flex gap-3">
+                                                            <span v-if="cust.phone"><i class="fa-solid fa-phone mr-1"></i> {{ cust.phone }}</span>
+                                                            <span v-if="cust.id_card"><i class="fa-regular fa-id-card mr-1"></i> {{ cust.id_card }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex flex-col gap-1 items-end">
+                                                        <span v-if="cust.id_card_photo" class="text-[9px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-500/30">รูปบัตร</span>
+                                                        <span v-if="cust.signature" class="text-[9px] text-green-400 bg-green-900/30 px-1.5 py-0.5 rounded border border-green-500/30">ลายเซ็น</span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div>
                                             <label class="block text-sm font-medium text-gray-400 mb-1">เบอร์โทรศัพท์ <span
@@ -1431,8 +1465,22 @@
                                                     :title="isEmployee && !isAdmin ? 'ไม่อนุญาตให้พนักงานแก้ไขราคาอ้างอิง' : ''"
                                                     :class="(isEmployee && !isAdmin) ? 'bg-dark-surface text-gray-500 border-gray-800 cursor-not-allowed' : 'bg-dark-base text-gold-400 border-gray-600 focus:border-gold-500'"
                                                     class="w-28 px-3 py-1.5 border rounded-lg outline-none text-sm transition-colors text-right font-bold">
-                                                <span class="text-xs text-gray-500"
-                                                    v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice">(อิงสมาคม)</span>
+                                                <div v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice" class="flex items-center gap-1.5">
+                                                    <span class="text-xs text-gray-500">(อิงสมาคม)</span>
+                                                    <template v-if="calcForm.type !== 'silver'">
+                                                        <span v-if="goldPriceMeta.priceChangeFromPrevRow !== undefined" class="text-[10px] px-1.5 py-0.5 rounded"
+                                                            :class="goldPriceMeta.priceChangeFromPrevRow >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
+                                                            {{ goldPriceMeta.priceChangeFromPrevRow >= 0 ? '▲' : '▼' }} {{ Math.abs(goldPriceMeta.priceChangeFromPrevRow) }}
+                                                        </span>
+                                                        <span v-else class="text-[10px] px-1.5 py-0.5 rounded"
+                                                            :class="priceTrendGold >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
+                                                            {{ priceTrendGold >= 0 ? '▲' : '▼' }} {{ Math.abs(priceTrendGold) }}
+                                                        </span>
+                                                        <span v-if="goldPriceMeta.time_th" class="text-[10px] text-gray-500 ml-1">
+                                                            <i class="fa-regular fa-clock"></i> {{ goldPriceMeta.time_th }}
+                                                        </span>
+                                                    </template>
+                                                </div>
                                                 <span class="text-xs text-yellow-500" v-else>(ปรับเอง)</span>
                                             </div>
                                             

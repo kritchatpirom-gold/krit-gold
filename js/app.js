@@ -1,10 +1,10 @@
 const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 
-const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
-const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
+//const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
+//const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 
-//const supabaseUrl = 'http://192.168.1.151:54321';
-//const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
+const supabaseUrl = 'http://192.168.1.151:54321';
+const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
 //const supabaseUrl = 'http://192.168.1.124:54121';
 //const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
@@ -606,6 +606,7 @@ createApp({
             manualPrice: null,
             manualPremium: null
         });
+        const isOldCustomer = ref(false);
 
         const resetForm = () => {
             calcForm.value = {
@@ -623,6 +624,7 @@ createApp({
             };
             transferAmount.value = 0;
             clearSignature();
+            isOldCustomer.value = false;
         };
 
         const formatThaiDate = (dateStr) => {
@@ -718,13 +720,7 @@ createApp({
         });
 
         watch(() => calcForm.value.type, () => {
-            calcForm.value.manualPrice = currentAssetPrice.value;
-        });
-
-        watch(currentAssetPrice, (newVal, oldVal) => {
-            if (!calcForm.value.manualPrice || calcForm.value.manualPrice === 0 || calcForm.value.manualPrice === oldVal) {
-                calcForm.value.manualPrice = newVal;
-            }
+            calcForm.value.manualPrice = null;
         });
 
         // Enforce integer for percent (all types) and 2 decimals for weight (all types)
@@ -788,12 +784,13 @@ createApp({
             if (tForm.type === 'tong_lom') {
                 base = gp;
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
-                // ทองหลอมถ้าน้ำหนักรวม (ในบิล + ที่กำลังกรอก) >= 5 กรัม ให้บวกพรีเมียม
+                // ทองหลอมถ้าน้ำหนักรวม >= 5 กรัม หรือเป็นลูกค้าเก่า ให้บวกพรีเมียม
                 const totalWeightForPremium = accumulatedGoldWeight.value + w;
+                const meetsWeightReq = totalWeightForPremium >= 5 || isOldCustomer.value;
                 
-                let rawPremium = (activePremium && totalWeightForPremium >= 5) ? Number(activePremium.premium_amount) : 0;
-                let rawPercent = (activePremium && totalWeightForPremium >= 5) ? Number(activePremium.premium_percent) : 0;
-                if (activePremium && activePremium.premium_type === 'percent' && totalWeightForPremium >= 5) {
+                let rawPremium = (activePremium && meetsWeightReq) ? Number(activePremium.premium_amount) : 0;
+                let rawPercent = (activePremium && meetsWeightReq) ? Number(activePremium.premium_percent) : 0;
+                if (activePremium && activePremium.premium_type === 'percent' && meetsWeightReq) {
                     premium = Math.floor(base * (rawPercent / 100));
                 } else {
                     premium = rawPremium;
@@ -1931,10 +1928,39 @@ createApp({
                     calcForm.value.customerName = data.full_name || '';
                     calcForm.value.idCard = data.cid || '';
                     calcForm.value.address = data.address || '';
-                    calcForm.value.idCardPhoto = data.photo_base64 || '';
+                    let photoBase64 = data.photo_base64 || '';
+                    if (photoBase64 && !photoBase64.startsWith('data:')) {
+                        photoBase64 = 'data:image/jpeg;base64,' + photoBase64;
+                    }
+                    calcForm.value.idCardPhoto = photoBase64;
                     calcForm.value.expireDate = data.expire_date || '';
 
                     console.log('Read ID Card Success:', data.full_name);
+
+                    // Fetch existing customer phone and signature if available
+                    if (data.cid && isLoggedIn.value) {
+                        try {
+                            const { data: pastTx, error } = await supabase
+                                .from('transactions')
+                                .select('phone, signature')
+                                .eq('id_card', data.cid)
+                                .order('created_at', { ascending: false })
+                                .limit(10);
+                                
+                            if (!error && pastTx && pastTx.length > 0) {
+                                isOldCustomer.value = true;
+                                const validPhoneTx = pastTx.find(tx => tx.phone && tx.phone.trim() !== '');
+                                const validSigTx = pastTx.find(tx => tx.signature && tx.signature.trim() !== '');
+                                
+                                if (validPhoneTx) calcForm.value.phone = validPhoneTx.phone;
+                                if (validSigTx) lastSignature.value = validSigTx.signature;
+                                
+                                if (validPhoneTx || validSigTx) console.log('Loaded previous customer data');
+                            }
+                        } catch (err) {
+                            console.error('Error fetching past customer data:', err);
+                        }
+                    }
                 } else {
                     alert('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถอ่านข้อมูลได้'));
                 }
@@ -1945,6 +1971,151 @@ createApp({
                 readCardLoading.value = false;
             }
         };
+
+        // --- Fetch Customer by Manual Input ---
+        let fetchCustomerTimeout = null;
+        const showCustomerSearch = ref(false);
+        const customerSearchResults = ref([]);
+        
+        const fixUrl = (url) => {
+            if (!url) return url;
+            try {
+                const urlObj = new URL(url);
+                const path = urlObj.pathname.split('/transaction_assets/')[1];
+                if (path) {
+                    return `${supabaseUrl}/storage/v1/object/public/transaction_assets/${path}`;
+                }
+            } catch(e) {}
+            return url;
+        };
+
+        const fetchCustomerByField = async (field, value) => {
+            if (!isLoggedIn.value || !value || value.trim().length < 3) {
+                showCustomerSearch.value = false;
+                return;
+            }
+            try {
+                let query = supabase
+                    .from('transactions')
+                    .select('customer_name, phone, id_card, id_card_photo, signature, address')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+                    
+                if (field === 'customer_name') {
+                    query = query.ilike('customer_name', `%${value.trim()}%`);
+                } else {
+                    query = query.eq(field, value.trim());
+                }
+
+                const { data: pastTx, error } = await query;
+                    
+                if (!error && pastTx && pastTx.length > 0) {
+                    const uniqueCustomersMap = new Map();
+                    pastTx.forEach(tx => {
+                        if (!tx.customer_name) return;
+                        const key = tx.id_card ? tx.id_card : (tx.phone ? tx.phone : tx.customer_name);
+                        if (!uniqueCustomersMap.has(key)) {
+                            const customerTxs = pastTx.filter(t => (t.id_card && t.id_card === key) || (t.phone && t.phone === key) || (t.customer_name === key));
+                            
+                            const latestPhone = customerTxs.find(t => t.phone && t.phone.trim() !== '');
+                            const latestIdCardTx = customerTxs.find(t => t.id_card && t.id_card.trim() !== '');
+                            const latestPhotoTx = customerTxs.find(t => t.id_card_photo && t.id_card_photo.trim() !== '');
+                            const latestSigTx = customerTxs.find(t => t.signature && t.signature.trim() !== '');
+                            const latestAddress = customerTxs.find(t => t.address && t.address.trim() !== '');
+
+                            uniqueCustomersMap.set(key, {
+                                customer_name: tx.customer_name,
+                                phone: latestPhone ? latestPhone.phone : '',
+                                id_card: latestIdCardTx ? latestIdCardTx.id_card : '',
+                                address: latestAddress ? latestAddress.address : '',
+                                id_card_photo: latestPhotoTx ? latestPhotoTx.id_card_photo : '',
+                                signature: latestSigTx ? latestSigTx.signature : ''
+                            });
+                        }
+                    });
+
+                    const uniqueCustomers = Array.from(uniqueCustomersMap.values());
+
+                    if (uniqueCustomers.length === 1) {
+                        applyCustomerData(uniqueCustomers[0], field);
+                        showCustomerSearch.value = false;
+                    } else if (uniqueCustomers.length > 1) {
+                        customerSearchResults.value = uniqueCustomers;
+                        showCustomerSearch.value = true;
+                    } else {
+                        showCustomerSearch.value = false;
+                    }
+                } else {
+                    showCustomerSearch.value = false;
+                }
+            } catch (err) {
+                console.error('Error fetching customer by ' + field + ':', err);
+            }
+        };
+
+        const applyCustomerData = (customer, field) => {
+            let loadedAny = false;
+            
+            // Overwrite with full name if different
+            if (customer.customer_name && calcForm.value.customerName !== customer.customer_name) {
+                calcForm.value.customerName = customer.customer_name;
+                loadedAny = true;
+            }
+            // Overwrite with full phone if different
+            if (customer.phone && calcForm.value.phone !== customer.phone) {
+                calcForm.value.phone = customer.phone;
+                loadedAny = true;
+            }
+            if (customer.id_card && (!calcForm.value.idCard || calcForm.value.idCard === '')) {
+                calcForm.value.idCard = customer.id_card;
+                loadedAny = true;
+            }
+            if (customer.address && (!calcForm.value.address || calcForm.value.address === '')) {
+                calcForm.value.address = customer.address;
+                loadedAny = true;
+            }
+            if (customer.id_card_photo && (!calcForm.value.idCardPhoto || calcForm.value.idCardPhoto === '')) {
+                calcForm.value.idCardPhoto = fixUrl(customer.id_card_photo);
+                loadedAny = true;
+            }
+            if (customer.signature && !lastSignature.value) {
+                lastSignature.value = fixUrl(customer.signature);
+                loadedAny = true;
+            }
+            if (loadedAny) {
+                isOldCustomer.value = true;
+                console.log('Loaded customer data');
+            }
+        };
+
+        const selectCustomer = (customer) => {
+            calcForm.value.customerName = customer.customer_name;
+            if (customer.phone) calcForm.value.phone = customer.phone;
+            if (customer.id_card) calcForm.value.idCard = customer.id_card;
+            if (customer.address) calcForm.value.address = customer.address;
+            if (customer.id_card_photo) calcForm.value.idCardPhoto = fixUrl(customer.id_card_photo);
+            if (customer.signature) lastSignature.value = fixUrl(customer.signature);
+            isOldCustomer.value = true;
+            showCustomerSearch.value = false;
+        };
+
+        watch(() => calcForm.value.phone, (newVal) => {
+            clearTimeout(fetchCustomerTimeout);
+            if (newVal && newVal.length >= 9) { // Trigger search when phone is almost complete
+                fetchCustomerTimeout = setTimeout(() => {
+                    fetchCustomerByField('phone', newVal);
+                }, 600);
+            }
+        });
+
+        watch(() => calcForm.value.customerName, (newVal) => {
+            clearTimeout(fetchCustomerTimeout);
+            if (newVal && newVal.length >= 3) {
+                fetchCustomerTimeout = setTimeout(() => {
+                    fetchCustomerByField('customer_name', newVal);
+                }, 800);
+            }
+        });
 
         // Graph
         const initChart = () => {
@@ -2153,10 +2324,10 @@ createApp({
         const unsentTransactions = ref([]);
         const groupedUnsent = ref({
             'tong_tang': { label: 'ทองคำแท่ง', items: [], selectedIds: [] },
-            'tong_roop': { label: 'ทองรูปพรรณ', items: [], selectedIds: [] },
-            'gold_60_100': { label: 'ทอง (60-100%)', items: [], selectedIds: [] },
-            'gold_30_59': { label: 'ทอง (30-59%)', items: [], selectedIds: [] },
-            'gold_20_29': { label: 'ทอง (20-29%)', items: [], selectedIds: [] },
+            'tong_roop': { label: 'ทองรูปพรรณ/ไถ่ถอน', items: [], selectedIds: [] },
+            'gold_50_99': { label: 'ทอง (50-99%)', items: [], selectedIds: [] },
+            'gold_25_49': { label: 'ทอง (25-49%)', items: [], selectedIds: [] },
+            'gold_1_24': { label: 'ทอง (1-24%)', items: [], selectedIds: [] },
             'silver': { label: 'เงิน', items: [], selectedIds: [] }
         });
 
@@ -2226,10 +2397,10 @@ createApp({
                 // Reset groups
                 const groups = {
                     'tong_tang': { label: 'ทองคำแท่ง', items: [] },
-                    'tong_roop': { label: 'ทองรูปพรรณ', items: [] },
-                    'gold_60_100': { label: 'ทอง (60-100%)', items: [] },
-                    'gold_30_59': { label: 'ทอง (30-59%)', items: [] },
-                    'gold_20_29': { label: 'ทอง (20-29%)', items: [] },
+                    'tong_roop': { label: 'ทองรูปพรรณ/ไถ่ถอน', items: [] },
+                    'gold_50_99': { label: 'ทอง (50-99%)', items: [] },
+                    'gold_25_49': { label: 'ทอง (25-49%)', items: [] },
+                    'gold_1_24': { label: 'ทอง (1-24%)', items: [] },
                     'silver': { label: 'เงิน', items: [] }
                 };
                 
@@ -2239,13 +2410,13 @@ createApp({
                         key = 'silver';
                     } else if (t.type === 'tong_tang') {
                         key = 'tong_tang';
-                    } else if (t.type === 'tong_roop') {
+                    } else if (t.type === 'tong_roop' || t.type === 'redeem') {
                         key = 'tong_roop';
                     } else {
                         const p = parseFloat(t.percent || 0);
-                        if (p >= 60) key = 'gold_60_100';
-                        else if (p >= 30 && p < 60) key = 'gold_30_59';
-                        else if (p >= 0 && p < 30) key = 'gold_20_29';
+                        if (p >= 50) key = 'gold_50_99';
+                        else if (p >= 25 && p < 50) key = 'gold_25_49';
+                        else if (p >= 0 && p < 25) key = 'gold_1_24';
                     }
                     if (key) {
                         groups[key].items.push(t);
@@ -2919,6 +3090,10 @@ createApp({
             isPhoneValid,
             isIdCardValid,
             formatPricePerGram,
+            fetchCustomerByField,
+            showCustomerSearch,
+            customerSearchResults,
+            selectCustomer,
 
             billItems,
             addToBill,

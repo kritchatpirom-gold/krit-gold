@@ -36,7 +36,9 @@ async function onRequest(context) {
       meta: {
         date_th,
         time_th,
-        round: rawData.seq
+        round: rawData.seq,
+        priceChangeFromPrevRow: rawData.priceChangeFromPrevRow,
+        priceChangeFromPrevDayLast: rawData.priceChangeFromPrevDayLast
       }
     };
     return new Response(JSON.stringify(mappedData), {
