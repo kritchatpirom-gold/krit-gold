@@ -1248,15 +1248,25 @@ createApp({
             if (data) {
                 transactions.value = data.map(t => {
                     const fixUrl = (url) => {
-                        if (!url) return url;
+                        if (!url || url === 'null' || url === 'undefined' || typeof url !== 'string') return null;
+                        if (url.startsWith('data:')) return url;
                         try {
                             const urlObj = new URL(url);
-                            const path = urlObj.pathname.split('/transaction_assets/')[1];
-                            if (path) {
-                                return `${supabaseUrl}/storage/v1/object/public/transaction_assets/${path}`;
+                            const match = urlObj.pathname.match(/\/storage\/v1\/object\/public\/(.*)/);
+                            if (match && match[1]) {
+                                return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
                             }
-                        } catch(e) {}
-                        return url;
+                            return url;
+                        } catch(e) {
+                            if (url.includes('storage/v1/object/public/')) {
+                                const match = url.match(/\/storage\/v1\/object\/public\/(.*)/);
+                                if (match && match[1]) return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
+                            }
+                            if (url.startsWith('transaction_assets/')) {
+                                return `${supabaseUrl}/storage/v1/object/public/${url}`;
+                            }
+                            return `${supabaseUrl}/storage/v1/object/public/transaction_assets/${url}`;
+                        }
                     };
                     t.signature = fixUrl(t.signature);
                     t.id_card_photo = fixUrl(t.id_card_photo);
@@ -1267,6 +1277,19 @@ createApp({
                 transactions.value = [];
             }
             loadingTransactions.value = false;
+        };
+
+        const preloadImage = (url) => {
+            return new Promise((resolve) => {
+                if (!url || url.startsWith('data:')) {
+                    resolve();
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                img.src = url;
+            });
         };
 
         const reprintGroup = async (g) => {
@@ -1291,20 +1314,29 @@ createApp({
             calcForm.value.address = g.address || '';
             
             transferAmount.value = g.items.reduce((sum, t) => sum + (parseFloat(t.transfer_amount) || 0), 0);
-            lastSignature.value = g.signature || null;
+            lastSignature.value = g.signature ? fixUrl(g.signature) : null;
 
             await nextTick();
+            await preloadImage(lastSignature.value);
             
             setTimeout(() => {
-                window.print();
-                
-                setTimeout(() => {
+                let restored = false;
+                const restoreData = () => {
+                    if (restored) return;
+                    restored = true;
+                    window.removeEventListener('afterprint', restoreData);
                     billItems.value = backupBillItems;
                     calcForm.value = backupCalcForm;
                     transferAmount.value = backupTransferAmount;
                     lastSignature.value = backupSignature;
-                }, 500);
-            }, 200);
+                };
+                
+                window.addEventListener('afterprint', restoreData);
+                window.print();
+                
+                // Fallback for mobile
+                setTimeout(restoreData, 30000);
+            }, 200); // Already preloaded, short delay for layout
         };
 
         const editTrxModal = ref({
@@ -1737,8 +1769,6 @@ createApp({
             // Capture signature
             if (signaturePad && !signaturePad.isEmpty()) {
                 lastSignature.value = signaturePad.toDataURL();
-            } else {
-                lastSignature.value = null;
             }
 
             let preDeductBalance = null;
@@ -1836,7 +1866,8 @@ createApp({
                 removePhoto();
             };
 
-            const triggerPrint = () => {
+            const triggerPrint = async () => {
+                await preloadImage(lastSignature.value);
                 window.addEventListener('afterprint', handleAfterPrint);
                 window.print();
 
@@ -1943,6 +1974,11 @@ createApp({
                     calcForm.value.idCardPhoto = photoBase64;
                     calcForm.value.expireDate = data.expire_date || '';
 
+                    // Clear previous customer-specific state before fetching
+                    calcForm.value.phone = '';
+                    lastSignature.value = null;
+                    isOldCustomer.value = false;
+
                     console.log('Read ID Card Success:', data.full_name);
 
                     // Fetch existing customer phone and signature if available
@@ -1957,11 +1993,11 @@ createApp({
                                 
                             if (!error && pastTx && pastTx.length > 0) {
                                 isOldCustomer.value = true;
-                                const validPhoneTx = pastTx.find(tx => tx.phone && tx.phone.trim() !== '');
-                                const validSigTx = pastTx.find(tx => tx.signature && tx.signature.trim() !== '');
+                                const validPhoneTx = pastTx.find(tx => tx.phone && tx.phone.trim() !== '' && tx.phone !== 'null' && tx.phone !== 'undefined');
+                                const validSigTx = pastTx.find(tx => tx.signature && tx.signature.trim() !== '' && tx.signature !== 'null' && tx.signature !== 'undefined');
                                 
                                 if (validPhoneTx) calcForm.value.phone = validPhoneTx.phone;
-                                if (validSigTx) lastSignature.value = validSigTx.signature;
+                                if (validSigTx) lastSignature.value = fixUrl(validSigTx.signature);
                                 
                                 if (validPhoneTx || validSigTx) console.log('Loaded previous customer data');
                             }
@@ -1986,15 +2022,25 @@ createApp({
         const customerSearchResults = ref([]);
         
         const fixUrl = (url) => {
-            if (!url) return url;
+            if (!url || url === 'null' || url === 'undefined' || typeof url !== 'string') return null;
+            if (url.startsWith('data:')) return url;
             try {
                 const urlObj = new URL(url);
-                const path = urlObj.pathname.split('/transaction_assets/')[1];
-                if (path) {
-                    return `${supabaseUrl}/storage/v1/object/public/transaction_assets/${path}`;
+                const match = urlObj.pathname.match(/\/storage\/v1\/object\/public\/(.*)/);
+                if (match && match[1]) {
+                    return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
                 }
-            } catch(e) {}
-            return url;
+                return url;
+            } catch(e) {
+                if (url.includes('storage/v1/object/public/')) {
+                    const match = url.match(/\/storage\/v1\/object\/public\/(.*)/);
+                    if (match && match[1]) return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
+                }
+                if (url.startsWith('transaction_assets/')) {
+                    return `${supabaseUrl}/storage/v1/object/public/${url}`;
+                }
+                return `${supabaseUrl}/storage/v1/object/public/transaction_assets/${url}`;
+            }
         };
 
         const fetchCustomerByField = async (field, value) => {
@@ -2025,11 +2071,11 @@ createApp({
                         if (!uniqueCustomersMap.has(key)) {
                             const customerTxs = pastTx.filter(t => (t.id_card && t.id_card === key) || (t.phone && t.phone === key) || (t.customer_name === key));
                             
-                            const latestPhone = customerTxs.find(t => t.phone && t.phone.trim() !== '');
-                            const latestIdCardTx = customerTxs.find(t => t.id_card && t.id_card.trim() !== '');
-                            const latestPhotoTx = customerTxs.find(t => t.id_card_photo && t.id_card_photo.trim() !== '');
-                            const latestSigTx = customerTxs.find(t => t.signature && t.signature.trim() !== '');
-                            const latestAddress = customerTxs.find(t => t.address && t.address.trim() !== '');
+                            const latestPhone = customerTxs.find(t => t.phone && t.phone.trim() !== '' && t.phone !== 'null' && t.phone !== 'undefined');
+                            const latestIdCardTx = customerTxs.find(t => t.id_card && t.id_card.trim() !== '' && t.id_card !== 'null' && t.id_card !== 'undefined');
+                            const latestPhotoTx = customerTxs.find(t => t.id_card_photo && t.id_card_photo.trim() !== '' && t.id_card_photo !== 'null' && t.id_card_photo !== 'undefined');
+                            const latestSigTx = customerTxs.find(t => t.signature && t.signature.trim() !== '' && t.signature !== 'null' && t.signature !== 'undefined');
+                            const latestAddress = customerTxs.find(t => t.address && t.address.trim() !== '' && t.address !== 'null' && t.address !== 'undefined');
 
                             uniqueCustomersMap.set(key, {
                                 customer_name: tx.customer_name,
@@ -2248,7 +2294,7 @@ createApp({
                 }, 500); // 500ms delay for Chrome CSS transition
 
                 fetchPrices();
-                setInterval(fetchPrices, 30000); // 30 sec interval
+                setInterval(fetchPrices, 5000); // 5 sec interval
             });
         });
 

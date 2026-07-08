@@ -112,7 +112,6 @@ body {
   background: var(--color-gold-400); 
 }
 
-/* Print Area Settings (Receipt) */
 .print-only {
   display: none;
 }

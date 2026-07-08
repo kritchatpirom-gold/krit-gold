@@ -85,7 +85,7 @@
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
-    <link href="/css/style.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css?v=1.0.3">
 </head>
 
 <body class="antialiased min-h-screen">
@@ -1425,10 +1425,8 @@
                                                         @click="openSignatureModal">
                                                         <img :src="lastSignature"
                                                             class="w-full h-full object-contain bg-white rounded-xl border border-gold-500/30 shadow-lg" />
-                                                        <div
-                                                            class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
-                                                            <span
-                                                                class="text-white text-[10px] font-bold uppercase tracking-wider">แก้ไขลายเซ็น</span>
+                                                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
+                                                            <span class="text-white text-[10px] font-bold uppercase tracking-wider">แก้ไขลายเซ็น</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2196,10 +2194,11 @@
                         <div
                             style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; position: relative;">
                             <span>ลงชื่อ</span>
-                            <div
-                                style="flex-grow: 1; border-bottom: 1px dotted #000; margin: 0 4px; position: relative; height: 14px;">
-                                <img v-if="lastSignature" :src="lastSignature"
-                                    style="position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); max-height: 32px; max-width: 150px; object-fit: contain; pointer-events: none;" />
+                            <div style="flex-grow: 1; margin: 0 4px; position: relative; min-height: 35px; text-align: center;">
+                                <div style="height: 32px; line-height: 32px;">
+                                    <img v-if="lastSignature" :src="lastSignature" style="max-height: 32px; max-width: 150px; vertical-align: bottom; display: inline-block;" />
+                                </div>
+                                <div style="width: 100%; border-bottom: 1px dotted #000; position: absolute; bottom: 0;"></div>
                             </div>
                             <span>ผู้ขาย/ผู้รับ</span>
                         </div>
@@ -2407,7 +2406,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.2" type="module"></script>
+    <script src="/js/app.js?v=1.0.4" type="module"></script>
 </body>
 
 </html>
