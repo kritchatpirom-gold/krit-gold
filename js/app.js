@@ -178,9 +178,9 @@ createApp({
         };
 
         // Custom Global Modal System
-        const appModal = ref({ show: false, type: 'alert', title: '', message: '', fields: [], resolveFn: null });
+        const appModal = ref({ show: false, type: 'alert', title: '', message: '', fields: [], resolveFn: null, confirmText: 'ตกลง', cancelText: 'ยกเลิก' });
 
-        const showAppModal = (type, title, message, fields = []) => {
+        const showAppModal = (type, title, message, fields = [], confirmText = 'ตกลง', cancelText = 'ยกเลิก') => {
             return new Promise((resolve) => {
                 appModal.value = {
                     show: true,
@@ -188,7 +188,9 @@ createApp({
                     title,
                     message,
                     fields: fields.map(f => ({ ...f, value: f.defaultValue || '' })),
-                    resolveFn: resolve
+                    resolveFn: resolve,
+                    confirmText,
+                    cancelText
                 };
             });
         };
@@ -1462,36 +1464,38 @@ createApp({
         };
 
         const deleteTransaction = async (id) => {
-            if (confirm('ยืนยันการลบรายการนี้?')) {
+            if (await showAppModal('confirm', 'ยืนยันการลบ', 'ยืนยันการลบรายการนี้ใช่หรือไม่?')) {
+                const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
                 // Fetch the transaction to get net_price and transfer_amount
                 const { data: trx } = await supabase.from('transactions').select('net_price, transfer_amount').eq('id', id).single();
                 
                 // Delete assets from storage first
-                await deleteTransactionAssets(id);
+                await deleteTransactionAssets(id, deleteAssets);
                 const { error } = await supabase.from('transactions').delete().eq('id', id);
                 if (!error) {
                     if (trx && trx.net_price) {
                         const transferPart = Number(trx.transfer_amount || 0);
                         const cashRefund = Number(trx.net_price) - transferPart;
                         if (cashRefund > 0) {
-                            if (confirm(`คุณต้องการคืนเงินสดจำนวน ${cashRefund} บาท เข้าลิ้นชักหรือไม่?\n(กด Cancel/ยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
+                            if (await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${cashRefund} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
                                 await restoreDrawerBalance(cashRefund);
                             }
                         }
                     }
                     loadTransactions();
                 }
-                else alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
+                else await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาดในการลบ: ' + error.message);
             }
         };
 
         const deleteGroup = async (g) => {
             const ids = g.items.map(t => t.id);
-            if (confirm(`ยืนยันการลบบิลนี้ (${g.items.length} รายการ)?`)) {
+            if (await showAppModal('confirm', 'ยืนยันการลบ', `ยืนยันการลบบิลนี้ (${g.items.length} รายการ) ใช่หรือไม่?`)) {
+                const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
                 // Fetch the transaction to get net_price and transfer_amount
                 const { data: trxs } = await supabase.from('transactions').select('net_price, transfer_amount').in('id', ids);
                 
-                await deleteTransactionAssets(ids);
+                await deleteTransactionAssets(ids, deleteAssets);
                 const { error } = await supabase.from('transactions').delete().in('id', ids);
                 
                 if (!error) {
@@ -1503,21 +1507,22 @@ createApp({
                             if (cashRefund > 0) totalRefund += cashRefund;
                         });
                         if (totalRefund > 0) {
-                            if (confirm(`คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n(กด Cancel/ยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
+                            if (await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
                                 await restoreDrawerBalance(totalRefund);
                             }
                         }
                     }
                     loadTransactions();
                 } else {
-                    alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
+                    await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาดในการลบ: ' + error.message);
                 }
             }
         };
 
         const deleteSelected = async () => {
             if (selectedTransactions.value.length === 0) return;
-            if (confirm(`ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ?`)) {
+            if (await showAppModal('confirm', 'ยืนยันการลบ', `ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ ใช่หรือไม่?`)) {
+                const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
                 loadingTransactions.value = true;
                 
                 // Fetch to get net prices and transfer amounts
@@ -1529,7 +1534,7 @@ createApp({
                 }, 0) : 0;
 
                 // Delete assets from storage first
-                await deleteTransactionAssets(selectedTransactions.value);
+                await deleteTransactionAssets(selectedTransactions.value, deleteAssets);
                 const { error } = await supabase
                     .from('transactions')
                     .delete()
@@ -1537,14 +1542,14 @@ createApp({
 
                 if (!error) {
                     if (totalRefund > 0) {
-                        if (confirm(`คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n(กด Cancel/ยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
+                        if (await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
                             await restoreDrawerBalance(totalRefund);
                         }
                     }
                     selectedTransactions.value = [];
                     await loadTransactions();
                 } else {
-                    alert('เกิดข้อผิดพลาดในการลบ: ' + error.message);
+                    await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาดในการลบ: ' + error.message);
                     loadingTransactions.value = false;
                 }
             }
@@ -1694,7 +1699,7 @@ createApp({
             return parts[1].split('?')[0];
         };
 
-        const deleteTransactionAssets = async (transactionIds) => {
+        const deleteTransactionAssets = async (transactionIds, deletePersonalData = true) => {
             try {
                 const ids = Array.isArray(transactionIds) ? transactionIds : [transactionIds];
                 if (ids.length === 0) return;
@@ -1714,13 +1719,15 @@ createApp({
 
                 const pathsToDelete = [];
                 records.forEach(r => {
-                    if (r.id_card_photo) {
-                        const path = extractStoragePath(r.id_card_photo);
-                        if (path) pathsToDelete.push(path);
-                    }
-                    if (r.signature) {
-                        const path = extractStoragePath(r.signature);
-                        if (path) pathsToDelete.push(path);
+                    if (deletePersonalData) {
+                        if (r.id_card_photo) {
+                            const path = extractStoragePath(r.id_card_photo);
+                            if (path) pathsToDelete.push(path);
+                        }
+                        if (r.signature) {
+                            const path = extractStoragePath(r.signature);
+                            if (path) pathsToDelete.push(path);
+                        }
                     }
                     if (r.photo) {
                         const path = extractStoragePath(r.photo);

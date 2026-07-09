@@ -2337,8 +2337,8 @@
                     </div>
                     
                     <div class="flex justify-end gap-3">
-                        <button v-if="appModal.type !== 'alert'" @click="resolveModal(false)" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors font-semibold">ยกเลิก</button>
-                        <button @click="resolveModal(true)" class="px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black font-bold rounded-lg transition-colors">ตกลง</button>
+                        <button v-if="appModal.type !== 'alert'" @click="resolveModal(false)" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors font-semibold">{{ appModal.cancelText || 'ยกเลิก' }}</button>
+                        <button @click="resolveModal(true)" class="px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black font-bold rounded-lg transition-colors">{{ appModal.confirmText || 'ตกลง' }}</button>
                     </div>
                 </div>
             </div>
@@ -2406,7 +2406,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.4" type="module"></script>
+    <script src="/js/app.js?v=1.0.8" type="module"></script>
 </body>
 
 </html>
