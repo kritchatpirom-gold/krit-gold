@@ -2361,95 +2361,99 @@
                         backgroundImage: `linear-gradient(rgba(10, 10, 9, 0.2), rgba(10, 10, 9, 0.6)), url('/images/gold_pouring.png')`
                      }">
                      
-                    <div class="w-full h-full max-w-none md:max-w-5xl max-h-none md:max-h-[90vh] glass-card-gold rounded-[3rem] p-8 md:p-16 flex flex-col justify-center relative overflow-hidden shadow-[0_0_100px_rgba(251,191,36,0.3)] m-4 md:m-0 border border-gold-500/30 backdrop-blur-sm bg-black/40">
+                    <div class="w-[96vmin] glass-card-gold rounded-[4vmin] p-[5vmin] flex flex-col justify-center relative shadow-[0_0_10vmin_rgba(251,191,36,0.3)] m-auto border border-gold-500/30 backdrop-blur-sm bg-black/40 overflow-hidden">
                         
-                        <div class="absolute -right-40 -top-40 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                        <div class="absolute -left-40 -bottom-40 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="absolute -right-[20vmin] -top-[20vmin] w-[40vmin] h-[40vmin] bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div class="absolute -left-[20vmin] -bottom-[20vmin] w-[40vmin] h-[40vmin] bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-                        <div class="flex items-center justify-center gap-6 mb-8">
-                            <img src="/images/logo.jpg" alt="กฤตหลอมทอง" class="w-24 h-24 rounded-full border-2 border-gold-400 shadow-2xl object-cover">
+                        <div class="flex items-center justify-center gap-[3vmin] mb-[3vmin]">
+                            <img src="/images/logo.jpg" alt="กฤตหลอมทอง" class="w-[10vmin] h-[10vmin] rounded-full border-[0.3vmin] border-gold-400 shadow-2xl object-cover">
                             <div class="flex flex-col">
-                                <h1 class="text-3xl md:text-5xl font-bold text-white tracking-wide drop-shadow-md">กฤตหลอมทอง <span class="text-gold-400 font-light">อุบลราชธานี</span></h1>
-                                <p class="text-gray-300 text-xl tracking-widest mt-1">KRIT GOLD UBON RATCHATHANI</p>
+                                <h1 class="text-[4vmin] font-bold text-white tracking-wide drop-shadow-md">กฤตหลอมทอง <span class="text-gold-400 font-light">อุบลราชธานี</span></h1>
+                                <p class="text-gray-300 text-[1.8vmin] tracking-widest mt-[0.5vmin]">KRIT GOLD UBON RATCHATHANI</p>
                             </div>
                         </div>
 
-                        <h3 class="text-4xl md:text-5xl font-bold text-gold-400 mb-10 flex items-center justify-center tracking-tight drop-shadow-md">
-                            <i class="fa-solid fa-chart-line mr-5"></i> ราคาสมาคมค้าทองคำ
+                        <h3 class="text-[3.5vmin] font-bold text-gold-400 mb-[4vmin] flex items-center justify-center tracking-tight drop-shadow-md">
+                            <i class="fa-solid fa-chart-line mr-[2vmin]"></i> ราคาสมาคมค้าทองคำ
                         </h3>
 
-                        <div class="space-y-10 relative z-10">
+                        <div class="space-y-[3vmin] relative z-10">
                             <!-- Gold (Bar & Ornament Combined) -->
-                            <div class="bg-black/60 p-8 md:p-10 rounded-3xl border border-gray-700/80 flex flex-col shadow-2xl backdrop-blur-md">
+                            <div class="bg-black/60 p-[4vmin] rounded-[3vmin] border border-gray-700/80 flex flex-col shadow-2xl backdrop-blur-md">
                                 <!-- Gold Bar Section -->
-                                <div class="flex flex-col gap-6">
+                                <div class="flex flex-col gap-[3vmin]">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-gold-300 font-bold text-3xl flex items-center"><i class="fa-solid fa-coins mr-3 text-gold-500"></i> ทองคำแท่ง 96.5%</span>
-                                        <span v-if="goldPriceMeta.priceChangeFromPrevRow !== undefined" class="text-2xl px-5 py-1.5 rounded-xl font-bold shadow-inner"
+                                        <span class="text-gold-300 font-bold text-[3vmin] flex items-center"><i class="fa-solid fa-coins mr-[1.5vmin] text-gold-500"></i> ทองคำแท่ง 96.5%</span>
+                                        <span v-if="goldPriceMeta.priceChangeFromPrevRow !== undefined" class="text-[2vmin] px-[2.5vmin] py-[1vmin] rounded-[1vmin] font-bold shadow-inner"
                                             :class="goldPriceMeta.priceChangeFromPrevRow >= 0 ? 'bg-green-900/40 text-green-400 border border-green-500/30' : 'bg-red-900/40 text-red-400 border border-red-500/30'">
                                             {{ goldPriceMeta.priceChangeFromPrevRow >= 0 ? '▲' : '▼' }} {{ Math.abs(goldPriceMeta.priceChangeFromPrevRow) }}
                                         </span>
                                     </div>
                                     <div class="flex items-center justify-between">
                                         <div class="flex flex-col">
-                                            <span class="text-gray-400 text-xl font-medium tracking-widest mb-2 uppercase">รับซื้อ (Buy)</span>
-                                            <span class="text-white font-bold text-6xl md:text-7xl tracking-tighter drop-shadow-lg">{{ formatCurrency(goldPriceBid) }}</span>
+                                            <span class="text-gray-400 text-[2vmin] font-medium tracking-widest mb-[1vmin] uppercase">รับซื้อ (Buy)</span>
+                                            <span class="text-white font-bold text-[6.5vmin] tracking-tighter drop-shadow-lg">{{ formatCurrency(goldPriceBid) }}</span>
                                         </div>
                                         <div class="flex flex-col text-right">
-                                            <span class="text-gray-400 text-xl font-medium tracking-widest mb-2 uppercase">ขายออก (Sell)</span>
-                                            <span class="text-gold-400 font-bold font-mono text-6xl md:text-7xl tracking-tighter drop-shadow-lg">{{ formatCurrency(goldPriceAsk) }}</span>
+                                            <span class="text-gray-400 text-[2vmin] font-medium tracking-widest mb-[1vmin] uppercase">ขายออก (Sell)</span>
+                                            <span class="text-gold-400 font-bold font-mono text-[6.5vmin] tracking-tighter drop-shadow-lg">{{ formatCurrency(goldPriceAsk) }}</span>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <div class="border-t border-gray-700/50 my-8"></div>
+                                <div class="border-t border-gray-700/50 my-[3vmin]"></div>
 
                                 <!-- Gold Ornament Section -->
-                                <div class="flex flex-col gap-6">
+                                <div class="flex flex-col gap-[3vmin]">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-gray-300 font-bold text-3xl flex items-center"><i class="fa-solid fa-ring mr-3 text-gray-400"></i> ทองรูปพรรณ 96.5%</span>
+                                        <span class="text-gray-300 font-bold text-[3vmin] flex items-center"><i class="fa-solid fa-ring mr-[1.5vmin] text-gray-400"></i> ทองรูปพรรณ 96.5%</span>
                                     </div>
                                     <div class="flex items-center justify-between">
                                         <div class="flex flex-col">
-                                            <span class="text-gray-400 text-xl font-medium tracking-widest mb-2 uppercase">รับซื้อ (Buy)</span>
-                                            <span class="text-white font-bold text-5xl md:text-6xl tracking-tighter drop-shadow-lg">{{ formatCurrency(goldOrnBuy) }}</span>
+                                            <span class="text-gray-400 text-[2vmin] font-medium tracking-widest mb-[1vmin] uppercase">รับซื้อ (Buy)</span>
+                                            <span class="text-white font-bold text-[5.5vmin] tracking-tighter drop-shadow-lg">{{ formatCurrency(goldOrnBuy) }}</span>
                                         </div>
                                         <div class="flex flex-col text-right">
-                                            <span class="text-gray-400 text-xl font-medium tracking-widest mb-2 uppercase">ขายออก (Sell)</span>
-                                            <span class="text-gold-400 font-bold font-mono text-5xl md:text-6xl tracking-tighter drop-shadow-lg">{{ formatCurrency(goldOrnSell) }}</span>
+                                            <span class="text-gray-400 text-[2vmin] font-medium tracking-widest mb-[1vmin] uppercase">ขายออก (Sell)</span>
+                                            <span class="text-gold-400 font-bold font-mono text-[5.5vmin] tracking-tighter drop-shadow-lg">{{ formatCurrency(goldOrnSell) }}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Footer -->
-                            <div v-if="goldPriceMeta.date_th" class="mt-8 pt-8 border-t border-gray-800 text-center">
-                                <div class="text-2xl text-gold-500/80 font-bold mb-3 tracking-wide">
+                            <div v-if="goldPriceMeta.date_th" class="mt-[3vmin] pt-[3vmin] border-t border-gray-800 text-center">
+                                <div class="text-[2.2vmin] text-gold-500/80 font-bold mb-[1.5vmin] tracking-wide">
                                     อัพเดท : {{ goldPriceMeta.date_th }} เวลา {{ goldPriceMeta.time_th }} (รอบที่ {{ goldPriceMeta.round }})
                                 </div>
-                                <div class="text-xl font-medium mt-3 flex justify-center items-center space-x-4">
+                                <div class="text-[1.8vmin] font-medium mt-[1.5vmin] flex justify-center items-center space-x-[2vmin]">
                                     <span class="text-gray-400">เปลี่ยนแปลงเทียบเมื่อวาน:</span>
-                                    <span :class="goldPriceMeta.priceChangeFromPrevDayLast >= 0 ? 'text-green-400 bg-green-900/30 border-green-500/30' : 'text-red-400 bg-red-900/30 border-red-500/30'" class="px-4 py-1.5 rounded-lg border font-bold shadow-inner">
+                                    <span :class="goldPriceMeta.priceChangeFromPrevDayLast >= 0 ? 'text-green-400 bg-green-900/30 border-green-500/30' : 'text-red-400 bg-red-900/30 border-red-500/30'" class="px-[2vmin] py-[1vmin] rounded-[0.8vmin] border font-bold shadow-inner">
                                         {{ goldPriceMeta.priceChangeFromPrevDayLast >= 0 ? '▲ ขึ้น' : '▼ ลง' }} {{ Math.abs(goldPriceMeta.priceChangeFromPrevDayLast || 0) }}
                                     </span>
                                 </div>
                             </div>
 
                             <!-- Silver -->
-                            <div class="bg-black/60 p-8 md:p-10 rounded-3xl border border-gray-700/80 flex flex-col gap-6 shadow-2xl backdrop-blur-md">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-gray-300 font-bold text-3xl flex items-center"><i class="fa-solid fa-gem mr-3 text-gray-400"></i> โลหะเงิน (Silver 99.9%)</span>
+                            <div class="bg-black/60 p-[4vmin] rounded-[3vmin] border border-gray-700/80 flex flex-col gap-[3vmin] shadow-2xl backdrop-blur-md">
+                                <div class="flex justify-between items-center mb-[1vmin]">
+                                    <span class="text-gray-300 font-bold text-[3vmin] flex items-center"><i class="fa-solid fa-gem mr-[1.5vmin] text-gray-400"></i> โลหะเงิน (Silver 99.9%)</span>
                                 </div>
-                                <div class="flex items-center justify-between border-t border-gray-700/50 pt-8">
+                                <div class="flex items-center justify-between border-t border-gray-700/50 pt-[3vmin]">
                                     <div class="flex flex-col">
-                                        <span class="text-gray-400 text-xl font-medium tracking-widest mb-2 uppercase">รับซื้อ (Buy)</span>
-                                        <span class="text-white font-bold text-5xl md:text-6xl tracking-tighter drop-shadow-lg">{{ formatCurrency(silverPriceBuy) }}</span>
+                                        <span class="text-gray-400 text-[2vmin] font-medium tracking-widest mb-[1vmin] uppercase">รับซื้อ (Buy)</span>
+                                        <span class="text-white font-bold text-[5.5vmin] tracking-tighter drop-shadow-lg">{{ formatCurrency(silverPriceBuy) }}</span>
                                     </div>
                                     <div class="flex flex-col text-right">
-                                        <span class="text-gray-400 text-xl font-medium tracking-widest mb-2 uppercase">ขายออก (Sell)</span>
-                                        <span class="text-gray-300 font-bold font-mono text-5xl md:text-6xl tracking-tighter drop-shadow-lg">{{ formatCurrency(silverPriceSell) }}</span>
+                                        <span class="text-gray-400 text-[2vmin] font-medium tracking-widest mb-[1vmin] uppercase">ขายออก (Sell)</span>
+                                        <span class="text-gray-300 font-bold font-mono text-[5.5vmin] tracking-tighter drop-shadow-lg">{{ formatCurrency(silverPriceSell) }}</span>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div class="text-center pt-[1vmin]">
+                                <span class="text-[1.8vmin] text-gray-500 animate-pulse font-medium"><i class="fa-solid fa-circle text-[1.2vmin] text-green-500 mr-[1vmin]"></i> อัปเดตทุก 5 วินาที</span>
                             </div>
                         </div>
                     </div>
@@ -2640,7 +2644,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.25" type="module"></script>
+    <script src="/js/app.js?v=1.0.28" type="module"></script>
 </body>
 
 </html>
