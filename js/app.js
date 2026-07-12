@@ -3193,14 +3193,28 @@ createApp({
         // --- TV Preview Feature ---
         const showTVModal = ref(false);
         const tvOrientation = ref('landscape');
+        const isTVMouseIdle = ref(false);
+        let tvIdleTimer = null;
+
         const toggleTVOrientation = () => {
             tvOrientation.value = tvOrientation.value === 'landscape' ? 'portrait' : 'landscape';
+            handleTVMouseMove();
+        };
+
+        const handleTVMouseMove = () => {
+            isTVMouseIdle.value = false;
+            if (tvIdleTimer) clearTimeout(tvIdleTimer);
+            tvIdleTimer = setTimeout(() => {
+                isTVMouseIdle.value = true;
+            }, 3000);
         };
 
         return {
             showTVModal,
             tvOrientation,
             toggleTVOrientation,
+            isTVMouseIdle,
+            handleTVMouseMove,
             preMeltItems,
             addPreMeltItem,
             removePreMeltItem,

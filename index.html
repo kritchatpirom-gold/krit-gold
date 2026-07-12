@@ -2341,9 +2341,10 @@
 
         <!-- TV Preview Modal -->
         <transition name="fade">
-            <div v-if="showTVModal" class="fixed inset-0 z-[100] bg-black overflow-hidden">
+            <div v-if="showTVModal" @mousemove="handleTVMouseMove" class="fixed inset-0 z-[100] bg-black overflow-hidden">
                 <!-- Controls -->
-                <div class="absolute top-4 right-4 z-50 flex gap-4 opacity-30 hover:opacity-100 transition-opacity">
+                <div class="absolute top-4 right-4 z-50 flex gap-4 transition-all duration-500"
+                     :class="isTVMouseIdle ? 'opacity-0 -translate-y-2 pointer-events-none' : 'opacity-30 hover:opacity-100'">
                     <button @click="toggleTVOrientation" class="w-12 h-12 flex items-center justify-center bg-gray-800 text-white rounded-full hover:bg-gray-700 shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all">
                         <i class="fa-solid fa-rotate text-xl"></i>
                     </button>
@@ -2366,11 +2367,11 @@
                         <div class="absolute -right-[20vmin] -top-[20vmin] w-[40vmin] h-[40vmin] bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
                         <div class="absolute -left-[20vmin] -bottom-[20vmin] w-[40vmin] h-[40vmin] bg-gold-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-                        <div class="flex items-center justify-center gap-[3vmin] mb-[3vmin]">
-                            <img src="/images/logo.jpg" alt="กฤตหลอมทอง" class="w-[10vmin] h-[10vmin] rounded-full border-[0.3vmin] border-gold-400 shadow-2xl object-cover">
+                        <div class="flex items-center justify-center gap-[4vmin] mb-[3vmin]">
+                            <img src="/images/logo.jpg" alt="กฤตหลอมทอง" class="w-[15vmin] h-[15vmin] rounded-full border-[0.5vmin] border-gold-400 shadow-2xl object-cover">
                             <div class="flex flex-col">
-                                <h1 class="text-[4vmin] font-bold text-white tracking-wide drop-shadow-md">กฤตหลอมทอง <span class="text-gold-400 font-light">อุบลราชธานี</span></h1>
-                                <p class="text-gray-300 text-[1.8vmin] tracking-widest mt-[0.5vmin]">KRIT GOLD UBON RATCHATHANI</p>
+                                <h1 class="text-[6vmin] font-bold text-white tracking-wide drop-shadow-md whitespace-nowrap">กฤตหลอมทอง <span class="text-gold-400 font-light">อุบลราชธานี</span></h1>
+                                <p class="text-gray-300 text-[2.2vmin] tracking-widest mt-[0.5vmin]">KRIT GOLD UBON RATCHATHANI</p>
                             </div>
                         </div>
 
@@ -2644,7 +2645,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.28" type="module"></script>
+    <script src="/js/app.js?v=1.0.31" type="module"></script>
 </body>
 
 </html>
