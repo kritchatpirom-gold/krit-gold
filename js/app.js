@@ -527,6 +527,18 @@ createApp({
             search: '',
             purityRange: [] // Multi-select array
         });
+        const toggleGoldCategory = () => {
+            const goldTypes = ['tong_lom', 'tong_roop', 'tong_tang', 'redeem'];
+            const allGoldSelected = goldTypes.every(t => filter.value.type.includes(t));
+            
+            if (allGoldSelected) {
+                // Remove all gold types
+                filter.value.type = filter.value.type.filter(t => !goldTypes.includes(t));
+            } else {
+                // Add all gold types
+                filter.value.type = [...new Set([...filter.value.type, ...goldTypes])];
+            }
+        };
 
         const isFilterActive = computed(() => {
             const today = new Date().toLocaleDateString('en-CA');
@@ -2486,18 +2498,33 @@ createApp({
                 groupedUnsent.value = groups;
 
                 // 2. Fetch pending ingots
-                const { data: pending } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight)').is('round_id', null).order('created_at', { ascending: true });
+                const { data: pending } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight, percent)').is('round_id', null).order('created_at', { ascending: true });
                 if (pending) {
                     pending.forEach(ing => {
                         ing.total_cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
                         ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
+                        let sumW = 0, sumWP = 0;
+                        ing.transactions.forEach(t => {
+                            const w = Number(t.weight) || 0;
+                            const p = Number(t.percent) || 0;
+                            sumW += w;
+                            sumWP += (w * p);
+                        });
+                        ing.avg_percent = sumW > 0 ? (sumWP / sumW) : 0;
+                    });
+                    pending.sort((a, b) => {
+                        const isASilver = a.category === 'silver';
+                        const isBSilver = b.category === 'silver';
+                        if (isASilver && !isBSilver) return 1;
+                        if (!isASilver && isBSilver) return -1;
+                        return 0;
                     });
                 }
                 pendingIngots.value = pending || [];
 
                 // 3. Fetch rounds history (Admin ONLY)
                 if (isAdmin.value) {
-                    let roundsQuery = supabase.from('delivery_rounds').select('*, delivery_ingots(*, transactions(net_price, weight))').order('created_at', { ascending: false });
+                    let roundsQuery = supabase.from('delivery_rounds').select('*, delivery_ingots(*, transactions(net_price, weight, percent))').order('created_at', { ascending: false });
                     
                     if (historyStatusFilter.value !== 'all') {
                         roundsQuery = roundsQuery.eq('status', historyStatusFilter.value);
@@ -2548,9 +2575,24 @@ createApp({
                             r.delivery_ingots.forEach(ing => {
                                 const cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
                                 ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
+                                let sumW = 0, sumWP = 0;
+                                ing.transactions.forEach(t => {
+                                    const w = Number(t.weight) || 0;
+                                    const p = Number(t.percent) || 0;
+                                    sumW += w;
+                                    sumWP += (w * p);
+                                });
+                                ing.avg_percent = sumW > 0 ? (sumWP / sumW) : 0;
                                 totalCost += cost;
                                 if (ing.category === 'silver') silverCost += cost;
                                 else goldCost += cost;
+                            });
+                            r.delivery_ingots.sort((a, b) => {
+                                const isASilver = a.category === 'silver';
+                                const isBSilver = b.category === 'silver';
+                                if (isASilver && !isBSilver) return 1;
+                                if (!isASilver && isBSilver) return -1;
+                                return 0;
                             });
                             r.total_cost = totalCost;
                             r.gold_cost = goldCost;
@@ -2689,10 +2731,23 @@ createApp({
 
         const selectedStats = computed(() => {
             const selected = unsentTransactions.value.filter(i => selectedTransactionIds.value.includes(i.id));
+            let totalWeight = 0;
+            let weightedPercentSum = 0;
+            let totalCost = 0;
+            
+            selected.forEach(i => {
+                const w = Number(i.weight) || 0;
+                const p = Number(i.percent) || 0;
+                totalWeight += w;
+                weightedPercentSum += (w * p);
+                totalCost += Number(i.net_price) || 0;
+            });
+            
             return {
                 count: selected.length,
-                weight: selected.reduce((s, i) => s + Number(i.weight), 0),
-                cost: selected.reduce((s, i) => s + Number(i.net_price), 0)
+                weight: totalWeight,
+                cost: totalCost,
+                avgPercent: totalWeight > 0 ? (weightedPercentSum / totalWeight) : 0
             };
         });
 
@@ -2938,15 +2993,36 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
-                const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
-                    status: 'pending',
-                    created_at: createdAtIso
-                }]).select();
-                if (roundError) throw roundError;
-                const newRoundId = roundData[0].id;
+                // Check if a round exists on this date
+                const startOfDay = new Date(dateInput);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(dateInput);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const { data: existingRounds, error: existingError } = await supabase
+                    .from('delivery_rounds')
+                    .select('id')
+                    .gte('created_at', startOfDay.toISOString())
+                    .lte('created_at', endOfDay.toISOString())
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (existingError) throw existingError;
+
+                let targetRoundId;
+                if (existingRounds && existingRounds.length > 0) {
+                    targetRoundId = existingRounds[0].id;
+                } else {
+                    const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
+                        status: 'pending',
+                        created_at: createdAtIso
+                    }]).select();
+                    if (roundError) throw roundError;
+                    targetRoundId = roundData[0].id;
+                }
 
                 const ingotIds = pendingIngots.value.map(i => i.id);
-                const { error: updateError } = await supabase.from('delivery_ingots').update({ round_id: newRoundId }).in('id', ingotIds);
+                const { error: updateError } = await supabase.from('delivery_ingots').update({ round_id: targetRoundId }).in('id', ingotIds);
                 if (updateError) throw updateError;
 
                 await loadDeliveryData();
@@ -3036,7 +3112,90 @@ createApp({
             }
         });
 
+        // --- Pre-melt Calculator Feature ---
+        const preMeltItems = ref([{ id: Date.now(), type: 'gold', weight: null, percent: null }]);
+
+        const addPreMeltItem = () => {
+            preMeltItems.value.push({ id: Date.now() + Math.random(), type: 'gold', weight: null, percent: null });
+        };
+
+        const removePreMeltItem = (id) => {
+            if (preMeltItems.value.length > 1) {
+                preMeltItems.value = preMeltItems.value.filter(i => i.id !== id);
+            }
+        };
+
+        const calculatePreMeltAppraisal = (totalWeight, avgPercent, isGold) => {
+            if (totalWeight <= 0) return 0;
+            const gp = Math.floor(goldPrice.value || 0);
+            const sp = Math.floor(manualSilverPrice.value || 0);
+            
+            if (isGold) {
+                let base = gp;
+                let premium = 0;
+                let activePremium = premiums.value.find(pr => avgPercent >= pr.range_min && avgPercent <= pr.range_max);
+                const meetsWeightReq = totalWeight >= 5 || isOldCustomer.value;
+                if (activePremium && meetsWeightReq) {
+                    if (activePremium.premium_type === 'percent') {
+                        premium = Math.floor(base * (Number(activePremium.premium_percent) / 100));
+                    } else {
+                        premium = Number(activePremium.premium_amount);
+                    }
+                }
+                const perGram = floor2((base + premium) * 0.0656);
+                const withPurity = floor2(perGram * (avgPercent / 100));
+                return floor2(withPurity * totalWeight);
+            } else {
+                const multiplier = useSilverDeduction.value ? (100 - (Number(silverDeduction.value) || 0)) / 100 : 1;
+                const spDeducted = Math.floor(sp * multiplier);
+                
+                const perGram = Math.floor(spDeducted / 1000);
+                const withPercent = Math.floor(perGram * (avgPercent / 100));
+                return Math.floor(withPercent * totalWeight);
+            }
+        };
+
+        const preMeltGoldSummary = computed(() => {
+            const items = preMeltItems.value.filter(i => i.type === 'gold');
+            let sumW = 0, sumWP = 0;
+            items.forEach(i => {
+                const w = Number(i.weight) || 0;
+                const p = Number(i.percent) || 0;
+                sumW += w;
+                sumWP += (w * p);
+            });
+            const avgP = sumW > 0 ? (sumWP / sumW) : 0;
+            return {
+                weight: sumW,
+                avgPercent: avgP,
+                price: calculatePreMeltAppraisal(sumW, avgP, true)
+            };
+        });
+
+        const preMeltSilverSummary = computed(() => {
+            const items = preMeltItems.value.filter(i => i.type === 'silver');
+            let sumW = 0, sumWP = 0;
+            items.forEach(i => {
+                const w = Number(i.weight) || 0;
+                const p = Number(i.percent) || 0;
+                sumW += w;
+                sumWP += (w * p);
+            });
+            const avgP = sumW > 0 ? (sumWP / sumW) : 0;
+            return {
+                weight: sumW,
+                avgPercent: avgP,
+                price: calculatePreMeltAppraisal(sumW, avgP, false)
+            };
+        });
+
+
         return {
+            preMeltItems,
+            addPreMeltItem,
+            removePreMeltItem,
+            preMeltGoldSummary,
+            preMeltSilverSummary,
             currentTab,
             showTopUpModal,
             savingTopUp,
@@ -3124,6 +3283,7 @@ createApp({
             formatCurrency,
             formatThaiDateTime,
               filter,
+            toggleGoldCategory,
               isFilterActive,
               deleteTransaction,
               deleteGroup,
