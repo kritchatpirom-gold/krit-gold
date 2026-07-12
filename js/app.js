@@ -3190,7 +3190,17 @@ createApp({
         });
 
 
+        // --- TV Preview Feature ---
+        const showTVModal = ref(false);
+        const tvOrientation = ref('landscape');
+        const toggleTVOrientation = () => {
+            tvOrientation.value = tvOrientation.value === 'landscape' ? 'portrait' : 'landscape';
+        };
+
         return {
+            showTVModal,
+            tvOrientation,
+            toggleTVOrientation,
             preMeltItems,
             addPreMeltItem,
             removePreMeltItem,
