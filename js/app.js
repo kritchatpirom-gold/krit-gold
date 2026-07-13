@@ -504,6 +504,35 @@ createApp({
             }
         };
 
+        const refundDrawerLog = async (log) => {
+            if (!isAdmin.value) return;
+            
+            // Only allow refunding negative amounts (money taken out)
+            if (log.amount >= 0) {
+                await showAppModal('alert', 'ไม่สามารถทำรายการได้', 'สามารถคืนเงินได้เฉพาะรายการที่มีการนำเงินออกเท่านั้น');
+                return;
+            }
+            
+            const amountToRefund = Math.abs(log.amount);
+            
+            const confirm = await showAppModal('prompt', 'ยืนยันการคืนเงิน', `ต้องการคืนเงินจำนวน ${formatCurrency(amountToRefund)} บาท เข้าลิ้นชักใช่หรือไม่?\n\n(อ้างอิงรายการ: ${log.action})`, [], 'ยืนยัน', 'ยกเลิก');
+            if (!confirm) return;
+            
+            try {
+                savingDrawer.value = true;
+                // Use action TRANSACTION_RESTORE for refund, or create a new action type like REFUND if needed, 
+                // but restoreDrawerBalance already logs it as TRANSACTION_RESTORE
+                await restoreDrawerBalance(amountToRefund, log.reference_id || log.id);
+                await loadDrawerLogs();
+                await showAppModal('alert', 'สำเร็จ', `คืนเงินจำนวน ${formatCurrency(amountToRefund)} บาท เข้าลิ้นชักเรียบร้อยแล้ว`);
+            } catch (err) {
+                console.error("Error refunding:", err);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถคืนเงินได้: ' + err.message);
+            } finally {
+                savingDrawer.value = false;
+            }
+        };
+
         // DB Data
         const premiums = ref([
             { id: 1, range_min: 0, range_max: 29, premium_amount: 0, premium_percent: 0, premium_type: 'fixed', label: '<30%' },
@@ -3165,10 +3194,11 @@ createApp({
                 sumWP += (w * p);
             });
             const avgP = sumW > 0 ? (sumWP / sumW) : 0;
+            const flooredAvgP = Math.floor(avgP);
             return {
                 weight: sumW,
-                avgPercent: avgP,
-                price: calculatePreMeltAppraisal(sumW, avgP, true)
+                avgPercent: flooredAvgP,
+                price: calculatePreMeltAppraisal(sumW, flooredAvgP, true)
             };
         });
 
@@ -3182,10 +3212,11 @@ createApp({
                 sumWP += (w * p);
             });
             const avgP = sumW > 0 ? (sumWP / sumW) : 0;
+            const flooredAvgP = Math.floor(avgP);
             return {
                 weight: sumW,
-                avgPercent: avgP,
-                price: calculatePreMeltAppraisal(sumW, avgP, false)
+                avgPercent: flooredAvgP,
+                price: calculatePreMeltAppraisal(sumW, flooredAvgP, false)
             };
         });
 
@@ -3298,6 +3329,7 @@ createApp({
             loadingDrawerLogs,
             showDrawerLogsModal,
             openDrawerLogsModal,
+            refundDrawerLog,
             getDrawerTotalFromObj,
             getDrawerDiff,
             getDrawerBreakdown,

@@ -649,6 +649,7 @@
                                             <th class="p-3 text-sm font-semibold text-gray-300">ประเภทรายการ</th>
                                             <th class="p-3 text-sm font-semibold text-gray-300 text-right">ยอดเงิน (+/-)</th>
                                             <th class="p-3 text-sm font-semibold text-gray-300">รายละเอียด</th>
+                                            <th class="p-3 text-sm font-semibold text-gray-300 text-center">จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-800 text-sm">
@@ -690,6 +691,11 @@
                                                         </span>
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td class="p-3 text-center align-top">
+                                                <button v-if="log.amount < 0 && isAdmin" @click="refundDrawerLog(log)" class="px-2 py-1 rounded bg-blue-900/50 hover:bg-blue-800 text-blue-400 border border-blue-700/50 text-[10px] font-bold transition-colors whitespace-nowrap" title="คืนเงินเข้าลิ้นชัก">
+                                                    <i class="fa-solid fa-rotate-left mr-1"></i> คืนเงิน
+                                                </button>
                                             </td>
                                         </tr>
                                     </tbody>
