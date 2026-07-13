@@ -3240,8 +3240,33 @@ createApp({
             }, 3000);
         };
 
+        const openTVMode = async () => {
+            tvOrientation.value = 'portrait';
+            showTVModal.value = true;
+            try {
+                if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                }
+            } catch (e) {
+                console.error("Fullscreen API not supported", e);
+            }
+        };
+
+        const closeTVMode = async () => {
+            showTVModal.value = false;
+            try {
+                if (document.fullscreenElement && document.exitFullscreen) {
+                    await document.exitFullscreen();
+                }
+            } catch (e) {
+                console.error("Exit fullscreen failed", e);
+            }
+        };
+
         return {
             showTVModal,
+            openTVMode,
+            closeTVMode,
             tvOrientation,
             toggleTVOrientation,
             isTVMouseIdle,
