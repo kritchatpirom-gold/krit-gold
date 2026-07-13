@@ -3243,6 +3243,7 @@ createApp({
         const openTVMode = async () => {
             tvOrientation.value = 'portrait';
             showTVModal.value = true;
+            handleTVMouseMove(); // Start idle timer immediately
             try {
                 if (document.documentElement.requestFullscreen) {
                     await document.documentElement.requestFullscreen();
