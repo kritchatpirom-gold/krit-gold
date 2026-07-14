@@ -1342,7 +1342,12 @@
 
                                         <!-- Unified Identity Block -->
                                         <div v-if="calcForm.idCard"
-                                            class="mb-8 p-5 bg-gold-400/5 border border-gold-500/20 rounded-2xl animate-fade-in relative group overflow-hidden">
+                                            class="mb-8 p-5 rounded-2xl animate-fade-in relative group overflow-hidden transition-all"
+                                            :class="{
+                                                'bg-gold-400/10 border-4 border-gold-400 shadow-[0_0_20px_rgba(250,204,21,0.2)]': calcForm.customerTier === 'vip',
+                                                'bg-purple-500/10 border-4 border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.2)]': calcForm.customerTier === 'vvip',
+                                                'bg-gold-400/5 border border-gold-500/20': calcForm.customerTier === 'normal' || !calcForm.customerTier
+                                            }">
                                             <div
                                                 class="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
                                                 <i class="fa-solid fa-id-card text-7xl text-gold-500"></i>
@@ -1351,10 +1356,21 @@
                                                 <div class="flex-shrink-0 mx-auto sm:mx-0">
                                                     <div class="relative">
                                                         <img v-if="calcForm.idCardPhoto" :src="calcForm.idCardPhoto"
-                                                            class="w-32 h-40 object-cover rounded-xl border-2 border-gold-500/30 shadow-2xl hover:border-gold-500/60 transition-all cursor-zoom-in"
+                                                            class="w-32 h-40 object-cover rounded-xl transition-all cursor-zoom-in"
+                                                            :class="{
+                                                                'border-4 border-gold-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] hover:shadow-[0_0_20px_rgba(250,204,21,0.8)]': calcForm.customerTier === 'vip',
+                                                                'border-4 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] hover:shadow-[0_0_20px_rgba(168,85,247,0.8)]': calcForm.customerTier === 'vvip',
+                                                                'border-2 border-gold-500/30 shadow-2xl hover:border-gold-500/60': calcForm.customerTier === 'normal' || !calcForm.customerTier
+                                                            }"
                                                             @click="viewingPhoto = calcForm.idCardPhoto" />
-                                                        <div v-else class="w-32 h-40 bg-dark-surface rounded-xl border-2 border-gray-700 shadow-2xl flex items-center justify-center flex-col text-gray-500">
-                                                            <i class="fa-solid fa-user text-4xl mb-2"></i>
+                                                        <div v-else class="w-32 h-40 bg-dark-surface rounded-xl flex items-center justify-center flex-col text-gray-500 transition-all"
+                                                            :class="{
+                                                                'border-4 border-gold-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]': calcForm.customerTier === 'vip',
+                                                                'border-4 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]': calcForm.customerTier === 'vvip',
+                                                                'border-2 border-gray-700 shadow-2xl': calcForm.customerTier === 'normal' || !calcForm.customerTier
+                                                            }">
+                                                            <i class="fa-solid fa-user text-4xl mb-2"
+                                                                :class="{'text-gold-400': calcForm.customerTier === 'vip', 'text-purple-500': calcForm.customerTier === 'vvip'}"></i>
                                                             <span class="text-[10px]">ไม่มีรูปถ่าย</span>
                                                         </div>
                                                         <div class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center border-2 border-dark-base shadow-lg"
@@ -1371,8 +1387,11 @@
                                                                 class="text-[10px] text-gold-500/80 font-bold uppercase tracking-[0.3em] mb-1">
                                                                 Identity Verified</p>
                                                             <h3
-                                                                class="text-white text-xl font-bold truncate leading-tight">
-                                                                {{ calcForm.customerName }}</h3>
+                                                                class="text-white text-xl font-bold truncate leading-tight flex items-center gap-2">
+                                                                {{ calcForm.customerName }}
+                                                                <span v-if="calcForm.customerTier === 'vip'" class="bg-gold-500/20 text-gold-400 text-[10px] px-2 py-0.5 rounded border border-gold-500/30 mt-1">VIP</span>
+                                                                <span v-if="calcForm.customerTier === 'vvip'" class="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/30 mt-1">VVIP</span>
+                                                            </h3>
                                                             <p
                                                                 class="text-gray-400 text-xs font-mono mt-1 tracking-widest">
                                                                 {{ calcForm.idCard }}</p>
@@ -1406,7 +1425,11 @@
 
                                     <div v-show="isLoggedIn" class="space-y-4">
                                         <div v-if="!calcForm.idCard" class="relative">
-                                            <label class="block text-sm font-medium text-gray-400 mb-1">ชื่อลูกค้า (กรณีไม่มีบัตร) <span class="text-red-500">*</span></label>
+                                            <label class="block text-sm font-medium text-gray-400 mb-1 flex items-center gap-2">
+                                                ชื่อลูกค้า (กรณีไม่มีบัตร) <span class="text-red-500">*</span>
+                                                <span v-if="calcForm.customerTier === 'vip'" class="bg-gold-500/20 text-gold-400 text-[10px] px-2 py-0.5 rounded border border-gold-500/30">VIP</span>
+                                                <span v-if="calcForm.customerTier === 'vvip'" class="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/30">VVIP</span>
+                                            </label>
                                             <input type="text" v-model="calcForm.customerName"
                                                 class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
                                                 placeholder="กรอกชื่อ-นามสกุลลูกค้า"
@@ -2124,23 +2147,58 @@
                             </div>
 
                             <div v-for="(p, i) in premiums" :key="p.id"
-                                class="flex flex-col sm:flex-row gap-4 bg-dark-base p-4 rounded-xl border border-gray-800 items-start sm:items-center">
-                                <span class="w-full sm:w-1/3 px-3 py-1 font-semibold text-gray-300">ช่วง %: <span
-                                        class="text-white">{{ p.label }}</span></span>
-                                <div class="w-full sm:w-2/3 flex items-center gap-3">
-                                    <!-- Premium Amount Input (Fixed Baht) -->
-                                    <div v-show="p.premium_type !== 'percent'" class="relative flex-grow min-w-[120px]">
-                                        <span class="absolute left-3 top-2.5 text-sm text-gray-500 font-bold">+</span>
-                                        <input type="number" step="any" v-model.number="p.premium_amount"
-                                            class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
-                                        <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">฿</span>
+                                class="flex flex-col gap-4 bg-dark-base p-4 rounded-xl border border-gray-800">
+                                <div class="flex items-center justify-between border-b border-gray-700/50 pb-2">
+                                    <span class="px-3 py-1 font-semibold text-gray-300">ช่วงความบริสุทธิ์: <span class="text-white bg-gray-800 px-2 py-1 rounded">{{ p.label }}</span></span>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <!-- ทั่วไป -->
+                                    <div class="flex flex-col">
+                                        <label class="block text-xs font-medium text-gray-400 mb-1">ลูกค้าทั่วไป</label>
+                                        <div v-show="p.premium_type !== 'percent'" class="relative flex-grow">
+                                            <span class="absolute left-3 top-2.5 text-sm text-gray-500 font-bold">+</span>
+                                            <input type="number" step="any" v-model.number="p.premium_amount"
+                                                class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
+                                            <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">฿</span>
+                                        </div>
+                                        <div v-show="p.premium_type === 'percent'" class="relative flex-grow">
+                                            <span class="absolute left-3 top-2.5 text-sm text-gray-500 font-bold">+</span>
+                                            <input type="number" step="any" v-model.number="p.premium_percent"
+                                                class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
+                                            <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">%</span>
+                                        </div>
                                     </div>
-                                    <!-- Premium Percent Input (%) -->
-                                    <div v-show="p.premium_type === 'percent'" class="relative flex-grow min-w-[120px]">
-                                        <span class="absolute left-3 top-2.5 text-sm text-gray-500 font-bold">+</span>
-                                        <input type="number" step="any" v-model.number="p.premium_percent"
-                                            class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gray-700 text-white rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
-                                        <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">%</span>
+                                    <!-- VIP -->
+                                    <div class="flex flex-col">
+                                        <label class="block text-xs font-medium text-gold-400 mb-1"><i class="fa-solid fa-star text-[10px]"></i> VIP (พ่อค้า)</label>
+                                        <div v-show="p.premium_type !== 'percent'" class="relative flex-grow">
+                                            <span class="absolute left-3 top-2.5 text-sm text-gold-600 font-bold">+</span>
+                                            <input type="number" step="any" v-model.number="p.premium_amount_vip"
+                                                class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gold-500/30 text-gold-100 rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
+                                            <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">฿</span>
+                                        </div>
+                                        <div v-show="p.premium_type === 'percent'" class="relative flex-grow">
+                                            <span class="absolute left-3 top-2.5 text-sm text-gold-600 font-bold">+</span>
+                                            <input type="number" step="any" v-model.number="p.premium_percent_vip"
+                                                class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-gold-500/30 text-gold-100 rounded-lg focus:border-gold-500 outline-none text-right font-semibold">
+                                            <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">%</span>
+                                        </div>
+                                    </div>
+                                    <!-- VVIP -->
+                                    <div class="flex flex-col">
+                                        <label class="block text-xs font-medium text-purple-400 mb-1"><i class="fa-solid fa-crown text-[10px]"></i> VVIP (พ่อค้าใหญ่)</label>
+                                        <div v-show="p.premium_type !== 'percent'" class="relative flex-grow">
+                                            <span class="absolute left-3 top-2.5 text-sm text-purple-600 font-bold">+</span>
+                                            <input type="number" step="any" v-model.number="p.premium_amount_vvip"
+                                                class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-purple-500/30 text-purple-100 rounded-lg focus:border-purple-500 outline-none text-right font-semibold">
+                                            <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">฿</span>
+                                        </div>
+                                        <div v-show="p.premium_type === 'percent'" class="relative flex-grow">
+                                            <span class="absolute left-3 top-2.5 text-sm text-purple-600 font-bold">+</span>
+                                            <input type="number" step="any" v-model.number="p.premium_percent_vvip"
+                                                class="w-full pl-6 pr-8 py-2 bg-gray-900 border border-purple-500/30 text-purple-100 rounded-lg focus:border-purple-500 outline-none text-right font-semibold">
+                                            <span class="absolute right-3 top-2.5 text-sm text-gray-400 font-medium">%</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2183,6 +2241,78 @@
                                     <span class="text-xl text-gray-500">฿</span>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-3">หากเปิดใช้งาน ระบบจะใช้ราคานี้แทนราคาอัตโนมัติ (API) ทันที</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Customer Tier Management -->
+                    <div class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+                            <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-users mr-2 text-gray-400"></i> จัดการลูกค้า VIP/VVIP (พ่อค้า)</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Search & Add -->
+                            <div class="bg-dark-base p-6 rounded-xl border border-gray-800 flex flex-col gap-4">
+                                <label class="block text-sm font-medium text-gray-400">ค้นหาลูกค้าเก่าเพื่อเพิ่มระดับ</label>
+                                <div class="flex gap-2">
+                                    <input type="text" v-model="customerSearchQuery" placeholder="ชื่อ หรือ เลขบัตรประชาชน" class="flex-grow bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white outline-none focus:border-gold-500">
+                                    <button @click="searchOldCustomers" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg text-white font-bold transition"><i class="fa-solid fa-search"></i></button>
+                                </div>
+                                <div v-if="adminCustomerSearchResults.length > 0" class="flex flex-col gap-2 mt-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <div v-for="res in adminCustomerSearchResults" :key="res.id_card" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex flex-col gap-2">
+                                        <div class="flex justify-between">
+                                            <span class="text-white font-bold">{{ res.customer_name }}</span>
+                                            <span class="text-xs text-gray-400">{{ res.id_card }}</span>
+                                        </div>
+                                        <div class="flex gap-2 items-center">
+                                            <select v-model="res.selectedTier" class="flex-grow bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 outline-none">
+                                                <option value="vip">VIP (พ่อค้า)</option>
+                                                <option value="vvip">VVIP (พ่อค้าใหญ่)</option>
+                                            </select>
+                                            <button @click="addCustomerTier(res)" class="bg-gold-600 hover:bg-gold-500 text-black px-3 py-1 rounded font-bold text-sm"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-else-if="customerSearchAttempted" class="text-center text-gray-500 text-sm mt-2">ไม่พบลูกค้าเก่า</div>
+                            </div>
+                            <!-- List -->
+                            <div class="bg-dark-base p-6 rounded-xl border border-gray-800 flex flex-col gap-4">
+                                <label class="block text-sm font-medium text-gray-400">รายชื่อลูกค้า VIP / VVIP ปัจจุบัน</label>
+                                <div class="flex flex-col gap-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <!-- VIP Section -->
+                                    <div>
+                                        <h4 class="text-gold-400 font-bold mb-3 flex items-center gap-2 text-sm"><i class="fa-solid fa-crown"></i> VIP (พ่อค้า)</h4>
+                                        <div class="flex flex-col gap-2">
+                                            <template v-for="cust in premiumCustomersList" :key="'vip_'+cust.id_card">
+                                                <div v-if="cust.tier === 'vip'" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex justify-between items-center">
+                                                    <div class="flex flex-col">
+                                                        <span class="text-white font-bold flex items-center gap-2">{{ cust.customer_name }}</span>
+                                                        <span class="text-xs text-gray-400">{{ cust.id_card }}</span>
+                                                    </div>
+                                                    <button @click="removeCustomerTier(cust.id_card)" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                                </div>
+                                            </template>
+                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'vip')" class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">ไม่มีรายชื่อ VIP</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- VVIP Section -->
+                                    <div>
+                                        <h4 class="text-purple-400 font-bold mb-3 flex items-center gap-2 text-sm"><i class="fa-solid fa-gem"></i> VVIP (พ่อค้าใหญ่)</h4>
+                                        <div class="flex flex-col gap-2">
+                                            <template v-for="cust in premiumCustomersList" :key="'vvip_'+cust.id_card">
+                                                <div v-if="cust.tier === 'vvip'" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex justify-between items-center">
+                                                    <div class="flex flex-col">
+                                                        <span class="text-white font-bold flex items-center gap-2">{{ cust.customer_name }}</span>
+                                                        <span class="text-xs text-gray-400">{{ cust.id_card }}</span>
+                                                    </div>
+                                                    <button @click="removeCustomerTier(cust.id_card)" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                                </div>
+                                            </template>
+                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'vvip')" class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">ไม่มีรายชื่อ VVIP</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

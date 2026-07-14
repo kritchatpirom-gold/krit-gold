@@ -8,7 +8,11 @@ CREATE TABLE IF NOT EXISTS gold_premiums (
   premium_amount NUMERIC NOT NULL,
   premium_percent NUMERIC DEFAULT 0,
   premium_type TEXT DEFAULT 'fixed',
-  label TEXT NOT NULL
+  label TEXT NOT NULL,
+  premium_amount_vip NUMERIC DEFAULT 0,
+  premium_percent_vip NUMERIC DEFAULT 0,
+  premium_amount_vvip NUMERIC DEFAULT 0,
+  premium_percent_vvip NUMERIC DEFAULT 0
 );
 
 -- Insert default rows
@@ -190,4 +194,16 @@ CREATE TABLE IF NOT EXISTS extra_profits (
 
 ALTER TABLE extra_profits ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated full access to extra_profits" ON extra_profits FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: customers
+CREATE TABLE IF NOT EXISTS customers (
+  id_card TEXT PRIMARY KEY,
+  customer_name TEXT,
+  tier TEXT DEFAULT 'normal',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to customers" ON customers FOR SELECT USING (true);
+CREATE POLICY "Allow authenticated full access to customers" ON customers FOR ALL USING (auth.role() = 'authenticated');
 

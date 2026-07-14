@@ -60,6 +60,11 @@ createApp({
         const useSilverDeduction = ref(true); // Default enabled
         const manualSilverPrice = ref(0);
         const useManualSilverPrice = ref(false);
+        const customerSearchQuery = ref('');
+
+        const adminCustomerSearchResults = ref([]);
+        const customerSearchAttempted = ref(false);
+        const premiumCustomersList = ref([]);
         let priceChart = null;
 
         // Drawer Balance
@@ -642,6 +647,7 @@ createApp({
             percent: null,
             customerName: '',
             phone: '',
+            customerTier: 'normal',
             idCard: '',
             address: '',
             idCardPhoto: '',
@@ -829,10 +835,25 @@ createApp({
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักรวม >= 5 กรัม หรือเป็นลูกค้าเก่า ให้บวกพรีเมียม
                 const totalWeightForPremium = accumulatedGoldWeight.value + w;
-                const meetsWeightReq = totalWeightForPremium >= 5 || isOldCustomer.value;
+                const isVipOrVvip = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip');
+                const meetsWeightReq = isVipOrVvip || totalWeightForPremium >= 5 || isOldCustomer.value;
                 
-                let rawPremium = (activePremium && meetsWeightReq) ? Number(activePremium.premium_amount) : 0;
-                let rawPercent = (activePremium && meetsWeightReq) ? Number(activePremium.premium_percent) : 0;
+                let rawPremium = 0;
+                let rawPercent = 0;
+
+                if (activePremium && meetsWeightReq) {
+                    if (tForm.customerTier === 'vip') {
+                        rawPremium = Number(activePremium.premium_amount_vip) || 0;
+                        rawPercent = Number(activePremium.premium_percent_vip) || 0;
+                    } else if (tForm.customerTier === 'vvip') {
+                        rawPremium = Number(activePremium.premium_amount_vvip) || 0;
+                        rawPercent = Number(activePremium.premium_percent_vvip) || 0;
+                    } else {
+                        rawPremium = Number(activePremium.premium_amount) || 0;
+                        rawPercent = Number(activePremium.premium_percent) || 0;
+                    }
+                }
+                
                 if (activePremium && activePremium.premium_type === 'percent' && meetsWeightReq) {
                     premium = Math.floor(base * (rawPercent / 100));
                 } else {
@@ -1203,6 +1224,8 @@ createApp({
                         useManualSilverPrice.value = Number(useManualSetting.value) === 1;
                     }
                 }
+                
+                await loadPremiumCustomers();
             } catch (err) {
                 console.error("Critical error loading premiums/settings:", err);
             } finally {
@@ -1218,7 +1241,11 @@ createApp({
                     await supabase.from('gold_premiums').update({ 
                         premium_amount: p.premium_amount,
                         premium_percent: p.premium_percent || 0,
-                        premium_type: p.premium_type || 'fixed'
+                        premium_type: p.premium_type || 'fixed',
+                        premium_amount_vip: p.premium_amount_vip || 0,
+                        premium_percent_vip: p.premium_percent_vip || 0,
+                        premium_amount_vvip: p.premium_amount_vvip || 0,
+                        premium_percent_vvip: p.premium_percent_vvip || 0
                     }).eq('id', p.id);
                 }
             }
@@ -1231,7 +1258,7 @@ createApp({
             ]);
 
             saving.value = false;
-            alert('บันทึกการตั้งค่าสำเร็จ');
+            await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่าสำเร็จ');
         };
 
         const autoSaveSettings = async () => {
@@ -1251,6 +1278,67 @@ createApp({
                 autoSaveSettings();
             }, 500);
         });
+
+        const searchOldCustomers = async () => {
+            if (!customerSearchQuery.value) return;
+            customerSearchAttempted.value = false;
+            
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('id_card, customer_name')
+                .or(`customer_name.ilike.%${customerSearchQuery.value}%,id_card.ilike.%${customerSearchQuery.value}%`)
+                .not('id_card', 'is', null)
+                .order('created_at', { ascending: false });
+                
+            customerSearchAttempted.value = true;
+            if (data) {
+                const unique = [];
+                const seen = new Set();
+                for (const item of data) {
+                    if (!seen.has(item.id_card) && item.customer_name) {
+                        seen.add(item.id_card);
+                        unique.push({ ...item, selectedTier: 'vip' });
+                    }
+                }
+                adminCustomerSearchResults.value = unique.slice(0, 10);
+            } else {
+                adminCustomerSearchResults.value = [];
+            }
+        };
+
+        const addCustomerTier = async (customer) => {
+            if (!customer.id_card || !customer.customer_name) return;
+            const { error } = await supabase.from('customers').upsert({
+                id_card: customer.id_card,
+                customer_name: customer.customer_name,
+                tier: customer.selectedTier
+            });
+            if (!error) {
+                await showAppModal('alert', 'สำเร็จ', 'เพิ่มลูกค้าเรียบร้อยแล้ว');
+                adminCustomerSearchResults.value = adminCustomerSearchResults.value.filter(c => c.id_card !== customer.id_card);
+                await loadPremiumCustomers();
+            } else {
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึก');
+            }
+        };
+
+        const removeCustomerTier = async (id_card) => {
+            if (!(await showAppModal('confirm', 'ยืนยัน', 'ยืนยันการลบลูกค้ารายนี้ออกจาก VIP/VVIP?'))) return;
+            const { error } = await supabase.from('customers').delete().eq('id_card', id_card);
+            if (!error) {
+                await loadPremiumCustomers();
+            }
+        };
+
+        const loadPremiumCustomers = async () => {
+            const { data } = await supabase.from('customers')
+                .select('*')
+                .in('tier', ['vip', 'vvip'])
+                .order('updated_at', { ascending: false });
+            if (data) {
+                premiumCustomersList.value = data;
+            }
+        };
 
         const loadTransactions = async () => {
             loadingTransactions.value = true;
@@ -2049,6 +2137,13 @@ createApp({
                                 
                                 if (validPhoneTx || validSigTx) console.log('Loaded previous customer data');
                             }
+                            
+                            const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', data.cid).single();
+                            if (custData && custData.tier) {
+                                calcForm.value.customerTier = custData.tier;
+                            } else {
+                                calcForm.value.customerTier = 'normal';
+                            }
                         } catch (err) {
                             console.error('Error fetching past customer data:', err);
                         }
@@ -2155,7 +2250,7 @@ createApp({
             }
         };
 
-        const applyCustomerData = (customer, field) => {
+        const applyCustomerData = async (customer, field) => {
             let loadedAny = false;
             
             // Overwrite with full name if different
@@ -2188,9 +2283,20 @@ createApp({
                 isOldCustomer.value = true;
                 console.log('Loaded customer data');
             }
+            
+            if (customer.id_card) {
+                const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', customer.id_card).single();
+                if (custData && custData.tier) {
+                    calcForm.value.customerTier = custData.tier;
+                } else {
+                    calcForm.value.customerTier = 'normal';
+                }
+            } else {
+                calcForm.value.customerTier = 'normal';
+            }
         };
 
-        const selectCustomer = (customer) => {
+        const selectCustomer = async (customer) => {
             calcForm.value.customerName = customer.customer_name;
             if (customer.phone) calcForm.value.phone = customer.phone;
             if (customer.id_card) calcForm.value.idCard = customer.id_card;
@@ -2198,6 +2304,18 @@ createApp({
             if (customer.id_card_photo) calcForm.value.idCardPhoto = fixUrl(customer.id_card_photo);
             if (customer.signature) lastSignature.value = fixUrl(customer.signature);
             isOldCustomer.value = true;
+            
+            if (customer.id_card) {
+                const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', customer.id_card).single();
+                if (custData && custData.tier) {
+                    calcForm.value.customerTier = custData.tier;
+                } else {
+                    calcForm.value.customerTier = 'normal';
+                }
+            } else {
+                calcForm.value.customerTier = 'normal';
+            }
+            
             showCustomerSearch.value = false;
         };
 
@@ -2210,8 +2328,25 @@ createApp({
             }
         });
 
-        watch(() => calcForm.value.customerName, (newVal) => {
+        watch(() => calcForm.value.customerName, async (newVal) => {
             clearTimeout(fetchCustomerTimeout);
+            
+            if (newVal && newVal.trim().length >= 2) {
+                const { data } = await supabase.from('customers').select('tier').eq('customer_name', newVal.trim());
+                if (data && data.length > 0) {
+                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip');
+                    if (vipTier) {
+                        calcForm.value.customerTier = vipTier.tier;
+                    } else {
+                        calcForm.value.customerTier = 'normal';
+                    }
+                } else {
+                    calcForm.value.customerTier = 'normal';
+                }
+            } else {
+                calcForm.value.customerTier = 'normal';
+            }
+
             if (newVal && newVal.length >= 3) {
                 fetchCustomerTimeout = setTimeout(() => {
                     fetchCustomerByField('customer_name', newVal);
@@ -3323,6 +3458,16 @@ createApp({
             openCamera,
             closeCamera,
             takeSnapshot,
+
+            customerSearchQuery,
+            customerSearchResults,
+            adminCustomerSearchResults,
+            customerSearchAttempted,
+            premiumCustomersList,
+            searchOldCustomers,
+            addCustomerTier,
+            removeCustomerTier,
+            loadPremiumCustomers,
 
             priceTrendGold,
             priceTrendSilver,
