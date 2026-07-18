@@ -37,7 +37,7 @@ createApp({
 
         // Roles
         const isAdmin = computed(() => user.value && user.value.email === 'admin@kritgold.com');
-        const isEmployee = computed(() => user.value && user.value.email === 'user@kritgold.com');
+        const isEmployee = computed(() => user.value && user.value.email !== 'admin@kritgold.com');
         const isLoggedIn = computed(() => user.value !== null);
 
         // Prices & Chart
@@ -60,6 +60,12 @@ createApp({
         const useSilverDeduction = ref(true); // Default enabled
         const manualSilverPrice = ref(0);
         const useManualSilverPrice = ref(false);
+        const employeeLastSilverUpdate = ref(null);
+
+        const isSilverPriceSetToday = computed(() => {
+            const today = new Date().toLocaleDateString('en-CA'); // format: YYYY-MM-DD
+            return employeeLastSilverUpdate.value === today;
+        });
         const customerSearchQuery = ref('');
 
         const adminCustomerSearchResults = ref([]);
@@ -456,33 +462,71 @@ createApp({
             // Reload fresh balance before adding
             await loadDrawerBalance();
             const oldBalance = { ...drawerBalance.value };
-            
-            // Greedy addition
-            const denoms = [
-                { key: 'b1000', val: 1000 },
-                { key: 'b500', val: 500 },
-                { key: 'b100', val: 100 },
-                { key: 'b50', val: 50 },
-                { key: 'b20', val: 20 },
-                { key: 'c10', val: 10 },
-                { key: 'c5', val: 5 },
-                { key: 'c1', val: 1 }
-            ];
-            
             const newBalance = { ...drawerBalance.value };
             let amountRestored = 0;
+            let exactRestoreDone = false;
             
-            for (const d of denoms) {
-                // ข้ามแบงก์/เหรียญที่มีจำนวนเป็น 0 ในลิ้นชักปัจจุบัน (ยกเว้นเหรียญ 1 บาทที่เป็นตัวสุดท้าย ต้องรับเศษเสมอ)
-                if (d.key !== 'c1' && newBalance[d.key] === 0) {
-                    continue;
+            if (transactionId) {
+                // Try to find the exact deduction from drawer_logs
+                const { data: logs, error } = await supabase
+                    .from('drawer_logs')
+                    .select('*')
+                    .or(`id.eq.${transactionId},reference_id.eq.${transactionId}`)
+                    .lte('amount', 0)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (!error && logs && logs.length > 0) {
+                    const log = logs[0];
+                    if (log.old_balance && log.new_balance) {
+                        const denomKeys = ['b1000', 'b500', 'b100', 'b50', 'b20', 'c10', 'c5', 'c1'];
+                        let diffTotal = 0;
+                        const toRestore = {};
+                        
+                        for (const k of denomKeys) {
+                            const diff = (log.old_balance[k] || 0) - (log.new_balance[k] || 0);
+                            if (diff > 0) {
+                                toRestore[k] = diff;
+                                const val = parseInt(k.replace(/[a-zA-Z]/g, ''));
+                                diffTotal += (diff * val);
+                            } else {
+                                toRestore[k] = 0;
+                            }
+                        }
+                        
+                        // Verify that the exact bills match the refund amount
+                        if (diffTotal === amount) {
+                            for (const k of denomKeys) {
+                                newBalance[k] += toRestore[k];
+                            }
+                            amountRestored = diffTotal;
+                            amount = 0;
+                            exactRestoreDone = true;
+                        }
+                    }
                 }
+            }
+            
+            if (!exactRestoreDone) {
+                // Greedy addition fallback
+                const denoms = [
+                    { key: 'b1000', val: 1000 },
+                    { key: 'b500', val: 500 },
+                    { key: 'b100', val: 100 },
+                    { key: 'b50', val: 50 },
+                    { key: 'b20', val: 20 },
+                    { key: 'c10', val: 10 },
+                    { key: 'c5', val: 5 },
+                    { key: 'c1', val: 1 }
+                ];
                 
-                if (amount >= d.val) {
-                    const addNotes = Math.floor(amount / d.val);
-                    newBalance[d.key] += addNotes;
-                    amount -= (addNotes * d.val);
-                    amountRestored += (addNotes * d.val);
+                for (const d of denoms) {
+                    if (amount >= d.val) {
+                        const addNotes = Math.floor(amount / d.val);
+                        newBalance[d.key] += addNotes;
+                        amount -= (addNotes * d.val);
+                        amountRestored += (addNotes * d.val);
+                    }
                 }
             }
             
@@ -1223,6 +1267,10 @@ createApp({
                     if (useManualSetting && useManualSetting.value !== null) {
                         useManualSilverPrice.value = Number(useManualSetting.value) === 1;
                     }
+                    const employeeSilverUpdateSetting = settingsData.find(s => s.key === 'employee_last_silver_update');
+                    if (employeeSilverUpdateSetting && employeeSilverUpdateSetting.value !== null) {
+                        employeeLastSilverUpdate.value = employeeSilverUpdateSetting.value;
+                    }
                 }
                 
                 await loadPremiumCustomers();
@@ -1262,12 +1310,40 @@ createApp({
         };
 
         const autoSaveSettings = async () => {
+            if (isEmployee.value) return; // Employees should not auto-save, they must use the save button
             await supabase.from('global_settings').upsert([
                 { key: 'silver_deduction', value: Number(silverDeduction.value) || 0 },
                 { key: 'use_silver_deduction', value: useSilverDeduction.value ? 1 : 0 },
                 { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
                 { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 }
             ]);
+            fetchPrices();
+        };
+
+        const saveSilverSettings = async () => {
+            if (isEmployee.value) {
+                if (isSilverPriceSetToday.value) {
+                    await showAppModal('alert', 'ไม่สามารถตั้งค่าได้', 'พนักงานสามารถตั้งราคาซิลเวอร์ได้ 1 ครั้งต่อวันเท่านั้น');
+                    return;
+                }
+                const today = new Date().toLocaleDateString('en-CA');
+                
+                saving.value = true;
+                await supabase.from('global_settings').upsert([
+                    { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
+                    { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 },
+                    { key: 'employee_last_silver_update', value: today }
+                ]);
+                employeeLastSilverUpdate.value = today;
+                saving.value = false;
+                await showAppModal('alert', 'สำเร็จ', 'พนักงานอัพเดทราคาซิลเวอร์ประจำวันสำเร็จ');
+            } else {
+                // Admin manually saves
+                saving.value = true;
+                await autoSaveSettings();
+                saving.value = false;
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่าราคาซิลเวอร์สำเร็จ');
+            }
             fetchPrices();
         };
 
@@ -1607,7 +1683,7 @@ createApp({
                         const cashRefund = Number(trx.net_price) - transferPart;
                         if (cashRefund > 0) {
                             if (await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${cashRefund} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
-                                await restoreDrawerBalance(cashRefund);
+                                await restoreDrawerBalance(cashRefund, id);
                             }
                         }
                     }
@@ -3478,6 +3554,8 @@ createApp({
             useSilverDeduction,
             manualSilverPrice,
             useManualSilverPrice,
+            isSilverPriceSetToday,
+            saveSilverSettings,
 
             premiums,
             allPremiumType,

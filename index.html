@@ -112,7 +112,7 @@
                         <button v-if="isAdmin" @click="currentTab = 'history'"
                             :class="currentTab === 'history' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ยอดซื้อขาย</button>
-                        <button v-if="isAdmin" @click="currentTab = 'settings'"
+                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'"
                             :class="currentTab === 'settings' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ตั้งค่า</button>
                         <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'"
@@ -151,7 +151,7 @@
                     <button v-if="isAdmin" @click="currentTab = 'history'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">สรุปยอดซื้อขาย
                         / ลบ</button>
-                    <button v-if="isAdmin" @click="currentTab = 'settings'; mobileMenuOpen = false"
+                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
                     <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ประเมินหลอม</button>
@@ -918,7 +918,9 @@
                                 </div>
                                 <div class="bg-dark-base/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center">
                                     <span class="text-gray-400">น้ำหนักก่อนหลอม:</span> <span class="text-gold-400 font-mono ml-2 font-bold text-base">{{ selectedStats.weight.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}g</span>
-                                    <span class="text-gray-400 ml-4 hidden sm:inline">เปอร์เซ็นต์เฉลี่ย:</span> <span class="text-green-400 font-mono ml-2 font-bold text-base hidden sm:inline">{{ selectedStats.avgPercent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}%</span>
+                                </div>
+                                <div class="bg-dark-base/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center">
+                                    <span class="text-gray-400">เปอร์เซ็นต์เฉลี่ย:</span> <span class="text-green-400 font-mono ml-2 font-bold text-base">{{ selectedStats.avgPercent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}%</span>
                                 </div>
                                 <div class="bg-dark-base/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center">
                                     <span class="text-gray-400">ต้นทุนรวม:</span> <span class="text-red-400 font-mono ml-2 font-bold text-base">{{ formatCurrency(selectedStats.cost) }}฿</span>
@@ -1598,9 +1600,9 @@
                                                 <label class="text-sm font-medium text-gray-400 whitespace-nowrap"><i
                                                         class="fa-solid fa-edit mr-1"></i> ราคาอ้างอิง:</label>
                                                 <input type="number" :placeholder="currentAssetPrice"
-                                                    v-model.number="calcForm.manualPrice" :disabled="isEmployee && !isAdmin"
-                                                    :title="isEmployee && !isAdmin ? 'ไม่อนุญาตให้พนักงานแก้ไขราคาอ้างอิง' : ''"
-                                                    :class="(isEmployee && !isAdmin) ? 'bg-dark-surface text-gray-500 border-gray-800 cursor-not-allowed' : 'bg-dark-base text-gold-400 border-gray-600 focus:border-gold-500'"
+                                                    v-model.number="calcForm.manualPrice" :disabled="!isAdmin"
+                                                    :title="!isAdmin ? 'ไม่อนุญาตให้แก้ไขราคาอ้างอิง' : ''"
+                                                    :class="!isAdmin ? 'bg-dark-surface text-gray-500 border-gray-800 cursor-not-allowed' : 'bg-dark-base text-gold-400 border-gray-600 focus:border-gold-500'"
                                                     class="w-28 px-3 py-1.5 border rounded-lg outline-none text-sm transition-colors text-right font-bold">
                                                 <div v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice" class="flex items-center gap-1.5">
                                                     <span class="text-xs text-gray-500">(อิงสมาคม)</span>
@@ -2118,8 +2120,8 @@
                 </div>
 
                 <!-- SettingsTab -->
-                <div v-if="currentTab === 'settings' && isAdmin" key="settings" class="max-w-3xl mx-auto space-y-6">
-                    <div class="glass p-8 rounded-2xl border border-gray-800">
+                <div v-if="currentTab === 'settings' && (isAdmin || isEmployee)" key="settings" class="max-w-3xl mx-auto space-y-6">
+                    <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
                             <h3 class="font-bold text-xl text-white"><i
                                     class="fa-solid fa-coins mr-2 text-gold-400"></i> โครงสร้างราคาบวกตารางหลอม</h3>
@@ -2205,10 +2207,10 @@
                         </div>
                     </div>
                     
-                    <div class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                    <div class="glass p-8 rounded-2xl border border-gray-800" :class="{'mt-6': isAdmin}">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
                             <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-flask mr-2 text-gray-400"></i> ตั้งค่าราคาเงิน (Silver Settings)</h3>
-                            <button @click="savePremiums" :disabled="saving"
+                            <button @click="saveSilverSettings" :disabled="saving || (isEmployee && isSilverPriceSetToday)"
                                 class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2216,12 +2218,12 @@
                                 <div class="flex items-center justify-between mb-4">
                                     <label class="block text-sm font-medium text-gray-400">หักเปอร์เซ็นต์ราคาเงิน (Silver Deduction %)</label>
                                     <label class="relative inline-flex items-center cursor-pointer">
-                                      <input type="checkbox" v-model="useSilverDeduction" @change="autoSaveSettings" class="sr-only peer">
+                                      <input type="checkbox" v-model="useSilverDeduction" @change="autoSaveSettings" :disabled="isEmployee" class="sr-only peer">
                                       <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
                                     </label>
                                 </div>
                                 <div class="flex items-center gap-3" :class="{ 'opacity-50 pointer-events-none': !useSilverDeduction }">
-                                    <input type="number" v-model.number="silverDeduction" @change="autoSaveSettings" :disabled="!useSilverDeduction"
+                                    <input type="number" v-model.number="silverDeduction" @change="autoSaveSettings" :disabled="!useSilverDeduction || isEmployee"
                                         class="w-full max-w-[200px] px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none text-xl font-bold">
                                     <span class="text-xl text-gray-500">%</span>
                                 </div>
@@ -2231,12 +2233,12 @@
                                 <div class="flex items-center justify-between mb-4">
                                     <label class="block text-sm font-medium text-gray-400">กำหนดราคาเงินเอง (Manual Price)</label>
                                     <label class="relative inline-flex items-center cursor-pointer">
-                                      <input type="checkbox" v-model="useManualSilverPrice" @change="autoSaveSettings" class="sr-only peer">
+                                      <input type="checkbox" v-model="useManualSilverPrice" @change="autoSaveSettings" :disabled="isEmployee && isSilverPriceSetToday" class="sr-only peer">
                                       <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-500"></div>
                                     </label>
                                 </div>
                                 <div class="flex items-center gap-3" :class="{ 'opacity-50 pointer-events-none': !useManualSilverPrice }">
-                                    <input type="number" v-model.number="manualSilverPrice" @change="autoSaveSettings" :disabled="!useManualSilverPrice"
+                                    <input type="number" v-model.number="manualSilverPrice" @change="autoSaveSettings" :disabled="!useManualSilverPrice || (isEmployee && isSilverPriceSetToday)"
                                         class="w-full max-w-[200px] px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none text-xl font-bold">
                                     <span class="text-xl text-gray-500">฿</span>
                                 </div>
@@ -2246,7 +2248,7 @@
                     </div>
                     
                     <!-- Customer Tier Management -->
-                    <div class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                    <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
                             <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-users mr-2 text-gray-400"></i> จัดการลูกค้า VIP/VVIP (พ่อค้า)</h3>
                         </div>
