@@ -61,6 +61,17 @@ createApp({
         const manualSilverPrice = ref(0);
         const useManualSilverPrice = ref(false);
         const employeeLastSilverUpdate = ref(null);
+        
+        // Attendance State
+        const lateDeductionRate = ref(1);
+        const attendanceData = ref({ idCard: '', name: '', photo: '' });
+        const attendanceLoading = ref(false);
+        const submittingAttendance = ref(false);
+        const todayAttendance = ref([]);
+        const loadingAttendanceList = ref(false);
+        const attendanceSummaryMonth = ref(new Date().toISOString().substring(0, 7)); // YYYY-MM
+        const attendanceSummary = ref([]);
+        const loadingAttendanceSummary = ref(false);
 
         const isSilverPriceSetToday = computed(() => {
             const today = new Date().toLocaleDateString('en-CA'); // format: YYYY-MM-DD
@@ -1250,6 +1261,10 @@ createApp({
                 if (settingsError) {
                     console.error("Global settings fetch error:", settingsError.message);
                 } else if (settingsData) {
+                    const lateRateSetting = settingsData.find(s => s.key === 'late_deduction_rate');
+                    if (lateRateSetting && lateRateSetting.value !== null) {
+                        lateDeductionRate.value = Number(lateRateSetting.value);
+                    }
                     const silverSetting = settingsData.find(s => s.key === 'silver_deduction');
                     if (silverSetting && silverSetting.value !== null) {
                         silverDeduction.value = Number(silverSetting.value);
@@ -1307,6 +1322,21 @@ createApp({
 
             saving.value = false;
             await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่าสำเร็จ');
+        };
+
+        const saveAttendanceSettings = async () => {
+            saving.value = true;
+            try {
+                await supabase.from('global_settings').upsert([
+                    { key: 'late_deduction_rate', value: Number(lateDeductionRate.value) || 0 }
+                ]);
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่าลงเวลาสำเร็จ');
+            } catch(e) {
+                console.error(e);
+                alert('เกิดข้อผิดพลาดในการบันทึก');
+            } finally {
+                saving.value = false;
+            }
         };
 
         const autoSaveSettings = async () => {
@@ -2521,6 +2551,196 @@ createApp({
             }
         };
 
+        const resetAttendanceData = () => {
+            attendanceData.value = { idCard: '', name: '', photo: '' };
+        };
+
+        const readCardForAttendance = async () => {
+            if (attendanceLoading.value) return;
+            attendanceLoading.value = true;
+            try {
+                const response = await fetch('http://localhost:8080/read', {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache'
+                });
+                if (!response.ok) throw new Error('ระบบเบื้องหลัง (Bridge) ไม่ตอบสนอง');
+                const result = await response.json();
+                if (result.status === 'success' && result.data) {
+                    attendanceData.value.name = result.data.full_name || '';
+                    attendanceData.value.idCard = result.data.cid || '';
+                    let photoBase64 = result.data.photo_base64 || '';
+                    if (photoBase64 && !photoBase64.startsWith('data:')) {
+                        photoBase64 = 'data:image/jpeg;base64,' + photoBase64;
+                    }
+                    attendanceData.value.photo = photoBase64;
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + (result.message || 'ไม่สามารถอ่านข้อมูลได้'));
+                }
+            } catch (err) {
+                console.error('Bridge Connection Error:', err);
+                alert('ไม่สามารถเชื่อมต่อกับเครื่องอ่านบัตรได้ กรุณาตรวจสอบว่าโปรแกรมอ่านบัตรทำงานอยู่หรือไม่');
+            } finally {
+                attendanceLoading.value = false;
+            }
+        };
+
+        const deleteAttendance = async (id) => {
+            if (!isAdmin.value) return;
+            const confirmDelete = await showAppModal('confirm', 'ยืนยันการลบ', 'คุณต้องการลบข้อมูลการลงเวลานี้ใช่หรือไม่?', [], 'ลบข้อมูล', 'ยกเลิก');
+            if (!confirmDelete) return;
+            
+            try {
+                const { error } = await supabase.from('attendance').delete().eq('id', id);
+                if (error) throw error;
+                
+                // Reload data
+                loadTodayAttendance();
+                if (isAdmin.value && currentTab.value === 'attendance') {
+                    loadAttendanceSummary();
+                }
+            } catch (err) {
+                console.error('Error deleting attendance:', err);
+                alert('เกิดข้อผิดพลาดในการลบข้อมูล');
+            }
+        };
+
+        const loadTodayAttendance = async () => {
+            loadingAttendanceList.value = true;
+            try {
+                const bkkTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+                const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
+                
+                const { data, error } = await supabase
+                    .from('attendance')
+                    .select('*')
+                    .eq('date', todayStr)
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+                todayAttendance.value = data || [];
+            } catch (err) {
+                console.error('Error loading attendance', err);
+            } finally {
+                loadingAttendanceList.value = false;
+            }
+        };
+
+        const submitCheckIn = async () => {
+            if (submittingAttendance.value || !attendanceData.value.idCard) return;
+            submittingAttendance.value = true;
+            try {
+                const now = new Date();
+                const bkkTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+                const checkInTimeStr = String(bkkTime.getHours()).padStart(2, '0') + ':' + String(bkkTime.getMinutes()).padStart(2, '0') + ':' + String(bkkTime.getSeconds()).padStart(2, '0');
+                const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
+
+                // Calculate late minutes based on 08:40
+                let lateMinutes = 0;
+                const currentMins = bkkTime.getHours() * 60 + bkkTime.getMinutes();
+                const targetMins = 8 * 60 + 40; // 08:40
+                if (currentMins > targetMins) {
+                    lateMinutes = currentMins - targetMins;
+                }
+                
+                const deduction = lateMinutes * lateDeductionRate.value;
+
+                const { error } = await supabase.from('attendance').insert([{
+                    id_card: attendanceData.value.idCard,
+                    name: attendanceData.value.name,
+                    date: todayStr,
+                    check_in_time: checkInTimeStr,
+                    late_minutes: lateMinutes,
+                    deduction_amount: deduction
+                }]);
+
+                if (error) throw error;
+                
+                let alertMessage = 'บันทึกเวลาเข้างานเรียบร้อยแล้ว\nเวลาเข้างานของคุณคือ: ' + checkInTimeStr;
+                if (lateMinutes > 0) {
+                    alertMessage += `\n\n⚠️ คุณมาสาย ${lateMinutes} นาที\nยอดหัก: ${deduction} บาท`;
+                } else {
+                    alertMessage += '\n\n✅ วันนี้คุณมาตรงเวลาเยี่ยมมากครับ!';
+                }
+                
+                await showAppModal('alert', 'สำเร็จ', alertMessage);
+                resetAttendanceData();
+                loadTodayAttendance();
+            } catch (err) {
+                console.error('Error submitting attendance', err);
+                alert('เกิดข้อผิดพลาดในการบันทึกเวลา');
+            } finally {
+                submittingAttendance.value = false;
+            }
+        };
+
+        const loadAttendanceSummary = async () => {
+            if (!isAdmin.value) return;
+            loadingAttendanceSummary.value = true;
+            try {
+                const startDate = `${attendanceSummaryMonth.value}-01`;
+                const dateParts = attendanceSummaryMonth.value.split('-');
+                const endDateObj = new Date(dateParts[0], dateParts[1], 0);
+                const endDate = `${attendanceSummaryMonth.value}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+
+                const { data, error } = await supabase
+                    .from('attendance')
+                    .select('*')
+                    .gte('date', startDate)
+                    .lte('date', endDate);
+                    
+                if (error) throw error;
+                
+                const summaryMap = {};
+                (data || []).forEach(log => {
+                    if (!summaryMap[log.id_card]) {
+                        summaryMap[log.id_card] = {
+                            id_card: log.id_card,
+                            name: log.name,
+                            total_late_minutes: 0,
+                            total_deduction: 0,
+                            late_days: 0,
+                            total_days: 0
+                        };
+                    }
+                    summaryMap[log.id_card].total_days += 1;
+                    if (log.late_minutes > 0) {
+                        summaryMap[log.id_card].total_late_minutes += log.late_minutes;
+                        summaryMap[log.id_card].total_deduction += Number(log.deduction_amount) || 0;
+                        summaryMap[log.id_card].late_days += 1;
+                    }
+                });
+                
+                attendanceSummary.value = Object.values(summaryMap).sort((a, b) => b.total_deduction - a.total_deduction);
+            } catch(e) {
+                console.error("Error loading attendance summary:", e);
+            } finally {
+                loadingAttendanceSummary.value = false;
+            }
+        };
+
+        watch(attendanceSummaryMonth, () => {
+            if (currentTab.value === 'attendance' && isAdmin.value) {
+                loadAttendanceSummary();
+            }
+        });
+
+        watch(currentTab, (newTab) => {
+            if (newTab === 'attendance') {
+                loadTodayAttendance();
+                if (isAdmin.value) loadAttendanceSummary();
+                // Update time display every second when on attendance tab
+                const timeInterval = setInterval(() => {
+                    const el = document.getElementById('attendanceCurrentTime');
+                    if (el) {
+                        el.innerText = new Date().toLocaleTimeString('th-TH');
+                    }
+                    if (currentTab.value !== 'attendance') {
+                        clearInterval(timeInterval);
+                    }
+                }, 1000);
+            }
+        });
+
         const syncHashToTab = () => {
             const hash = window.location.hash.replace('#', '');
             const validTabs = ['home', 'history', 'settings'];
@@ -3489,6 +3709,22 @@ createApp({
             preMeltGoldSummary,
             preMeltSilverSummary,
             currentTab,
+            attendanceData,
+            attendanceLoading,
+            submittingAttendance,
+            todayAttendance,
+            loadingAttendanceList,
+            attendanceSummaryMonth,
+            attendanceSummary,
+            loadingAttendanceSummary,
+            lateDeductionRate,
+            loadAttendanceSummary,
+            resetAttendanceData,
+            readCardForAttendance,
+            loadTodayAttendance,
+            deleteAttendance,
+            submitCheckIn,
+            saveAttendanceSettings,
             showTopUpModal,
             savingTopUp,
             topUpForm,

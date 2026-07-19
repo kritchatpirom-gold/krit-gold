@@ -58,6 +58,12 @@
             color: #d4af37;
         }
 
+        input.orange-calendar-icon::-webkit-calendar-picker-indicator {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="15" viewBox="0 0 24 24"><path fill="%23f97316" d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z"/></svg>');
+            cursor: pointer;
+            opacity: 1;
+        }
+
         .transition-all-custom {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -112,7 +118,10 @@
                         <button v-if="isAdmin" @click="currentTab = 'history'"
                             :class="currentTab === 'history' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ยอดซื้อขาย</button>
-                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'"
+                        <button v-if="isLoggedIn" @click="currentTab = 'attendance'"
+                            :class="currentTab === 'attendance' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">ลงเวลา</button>
+                        <button v-if="isAdmin" @click="currentTab = 'settings'"
                             :class="currentTab === 'settings' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ตั้งค่า</button>
                         <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'"
@@ -151,7 +160,9 @@
                     <button v-if="isAdmin" @click="currentTab = 'history'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">สรุปยอดซื้อขาย
                         / ลบ</button>
-                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'; mobileMenuOpen = false"
+                    <button v-if="isLoggedIn" @click="currentTab = 'attendance'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ลงเวลาเข้างาน</button>
+                    <button v-if="isAdmin" @click="currentTab = 'settings'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
                     <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ประเมินหลอม</button>
@@ -2119,8 +2130,150 @@
                     </div>
                 </div>
 
+                <!-- AttendanceTab -->
+                <div v-if="currentTab === 'attendance' && isLoggedIn" key="attendance" class="max-w-3xl mx-auto space-y-6">
+                    <div class="glass p-8 rounded-2xl border border-gray-800">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+                            <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-clock mr-2 text-gold-400"></i> ลงเวลาเข้างาน</h3>
+                        </div>
+                        
+                        <div class="flex flex-col items-center gap-6">
+                            <div class="text-center w-full max-w-md bg-dark-base p-8 rounded-xl border border-gray-700 shadow-lg">
+                                <p class="text-gray-400 mb-2">เวลาปัจจุบัน</p>
+                                <div class="text-4xl font-bold text-white mb-6 font-mono" id="attendanceCurrentTime">{{ new Date().toLocaleTimeString('th-TH') }}</div>
+                                
+                                <div v-if="!attendanceData.idCard" class="flex flex-col items-center">
+                                    <i class="fa-solid fa-id-card text-5xl text-gray-500 mb-4 opacity-50"></i>
+                                    <button @click="readCardForAttendance" :disabled="attendanceLoading"
+                                        class="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-400 hover:from-blue-500 hover:to-blue-300 text-white font-bold rounded-xl transition shadow-lg flex justify-center items-center gap-2">
+                                        <i v-if="attendanceLoading" class="fa-solid fa-circle-notch fa-spin"></i>
+                                        <i v-else class="fa-solid fa-address-card"></i> 
+                                        {{ attendanceLoading ? 'กำลังอ่าน...' : 'Check-in' }}
+                                    </button>
+                                </div>
+                                
+                                <div v-else class="w-full flex flex-col gap-4 text-left">
+                                    <div class="bg-gray-800/50 p-4 rounded-lg border border-gray-700 flex flex-col sm:flex-row items-center gap-4">
+                                        <img v-if="attendanceData.photo" :src="attendanceData.photo" alt="Photo" class="w-24 h-24 object-cover rounded-lg border-2 border-gold-400/50 shadow-md">
+                                        <div v-else class="w-24 h-24 bg-gray-700 rounded-lg flex items-center justify-center border-2 border-gray-600 shadow-md shrink-0">
+                                            <i class="fa-solid fa-user text-3xl text-gray-500"></i>
+                                        </div>
+                                        <div class="text-center sm:text-left">
+                                            <div class="text-sm text-gray-400 mb-1">ชื่อ-นามสกุล</div>
+                                            <div class="text-lg text-white font-bold">{{ attendanceData.name }}</div>
+                                            <div class="text-sm text-gray-400 mt-2 mb-1">รหัสบัตรประชาชน</div>
+                                            <div class="text-md text-gold-400">{{ attendanceData.idCard }}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex gap-2">
+                                        <button @click="resetAttendanceData" class="py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition">ยกเลิก</button>
+                                        <button @click="submitCheckIn" :disabled="submittingAttendance" class="flex-grow py-3 bg-gradient-to-r from-green-600 to-green-400 hover:from-green-500 hover:to-green-300 text-white font-bold rounded-lg transition shadow-lg flex justify-center items-center gap-2">
+                                            <i v-if="submittingAttendance" class="fa-solid fa-circle-notch fa-spin"></i>
+                                            <i v-else class="fa-solid fa-check-circle"></i>
+                                            บันทึกเวลาเข้างาน
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass p-6 rounded-2xl border border-gray-800">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-4">
+                            <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-list-check mr-2 text-gray-400"></i> ประวัติการลงเวลาวันนี้</h3>
+                            <button @click="loadTodayAttendance" class="text-gray-400 hover:text-white"><i class="fa-solid fa-rotate-right" :class="{'fa-spin': loadingAttendanceList}"></i></button>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-800">
+                                <thead>
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">เวลาเข้า</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">ชื่อพนักงาน</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">สาย (นาที)</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">หักเงิน (บาท)</th>
+                                        <th v-if="isAdmin" class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">ลบ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-800">
+                                    <tr v-if="todayAttendance.length === 0">
+                                        <td :colspan="isAdmin ? 5 : 4" class="px-4 py-6 text-center text-gray-500">ยังไม่มีข้อมูลการลงเวลาของวันนี้</td>
+                                    </tr>
+                                    <tr v-for="log in todayAttendance" :key="log.id" class="hover:bg-gray-800/30">
+                                        <td class="px-4 py-3 text-sm text-white font-mono">{{ log.check_in_time.substring(0, 5) }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-300">
+                                            <div>{{ log.name }}</div>
+                                            <div class="text-[10px] text-gray-500">{{ log.id_card }}</div>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-right">
+                                            <span :class="log.late_minutes > 0 ? 'text-red-400 font-bold' : 'text-green-400'">{{ log.late_minutes }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-right text-red-400 font-bold">{{ log.deduction_amount > 0 ? '-' + log.deduction_amount : '0' }}</td>
+                                        <td v-if="isAdmin" class="px-4 py-3 text-center">
+                                            <button @click="deleteAttendance(log.id)" class="text-red-500 hover:text-red-400 p-1 rounded transition" title="ลบข้อมูล">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Admin Summary Section -->
+                    <div v-if="isAdmin" class="glass p-6 rounded-2xl border border-gray-800">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-800 pb-4 mb-4 gap-4">
+                            <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-chart-pie mr-2 text-gold-400"></i> สรุปยอดการมาสายของพนักงาน</h3>
+                            <div class="flex items-center gap-3">
+                                <label class="text-sm text-gray-400">ประจำเดือน:</label>
+                                <input type="month" v-model="attendanceSummaryMonth" class="orange-calendar-icon bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-1.5 outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm transition-all cursor-pointer">
+                                <button @click="loadAttendanceSummary" class="px-4 py-1.5 bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold rounded-lg transition shadow-md ml-2 flex items-center gap-2">
+                                    <i class="fa-solid" :class="loadingAttendanceSummary ? 'fa-circle-notch fa-spin' : 'fa-search'"></i> ค้นหา
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-800">
+                                <thead>
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">ชื่อพนักงาน</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">มาทำงาน (วัน)</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">มาสาย (วัน)</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">สายรวม (นาที)</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">ยอดหักรวม (บาท)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-800">
+                                    <tr v-if="loadingAttendanceSummary">
+                                        <td colspan="5" class="px-4 py-6 text-center text-gray-500"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>กำลังโหลดข้อมูล...</td>
+                                    </tr>
+                                    <tr v-else-if="attendanceSummary.length === 0">
+                                        <td colspan="5" class="px-4 py-6 text-center text-gray-500">ไม่มีข้อมูลในเดือนที่เลือก</td>
+                                    </tr>
+                                    <tr v-for="sum in attendanceSummary" :key="sum.id_card" class="hover:bg-gray-800/30">
+                                        <td class="px-4 py-3 text-sm text-gray-300">
+                                            <div class="font-bold text-white">{{ sum.name }}</div>
+                                            <div class="text-[10px] text-gray-500">{{ sum.id_card }}</div>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-center text-blue-400 font-bold">{{ sum.total_days }}</td>
+                                        <td class="px-4 py-3 text-sm text-center">
+                                            <span :class="sum.late_days > 0 ? 'text-orange-400 font-bold' : 'text-gray-500'">{{ sum.late_days }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-right">
+                                            <span :class="sum.total_late_minutes > 0 ? 'text-red-400 font-bold' : 'text-gray-500'">{{ sum.total_late_minutes }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-right text-red-400 font-bold">{{ sum.total_deduction > 0 ? '-' + formatCurrency(sum.total_deduction) : '0' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- SettingsTab -->
-                <div v-if="currentTab === 'settings' && (isAdmin || isEmployee)" key="settings" class="max-w-3xl mx-auto space-y-6">
+                <div v-if="currentTab === 'settings' && isAdmin" key="settings" class="max-w-3xl mx-auto space-y-6">
                     <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
                             <h3 class="font-bold text-xl text-white"><i
@@ -2243,6 +2396,26 @@
                                     <span class="text-xl text-gray-500">฿</span>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-3">หากเปิดใช้งาน ระบบจะใช้ราคานี้แทนราคาอัตโนมัติ (API) ทันที</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+                            <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-business-time mr-2 text-gray-400"></i> ตั้งค่าการลงเวลา (Attendance)</h3>
+                            <button @click="saveAttendanceSettings" :disabled="saving"
+                                class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
+                        </div>
+                        <div class="bg-dark-base p-6 rounded-xl border border-gray-800">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-400">อัตราหักมาสาย (บาท/นาที)</label>
+                                    <p class="text-xs text-gray-500 mt-1">เวลาเข้างานคือ 08:40 หากเช็คอิน 08:41 จะถือว่าสาย 1 นาที</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <input type="number" v-model.number="lateDeductionRate" @change="autoSaveSettings" 
+                                    class="w-full max-w-[200px] px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none text-xl font-bold">
+                                <span class="text-xl text-gray-500">฿</span>
                             </div>
                         </div>
                     </div>
