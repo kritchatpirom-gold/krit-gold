@@ -121,7 +121,7 @@
                         <button v-if="isLoggedIn" @click="currentTab = 'attendance'"
                             :class="currentTab === 'attendance' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ลงเวลา</button>
-                        <button v-if="isAdmin" @click="currentTab = 'settings'"
+                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'"
                             :class="currentTab === 'settings' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ตั้งค่า</button>
                         <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'"
@@ -162,7 +162,7 @@
                         / ลบ</button>
                     <button v-if="isLoggedIn" @click="currentTab = 'attendance'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ลงเวลาเข้างาน</button>
-                    <button v-if="isAdmin" @click="currentTab = 'settings'; mobileMenuOpen = false"
+                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
                     <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ประเมินหลอม</button>
@@ -2273,7 +2273,7 @@
                 </div>
 
                 <!-- SettingsTab -->
-                <div v-if="currentTab === 'settings' && isAdmin" key="settings" class="max-w-3xl mx-auto space-y-6">
+                <div v-if="currentTab === 'settings' && (isAdmin || isEmployee)" key="settings" class="max-w-3xl mx-auto space-y-6">
                     <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
                             <h3 class="font-bold text-xl text-white"><i
@@ -2399,7 +2399,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                    <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
                             <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-business-time mr-2 text-gray-400"></i> ตั้งค่าการลงเวลา (Attendance)</h3>
                             <button @click="saveAttendanceSettings" :disabled="saving"
