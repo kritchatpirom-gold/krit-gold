@@ -2092,8 +2092,10 @@ createApp({
                         msg += `- ${item.label}: ${item.count} ${item.label.includes('เหรียญ') ? 'เหรียญ' : 'ใบ'}\n`;
                     });
                     
-                    // Open the cash drawer immediately as the payment window is displayed
-                    openDrawer();
+                    // Open the cash drawer immediately as the payment window is displayed (only if logged in)
+                    if (isLoggedIn.value) {
+                        openDrawer();
+                    }
                     
                     await showAppModal('alert', 'ตรวจสอบการจ่ายเงินสด', msg);
                 } else if (paidTransfer > 0) {

@@ -607,7 +607,7 @@
                                 <i class="fa-solid fa-clock-rotate-left mr-2"></i>
                                 ประวัติลิ้นชัก
                             </button>
-                            <button v-if="isAdmin" @click="openDrawer" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gold-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="สั่งเปิดลิ้นชักทันที">
+                            <button v-if="isAdmin || isEmployee" @click="openDrawer" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gold-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="สั่งเปิดลิ้นชักทันที">
                                 <i class="fa-solid fa-vault mr-2"></i>
                                 เปิดลิ้นชัก
                             </button>
@@ -615,7 +615,7 @@
                                 <i class="fa-solid fa-minus-circle mr-2"></i>
                                 นำเงินออก
                             </button>
-                            <button v-if="isAdmin" @click="openTopUpModal" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="เติมเงินเข้าลิ้นชัก">
+                            <button v-if="isAdmin || isEmployee" @click="openTopUpModal" class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg" title="เติมเงินเข้าลิ้นชัก">
                                 <i class="fa-solid fa-plus-circle mr-2"></i>
                                 เติมเงิน
                             </button>
@@ -1844,9 +1844,9 @@
                                     </div>
 
                                     <div class="flex gap-2">
-                                        <button v-if="isAdmin" @click="openDrawer"
+                                        <button v-if="isAdmin || isEmployee" @click="openDrawer"
                                             class="w-16 py-4 rounded-xl bg-gray-800 border border-gray-700 text-gold-400 hover:bg-gray-700 transition-all flex justify-center items-center group shadow-lg"
-                                            title="เปิดลิ้นชักเก็บเงิน (สิทธิ์ผู้จัดการ)">
+                                            title="เปิดลิ้นชักเก็บเงิน">
                                             <i class="fa-solid fa-vault text-xl group-hover:scale-110 transition-transform"></i>
                                         </button>
                                         <button @click="saveAndPrint" :disabled="(!isPrintReady && !isAdmin) || saving || (isLoggedIn && cashAmountToPay > drawerTotal)"
