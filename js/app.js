@@ -74,8 +74,9 @@ createApp({
         const loadingAttendanceSummary = ref(false);
 
         const isSilverPriceSetToday = computed(() => {
-            const today = new Date().toLocaleDateString('en-CA'); // format: YYYY-MM-DD
-            return employeeLastSilverUpdate.value === today;
+            const todayStr = new Date().toLocaleDateString('en-CA'); // format: YYYY-MM-DD
+            const todayNum = parseInt(todayStr.replace(/-/g, ''));
+            return Number(employeeLastSilverUpdate.value) === todayNum;
         });
         const customerSearchQuery = ref('');
 
@@ -823,16 +824,21 @@ createApp({
             return 0;
         });
 
-        watch(() => calcForm.value.type, () => {
+        watch(() => calcForm.value.type, (newType) => {
             calcForm.value.manualPrice = null;
+            if (newType === 'tong_roop') {
+                calcForm.value.percent = 96.00;
+            } else if (newType === 'redeem' || newType === 'tong_tang') {
+                calcForm.value.percent = null;
+            }
         });
 
         // Enforce integer for percent (all types) and 2 decimals for weight (all types)
         watch(() => calcForm.value.percent, (val) => {
             if (val !== null && val !== undefined && val !== '') {
                 let v = val;
-                if (isAdmin.value) {
-                    // Admin: Allow decimals up to 2 places, max 100
+                if (isAdmin.value || calcForm.value.type === 'tong_roop') {
+                    // Admin or tong_roop: Allow decimals up to 2 places, max 100
                     if (v > 100) {
                         v = parseFloat(String(v).substring(0, 5)) || 100;
                         if (v > 100) v = 100;
@@ -924,7 +930,7 @@ createApp({
                 net = floor2(withPurity * w);
             } else if (tForm.type === 'tong_roop') {
                 base = gp;
-                const baseAfterPercent = floor2(base * 0.96);
+                const baseAfterPercent = floor2(base * (p / 100));
                 const perGram = floor2(baseAfterPercent * 0.0656);
                 net = floor2(perGram * w);
             } else if (tForm.type === 'redeem') {
@@ -958,7 +964,7 @@ createApp({
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
-                percent: (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') ? 96.5 : calcForm.value.percent,
+                percent: (calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') ? 96.5 : calcForm.value.percent,
                 weight: calcForm.value.weight,
                 basePrice: calculatedResult.value.basePrice,
                 premium: calculatedResult.value.premium,
@@ -1356,15 +1362,23 @@ createApp({
                     await showAppModal('alert', 'ไม่สามารถตั้งค่าได้', 'พนักงานสามารถตั้งราคาซิลเวอร์ได้ 1 ครั้งต่อวันเท่านั้น');
                     return;
                 }
-                const today = new Date().toLocaleDateString('en-CA');
+                const todayStr = new Date().toLocaleDateString('en-CA');
+                const todayNum = parseInt(todayStr.replace(/-/g, ''));
                 
                 saving.value = true;
-                await supabase.from('global_settings').upsert([
+                const { error } = await supabase.from('global_settings').upsert([
                     { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
                     { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 },
-                    { key: 'employee_last_silver_update', value: today }
+                    { key: 'employee_last_silver_update', value: todayNum }
                 ]);
-                employeeLastSilverUpdate.value = today;
+                
+                if (error) {
+                    saving.value = false;
+                    await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกได้: ' + error.message);
+                    return;
+                }
+                
+                employeeLastSilverUpdate.value = todayNum;
                 saving.value = false;
                 await showAppModal('alert', 'สำเร็จ', 'พนักงานอัพเดทราคาซิลเวอร์ประจำวันสำเร็จ');
             } else {
@@ -1605,7 +1619,7 @@ createApp({
                 const withPurity = floor2(perGram * (p / 100));
                 net = floor2(withPurity * w);
             } else if (tForm.type === 'tong_roop') {
-                const baseAfterPercent = floor2(gp * 0.96);
+                const baseAfterPercent = floor2(gp * (p / 100));
                 const perGram = floor2(baseAfterPercent * 0.0656);
                 net = floor2(perGram * w);
             } else if (tForm.type === 'redeem') {
@@ -1662,7 +1676,7 @@ createApp({
             const diffAmount = tForm.original_net_price - tForm.net_price;
 
             let savePercent = Number(tForm.percent) || 0;
-            if (['tong_roop', 'redeem', 'tong_tang'].includes(tForm.type)) {
+            if (['redeem', 'tong_tang'].includes(tForm.type)) {
                 savePercent = 96.5;
             }
 
