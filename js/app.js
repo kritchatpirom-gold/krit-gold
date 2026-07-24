@@ -313,7 +313,7 @@ createApp({
         };
 
         const confirmTopUp = async () => {
-            if (!isAdmin.value) return;
+            if (!isAdmin.value && !isEmployee.value) return;
             if (topUpTotal.value <= 0) {
                 await showAppModal('alert', 'ไม่สามารถเติมเงินได้', 'กรุณาระบุจำนวนเงินที่ต้องการเติม');
                 return;
