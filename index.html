@@ -1359,6 +1359,8 @@
                                             :class="{
                                                 'bg-gold-400/10 border-4 border-gold-400 shadow-[0_0_20px_rgba(250,204,21,0.2)]': calcForm.customerTier === 'vip',
                                                 'bg-purple-500/10 border-4 border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.2)]': calcForm.customerTier === 'vvip',
+                                                'bg-blue-500/10 border-4 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]': calcForm.customerTier === 'network',
+                                                'bg-cyan-500/10 border-4 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.2)]': calcForm.customerTier === 'network_vip',
                                                 'bg-gold-400/5 border border-gold-500/20': calcForm.customerTier === 'normal' || !calcForm.customerTier
                                             }">
                                             <div
@@ -1373,6 +1375,8 @@
                                                             :class="{
                                                                 'border-4 border-gold-400 shadow-[0_0_15px_rgba(250,204,21,0.5)] hover:shadow-[0_0_20px_rgba(250,204,21,0.8)]': calcForm.customerTier === 'vip',
                                                                 'border-4 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] hover:shadow-[0_0_20px_rgba(168,85,247,0.8)]': calcForm.customerTier === 'vvip',
+                                                                'border-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_20px_rgba(59,130,246,0.8)]': calcForm.customerTier === 'network',
+                                                                'border-4 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)] hover:shadow-[0_0_20px_rgba(6,182,212,0.8)]': calcForm.customerTier === 'network_vip',
                                                                 'border-2 border-gold-500/30 shadow-2xl hover:border-gold-500/60': calcForm.customerTier === 'normal' || !calcForm.customerTier
                                                             }"
                                                             @click="viewingPhoto = calcForm.idCardPhoto" />
@@ -1380,10 +1384,12 @@
                                                             :class="{
                                                                 'border-4 border-gold-400 shadow-[0_0_15px_rgba(250,204,21,0.5)]': calcForm.customerTier === 'vip',
                                                                 'border-4 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]': calcForm.customerTier === 'vvip',
+                                                                'border-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]': calcForm.customerTier === 'network',
+                                                                'border-4 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]': calcForm.customerTier === 'network_vip',
                                                                 'border-2 border-gray-700 shadow-2xl': calcForm.customerTier === 'normal' || !calcForm.customerTier
                                                             }">
                                                             <i class="fa-solid fa-user text-4xl mb-2"
-                                                                :class="{'text-gold-400': calcForm.customerTier === 'vip', 'text-purple-500': calcForm.customerTier === 'vvip'}"></i>
+                                                                :class="{'text-gold-400': calcForm.customerTier === 'vip', 'text-purple-500': calcForm.customerTier === 'vvip', 'text-blue-400': calcForm.customerTier === 'network', 'text-cyan-400': calcForm.customerTier === 'network_vip'}"></i>
                                                             <span class="text-[10px]">ไม่มีรูปถ่าย</span>
                                                         </div>
                                                         <div class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center border-2 border-dark-base shadow-lg"
@@ -1404,6 +1410,8 @@
                                                                 {{ calcForm.customerName }}
                                                                 <span v-if="calcForm.customerTier === 'vip'" class="bg-gold-500/20 text-gold-400 text-[10px] px-2 py-0.5 rounded border border-gold-500/30 mt-1">VIP</span>
                                                                 <span v-if="calcForm.customerTier === 'vvip'" class="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/30 mt-1">VVIP</span>
+                                                                <span v-if="calcForm.customerTier === 'network'" class="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 mt-1">พ่อค้าในเครือข่าย</span>
+                                                                <span v-if="calcForm.customerTier === 'network_vip'" class="bg-cyan-500/20 text-cyan-400 text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 mt-1">พ่อค้าในเครือข่าย (VIP)</span>
                                                             </h3>
                                                             <p
                                                                 class="text-gray-400 text-xs font-mono mt-1 tracking-widest">
@@ -1442,6 +1450,8 @@
                                                 ชื่อลูกค้า (กรณีไม่มีบัตร) <span class="text-red-500">*</span>
                                                 <span v-if="calcForm.customerTier === 'vip'" class="bg-gold-500/20 text-gold-400 text-[10px] px-2 py-0.5 rounded border border-gold-500/30">VIP</span>
                                                 <span v-if="calcForm.customerTier === 'vvip'" class="bg-purple-500/20 text-purple-400 text-[10px] px-2 py-0.5 rounded border border-purple-500/30">VVIP</span>
+                                                <span v-if="calcForm.customerTier === 'network'" class="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-0.5 rounded border border-blue-500/30">ในเครือข่าย</span>
+                                                <span v-if="calcForm.customerTier === 'network_vip'" class="bg-cyan-500/20 text-cyan-400 text-[10px] px-2 py-0.5 rounded border border-cyan-500/30">ในเครือข่าย VIP</span>
                                             </label>
                                             <input type="text" v-model="calcForm.customerName"
                                                 class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
@@ -1462,7 +1472,7 @@
                                                         <div class="text-sm text-gold-400 font-medium group-hover:text-gold-300">{{ cust.customer_name }}</div>
                                                         <div class="text-xs text-gray-400 mt-1 flex gap-3">
                                                             <span v-if="cust.phone"><i class="fa-solid fa-phone mr-1"></i> {{ cust.phone }}</span>
-                                                            <span v-if="cust.id_card"><i class="fa-regular fa-id-card mr-1"></i> {{ cust.id_card }}</span>
+                                                            <span v-if="cust.id_card && !cust.id_card.startsWith('NO_ID_')"><i class="fa-regular fa-id-card mr-1"></i> {{ cust.id_card }}</span>
                                                         </div>
                                                     </div>
                                                     <div class="flex flex-col gap-1 items-end">
@@ -2358,6 +2368,84 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Network Merchant Gold Settings -->
+                        <div v-if="isAdmin" class="mt-6 p-6 rounded-xl border border-gray-800 bg-gray-900/30">
+                            <h4 class="font-bold text-lg text-white mb-4"><i class="fa-solid fa-users mr-2 text-blue-400"></i> ตั้งค่าราคาบวกทอง พ่อค้าในเครือข่าย (Network Merchant)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- 25-49% -->
+                                <div class="space-y-3 p-4 bg-dark-base rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">ความบริสุทธิ์ช่วง 25% - 49%</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กรัม)</span>
+                                            <input type="number" step="any" v-model.number="networkGoldPremiumAmount_25_49"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">หรือ บวกเปอเซ็นต์ (%)</span>
+                                            <input type="number" step="any" v-model.number="networkGoldPremiumPercent_25_49"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 50-100% -->
+                                <div class="space-y-3 p-4 bg-dark-base rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">ความบริสุทธิ์ช่วง 50% - 100%</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กรัม)</span>
+                                            <input type="number" step="any" v-model.number="networkGoldPremiumAmount_50_100"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">หรือ บวกเปอเซ็นต์ (%)</span>
+                                            <input type="number" step="any" v-model.number="networkGoldPremiumPercent_50_100"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Network Merchant (VIP) Gold Settings -->
+                        <div v-if="isAdmin" class="mt-6 p-6 rounded-xl border border-gray-800 bg-gray-900/30">
+                            <h4 class="font-bold text-lg text-white mb-4"><i class="fa-solid fa-users-crown mr-2 text-cyan-400"></i> ตั้งค่าราคาบวกทอง พ่อค้าในเครือข่าย (VIP)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- 25-49% -->
+                                <div class="space-y-3 p-4 bg-dark-base rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">ความบริสุทธิ์ช่วง 25% - 49%</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กรัม)</span>
+                                            <input type="number" step="any" v-model.number="networkVipGoldPremiumAmount_25_49"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">หรือ บวกเปอเซ็นต์ (%)</span>
+                                            <input type="number" step="any" v-model.number="networkVipGoldPremiumPercent_25_49"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 50-100% -->
+                                <div class="space-y-3 p-4 bg-dark-base rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">ความบริสุทธิ์ช่วง 50% - 100%</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กรัม)</span>
+                                            <input type="number" step="any" v-model.number="networkVipGoldPremiumAmount_50_100"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">หรือ บวกเปอเซ็นต์ (%)</span>
+                                            <input type="number" step="any" v-model.number="networkVipGoldPremiumPercent_50_100"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="glass p-8 rounded-2xl border border-gray-800" :class="{'mt-6': isAdmin}">
@@ -2396,6 +2484,57 @@
                                     <span class="text-xl text-gray-500">฿</span>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-3">หากเปิดใช้งาน ระบบจะใช้ราคานี้แทนราคาอัตโนมัติ (API) ทันที</p>
+                            </div>
+                        </div>
+
+                        <!-- Silver VIP Premium -->
+                        <div v-if="isAdmin" class="mt-6 bg-dark-base p-6 rounded-xl border border-gray-800">
+                            <h4 class="font-bold text-lg text-white mb-4"><i class="fa-solid fa-crown mr-2 text-gray-400"></i> ตั้งค่าราคาบวกเงิน (Silver VIP Premium)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- VIP -->
+                                <div class="space-y-3 p-4 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-gold-400 mb-2"><i class="fa-solid fa-star text-xs"></i> VIP (พ่อค้า)</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กิโลกรัม)</span>
+                                            <input type="number" step="any" v-model.number="silverPremiumAmountVip" @change="autoSaveSettings" :disabled="isEmployee"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- VVIP -->
+                                <div class="space-y-3 p-4 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-purple-400 mb-2"><i class="fa-solid fa-crown text-xs"></i> VVIP (พ่อค้าใหญ่)</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กิโลกรัม)</span>
+                                            <input type="number" step="any" v-model.number="silverPremiumAmountVvip" @change="autoSaveSettings" :disabled="isEmployee"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Network -->
+                                <div class="space-y-3 p-4 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-blue-400 mb-2"><i class="fa-solid fa-users text-xs"></i> พ่อค้าในเครือข่าย</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กิโลกรัม)</span>
+                                            <input type="number" step="any" v-model.number="silverPremiumAmountNetwork" @change="autoSaveSettings" :disabled="isEmployee"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Network VIP -->
+                                <div class="space-y-3 p-4 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-cyan-400 mb-2"><i class="fa-solid fa-users-crown text-xs"></i> พ่อค้าในเครือข่าย (VIP)</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กิโลกรัม)</span>
+                                            <input type="number" step="any" v-model.number="silverPremiumAmountNetworkVip" @change="autoSaveSettings" :disabled="isEmployee"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2437,12 +2576,14 @@
                                     <div v-for="res in adminCustomerSearchResults" :key="res.id_card" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex flex-col gap-2">
                                         <div class="flex justify-between">
                                             <span class="text-white font-bold">{{ res.customer_name }}</span>
-                                            <span class="text-xs text-gray-400">{{ res.id_card }}</span>
+                                            <span class="text-xs text-gray-400">{{ (!res.id_card || res.id_card.startsWith('NO_ID_')) ? '(ไม่มีเลขบัตร)' : res.id_card }}</span>
                                         </div>
                                         <div class="flex gap-2 items-center">
                                             <select v-model="res.selectedTier" class="flex-grow bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 outline-none">
                                                 <option value="vip">VIP (พ่อค้า)</option>
                                                 <option value="vvip">VVIP (พ่อค้าใหญ่)</option>
+                                                <option value="network">พ่อค้าในเครือข่าย</option>
+                                                <option value="network_vip">พ่อค้าในเครือข่าย (VIP)</option>
                                             </select>
                                             <button @click="addCustomerTier(res)" class="bg-gold-600 hover:bg-gold-500 text-black px-3 py-1 rounded font-bold text-sm"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
                                         </div>
@@ -2462,7 +2603,7 @@
                                                 <div v-if="cust.tier === 'vip'" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex justify-between items-center">
                                                     <div class="flex flex-col">
                                                         <span class="text-white font-bold flex items-center gap-2">{{ cust.customer_name }}</span>
-                                                        <span class="text-xs text-gray-400">{{ cust.id_card }}</span>
+                                                        <span class="text-xs text-gray-400">{{ (!cust.id_card || cust.id_card.startsWith('NO_ID_')) ? '(ไม่มีเลขบัตร)' : cust.id_card }}</span>
                                                     </div>
                                                     <button @click="removeCustomerTier(cust.id_card)" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
                                                 </div>
@@ -2479,12 +2620,44 @@
                                                 <div v-if="cust.tier === 'vvip'" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex justify-between items-center">
                                                     <div class="flex flex-col">
                                                         <span class="text-white font-bold flex items-center gap-2">{{ cust.customer_name }}</span>
-                                                        <span class="text-xs text-gray-400">{{ cust.id_card }}</span>
+                                                        <span class="text-xs text-gray-400">{{ (!cust.id_card || cust.id_card.startsWith('NO_ID_')) ? '(ไม่มีเลขบัตร)' : cust.id_card }}</span>
                                                     </div>
                                                     <button @click="removeCustomerTier(cust.id_card)" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
                                                 </div>
                                             </template>
                                             <div v-if="!premiumCustomersList.some(c => c.tier === 'vvip')" class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">ไม่มีรายชื่อ VVIP</div>
+                                        </div>
+                                    </div>
+                                    <!-- Network Section -->
+                                    <div>
+                                        <h4 class="text-blue-400 font-bold mb-3 flex items-center gap-2 text-sm"><i class="fa-solid fa-users"></i> พ่อค้าในเครือข่าย</h4>
+                                        <div class="flex flex-col gap-2">
+                                            <template v-for="cust in premiumCustomersList" :key="'network_'+cust.id_card">
+                                                <div v-if="cust.tier === 'network'" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex justify-between items-center">
+                                                    <div class="flex flex-col">
+                                                        <span class="text-white font-bold flex items-center gap-2">{{ cust.customer_name }}</span>
+                                                        <span class="text-xs text-gray-400">{{ (!cust.id_card || cust.id_card.startsWith('NO_ID_')) ? '(ไม่มีเลขบัตร)' : cust.id_card }}</span>
+                                                    </div>
+                                                    <button @click="removeCustomerTier(cust.id_card)" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                                </div>
+                                            </template>
+                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'network')" class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">ไม่มีรายชื่อพ่อค้าในเครือข่าย</div>
+                                        </div>
+                                    </div>
+                                    <!-- Network VIP Section -->
+                                    <div>
+                                        <h4 class="text-cyan-400 font-bold mb-3 flex items-center gap-2 text-sm"><i class="fa-solid fa-users-crown"></i> พ่อค้าในเครือข่าย (VIP)</h4>
+                                        <div class="flex flex-col gap-2">
+                                            <template v-for="cust in premiumCustomersList" :key="'network_vip_'+cust.id_card">
+                                                <div v-if="cust.tier === 'network_vip'" class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex justify-between items-center">
+                                                    <div class="flex flex-col">
+                                                        <span class="text-white font-bold flex items-center gap-2">{{ cust.customer_name }}</span>
+                                                        <span class="text-xs text-gray-400">{{ (!cust.id_card || cust.id_card.startsWith('NO_ID_')) ? '(ไม่มีเลขบัตร)' : cust.id_card }}</span>
+                                                    </div>
+                                                    <button @click="removeCustomerTier(cust.id_card)" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                                </div>
+                                            </template>
+                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'network_vip')" class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">ไม่มีรายชื่อพ่อค้าในเครือข่าย (VIP)</div>
                                         </div>
                                     </div>
                                 </div>

@@ -58,6 +58,20 @@ createApp({
         const priceTrendSilver = ref(0);
         const silverDeduction = ref(13); // Default 13%
         const useSilverDeduction = ref(true); // Default enabled
+        const silverPremiumAmountVip = ref(0);
+        const silverPremiumAmountVvip = ref(0);
+        const silverPremiumAmountNetwork = ref(0);
+        
+        const networkGoldPremiumAmount_25_49 = ref(0);
+        const networkGoldPremiumPercent_25_49 = ref(0);
+        const networkGoldPremiumAmount_50_100 = ref(0);
+        const networkGoldPremiumPercent_50_100 = ref(0);
+
+        const silverPremiumAmountNetworkVip = ref(0);
+        const networkVipGoldPremiumAmount_25_49 = ref(0);
+        const networkVipGoldPremiumPercent_25_49 = ref(0);
+        const networkVipGoldPremiumAmount_50_100 = ref(0);
+        const networkVipGoldPremiumPercent_50_100 = ref(0);
         const manualSilverPrice = ref(0);
         const useManualSilverPrice = ref(false);
         const employeeLastSilverUpdate = ref(null);
@@ -819,7 +833,19 @@ createApp({
                 return Number(goldPrice.value) || 0;
             } else if (calcForm.value.type === 'silver') {
                 const multiplier = useSilverDeduction.value ? (100 - (Number(silverDeduction.value) || 0)) / 100 : 1;
-                return Math.floor((Number(manualSilverPrice.value) || 0) * multiplier);
+                let price = Math.floor((Number(manualSilverPrice.value) || 0) * multiplier);
+                
+                if (calcForm.value.customerTier === 'vip') {
+                    price += (Number(silverPremiumAmountVip.value) || 0);
+                } else if (calcForm.value.customerTier === 'vvip') {
+                    price += (Number(silverPremiumAmountVvip.value) || 0);
+                } else if (calcForm.value.customerTier === 'network') {
+                    price += (Number(silverPremiumAmountNetwork.value) || 0);
+                } else if (calcForm.value.customerTier === 'network_vip') {
+                    price += (Number(silverPremiumAmountNetworkVip.value) || 0);
+                }
+                
+                return price;
             }
             return 0;
         });
@@ -834,22 +860,34 @@ createApp({
         });
 
         // Enforce integer for percent (all types) and 2 decimals for weight (all types)
-        watch(() => calcForm.value.percent, (val) => {
+        watch(() => calcForm.value.percent, (val, oldVal) => {
             if (val !== null && val !== undefined && val !== '') {
                 let v = val;
-                if (isAdmin.value || calcForm.value.type === 'tong_roop') {
-                    // Admin or tong_roop: Allow decimals up to 2 places, max 100
-                    if (v > 100) {
-                        v = parseFloat(String(v).substring(0, 5)) || 100;
-                        if (v > 100) v = 100;
-                    }
+                
+                if (v > 100) {
+                    v = (oldVal !== null && oldVal !== undefined && oldVal !== '') ? oldVal : 100;
+                    if (val !== v) calcForm.value.percent = v;
+                    return;
+                }
+                const tier = calcForm.value.customerTier;
+                const isPremium = tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip';
+                const type = calcForm.value.type;
+
+                let allowDecimal = false;
+                if (isAdmin.value) {
+                    allowDecimal = true;
+                } else if (type === 'tong_roop') {
+                    allowDecimal = true;
+                } else if (type === 'tong_lom' && isPremium) {
+                    allowDecimal = true;
+                }
+
+                if (allowDecimal) {
+                    // Allow decimals up to 2 places, max 100
                     if (v < 1) v = 1;
                     v = Number(Number(v).toFixed(2));
                 } else {
-                    // Non-admin: Enforce integer, max 99 (if typed over 100, take first 2 digits)
-                    if (v > 100) {
-                        v = parseInt(String(v).substring(0, 2));
-                    }
+                    // Enforce integer, max 100
                     if (v < 1) v = 1;
                     v = Math.floor(v);
                 }
@@ -858,10 +896,14 @@ createApp({
             }
         });
 
-        watch([() => calcForm.value.weight, () => calcForm.value.type], ([w, t]) => {
+        watch([() => calcForm.value.weight, () => calcForm.value.type, () => calcForm.value.customerTier], ([w, t, tier]) => {
             if (w !== null && w !== undefined && w !== '') {
-                // ทองหลอมและทองคำแท่งเอา 2 ตำแหน่ง, ประเภทอื่นเอา 1 ตำแหน่ง
-                const decimalPoints = (t === 'tong_lom' || t === 'tong_tang') ? 2 : 1;
+                // พนักงานให้กรอกทศนิยม 2 ตำแหน่งได้เฉพาะลูกค้า VIP/VVIP/Network/Network VIP (ทั้งเงินและทอง) ส่วน Admin ได้ 2 ตำแหน่งเสมอ
+                let decimalPoints = 1;
+                if (isAdmin.value || tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip') {
+                    decimalPoints = 2;
+                }
+
                 const multiplier = Math.pow(10, decimalPoints);
 
                 // Clean up binary ghost bits (e.g. 2.3 * 100 becoming 229.999...) 
@@ -896,13 +938,29 @@ createApp({
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักรวม >= 5 กรัม หรือเป็นลูกค้าเก่า ให้บวกพรีเมียม
                 const totalWeightForPremium = accumulatedGoldWeight.value + w;
-                const isVipOrVvip = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip');
+                const isVipOrVvip = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip');
                 const meetsWeightReq = isVipOrVvip || totalWeightForPremium >= 5 || isOldCustomer.value;
                 
                 let rawPremium = 0;
                 let rawPercent = 0;
 
-                if (activePremium && meetsWeightReq) {
+                if (tForm.customerTier === 'network' && meetsWeightReq) {
+                    if (p >= 25 && p < 50) {
+                        rawPremium = Number(networkGoldPremiumAmount_25_49.value) || 0;
+                        rawPercent = Number(networkGoldPremiumPercent_25_49.value) || 0;
+                    } else if (p >= 50 && p <= 100) {
+                        rawPremium = Number(networkGoldPremiumAmount_50_100.value) || 0;
+                        rawPercent = Number(networkGoldPremiumPercent_50_100.value) || 0;
+                    }
+                } else if (tForm.customerTier === 'network_vip' && meetsWeightReq) {
+                    if (p >= 25 && p < 50) {
+                        rawPremium = Number(networkVipGoldPremiumAmount_25_49.value) || 0;
+                        rawPercent = Number(networkVipGoldPremiumPercent_25_49.value) || 0;
+                    } else if (p >= 50 && p <= 100) {
+                        rawPremium = Number(networkVipGoldPremiumAmount_50_100.value) || 0;
+                        rawPercent = Number(networkVipGoldPremiumPercent_50_100.value) || 0;
+                    }
+                } else if (activePremium && meetsWeightReq) {
                     if (tForm.customerTier === 'vip') {
                         rawPremium = Number(activePremium.premium_amount_vip) || 0;
                         rawPercent = Number(activePremium.premium_percent_vip) || 0;
@@ -915,7 +973,7 @@ createApp({
                     }
                 }
                 
-                if (activePremium && activePremium.premium_type === 'percent' && meetsWeightReq) {
+                if (rawPercent > 0 && meetsWeightReq) {
                     premium = Math.floor(base * (rawPercent / 100));
                 } else {
                     premium = rawPremium;
@@ -945,7 +1003,14 @@ createApp({
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp;
                 base = deduct13;
-                const perGram = Math.floor(deduct13 / 1000);
+                
+                premium = 0;
+
+                if (isAdmin.value && tForm.manualPremium !== null && tForm.manualPremium !== '') {
+                    premium = Number(tForm.manualPremium);
+                }
+
+                const perGram = Math.floor((base + premium) / 1000);
                 const withPercent = Math.floor(perGram * (p / 100));
                 net = Math.floor(withPercent * w);
             }
@@ -1257,7 +1322,11 @@ createApp({
                     premiums.value = goldData.map(p => ({
                         ...p,
                         premium_percent: p.premium_percent || 0,
-                        premium_type: p.premium_type || 'fixed'
+                        premium_type: p.premium_type || 'fixed',
+                        premium_amount_vip: p.premium_amount_vip || 0,
+                        premium_percent_vip: p.premium_percent_vip || 0,
+                        premium_amount_vvip: p.premium_amount_vvip || 0,
+                        premium_percent_vvip: p.premium_percent_vvip || 0
                     }));
                     console.log("Gold premiums loaded:", goldData.length, "rows");
                 }
@@ -1292,6 +1361,25 @@ createApp({
                     if (employeeSilverUpdateSetting && employeeSilverUpdateSetting.value !== null) {
                         employeeLastSilverUpdate.value = employeeSilverUpdateSetting.value;
                     }
+
+                    const getSetting = (k, def) => {
+                        const s = settingsData.find(s => s.key === k);
+                        return (s && s.value !== null) ? Number(s.value) : def;
+                    };
+                    silverPremiumAmountVip.value = getSetting('silver_premium_amount_vip', 0);
+                    silverPremiumAmountVvip.value = getSetting('silver_premium_amount_vvip', 0);
+                    silverPremiumAmountNetwork.value = getSetting('silver_premium_amount_network', 0);
+                    silverPremiumAmountNetworkVip.value = getSetting('silver_premium_amount_network_vip', 0);
+                    
+                    networkGoldPremiumAmount_25_49.value = getSetting('network_gold_amount_25_49', 0);
+                    networkGoldPremiumPercent_25_49.value = getSetting('network_gold_percent_25_49', 0);
+                    networkGoldPremiumAmount_50_100.value = getSetting('network_gold_amount_50_100', 0);
+                    networkGoldPremiumPercent_50_100.value = getSetting('network_gold_percent_50_100', 0);
+
+                    networkVipGoldPremiumAmount_25_49.value = getSetting('network_vip_gold_amount_25_49', 0);
+                    networkVipGoldPremiumPercent_25_49.value = getSetting('network_vip_gold_percent_25_49', 0);
+                    networkVipGoldPremiumAmount_50_100.value = getSetting('network_vip_gold_amount_50_100', 0);
+                    networkVipGoldPremiumPercent_50_100.value = getSetting('network_vip_gold_percent_50_100', 0);
                 }
                 
                 await loadPremiumCustomers();
@@ -1323,7 +1411,19 @@ createApp({
                 { key: 'silver_deduction', value: Number(silverDeduction.value) || 0 },
                 { key: 'use_silver_deduction', value: useSilverDeduction.value ? 1 : 0 },
                 { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
-                { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 }
+                { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 },
+                { key: 'silver_premium_amount_vip', value: Number(silverPremiumAmountVip.value) || 0 },
+                { key: 'silver_premium_amount_vvip', value: Number(silverPremiumAmountVvip.value) || 0 },
+                { key: 'silver_premium_amount_network', value: Number(silverPremiumAmountNetwork.value) || 0 },
+                { key: 'silver_premium_amount_network_vip', value: Number(silverPremiumAmountNetworkVip.value) || 0 },
+                { key: 'network_gold_amount_25_49', value: Number(networkGoldPremiumAmount_25_49.value) || 0 },
+                { key: 'network_gold_percent_25_49', value: Number(networkGoldPremiumPercent_25_49.value) || 0 },
+                { key: 'network_gold_amount_50_100', value: Number(networkGoldPremiumAmount_50_100.value) || 0 },
+                { key: 'network_gold_percent_50_100', value: Number(networkGoldPremiumPercent_50_100.value) || 0 },
+                { key: 'network_vip_gold_amount_25_49', value: Number(networkVipGoldPremiumAmount_25_49.value) || 0 },
+                { key: 'network_vip_gold_percent_25_49', value: Number(networkVipGoldPremiumPercent_25_49.value) || 0 },
+                { key: 'network_vip_gold_amount_50_100', value: Number(networkVipGoldPremiumAmount_50_100.value) || 0 },
+                { key: 'network_vip_gold_percent_50_100', value: Number(networkVipGoldPremiumPercent_50_100.value) || 0 }
             ]);
 
             saving.value = false;
@@ -1351,7 +1451,14 @@ createApp({
                 { key: 'silver_deduction', value: Number(silverDeduction.value) || 0 },
                 { key: 'use_silver_deduction', value: useSilverDeduction.value ? 1 : 0 },
                 { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
-                { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 }
+                { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 },
+                { key: 'silver_premium_amount_vip', value: Number(silverPremiumAmountVip.value) || 0 },
+                { key: 'silver_premium_amount_vvip', value: Number(silverPremiumAmountVvip.value) || 0 },
+                { key: 'silver_premium_amount_network', value: Number(silverPremiumAmountNetwork.value) || 0 },
+                { key: 'network_gold_amount_25_49', value: Number(networkGoldPremiumAmount_25_49.value) || 0 },
+                { key: 'network_gold_percent_25_49', value: Number(networkGoldPremiumPercent_25_49.value) || 0 },
+                { key: 'network_gold_amount_50_100', value: Number(networkGoldPremiumAmount_50_100.value) || 0 },
+                { key: 'network_gold_percent_50_100', value: Number(networkGoldPremiumPercent_50_100.value) || 0 }
             ]);
             fetchPrices();
         };
@@ -1392,7 +1499,14 @@ createApp({
         };
 
         let autoSaveTimeout;
-        watch([silverDeduction, useSilverDeduction, manualSilverPrice, useManualSilverPrice], () => {
+        watch([
+            silverDeduction, useSilverDeduction, manualSilverPrice, useManualSilverPrice, 
+            silverPremiumAmountVip, silverPremiumAmountVvip, silverPremiumAmountNetwork, silverPremiumAmountNetworkVip,
+            networkGoldPremiumAmount_25_49, networkGoldPremiumPercent_25_49, 
+            networkGoldPremiumAmount_50_100, networkGoldPremiumPercent_50_100,
+            networkVipGoldPremiumAmount_25_49, networkVipGoldPremiumPercent_25_49,
+            networkVipGoldPremiumAmount_50_100, networkVipGoldPremiumPercent_50_100
+        ], () => {
             clearTimeout(autoSaveTimeout);
             autoSaveTimeout = setTimeout(() => {
                 autoSaveSettings();
@@ -1407,7 +1521,7 @@ createApp({
                 .from('transactions')
                 .select('id_card, customer_name')
                 .or(`customer_name.ilike.%${customerSearchQuery.value}%,id_card.ilike.%${customerSearchQuery.value}%`)
-                .not('id_card', 'is', null)
+                // Allow empty id_card, order by newest
                 .order('created_at', { ascending: false });
                 
             customerSearchAttempted.value = true;
@@ -1415,8 +1529,9 @@ createApp({
                 const unique = [];
                 const seen = new Set();
                 for (const item of data) {
-                    if (!seen.has(item.id_card) && item.customer_name) {
-                        seen.add(item.id_card);
+                    const uniqueKey = (item.id_card && item.id_card.trim() !== '') ? item.id_card : item.customer_name;
+                    if (!seen.has(uniqueKey) && item.customer_name) {
+                        seen.add(uniqueKey);
                         unique.push({ ...item, selectedTier: 'vip' });
                     }
                 }
@@ -1427,9 +1542,18 @@ createApp({
         };
 
         const addCustomerTier = async (customer) => {
-            if (!customer.id_card || !customer.customer_name) return;
+            if (!customer.customer_name || customer.customer_name.trim() === '') {
+                await showAppModal('alert', 'ไม่สามารถเพิ่มได้', 'ลูกค้าจำเป็นต้องมีชื่อ');
+                return;
+            }
+            
+            let finalIdCard = customer.id_card;
+            if (!finalIdCard || finalIdCard.trim() === '') {
+                finalIdCard = 'NO_ID_' + customer.customer_name.trim();
+            }
+
             const { error } = await supabase.from('customers').upsert({
-                id_card: customer.id_card,
+                id_card: finalIdCard,
                 customer_name: customer.customer_name,
                 tier: customer.selectedTier
             });
@@ -1453,7 +1577,7 @@ createApp({
         const loadPremiumCustomers = async () => {
             const { data } = await supabase.from('customers')
                 .select('*')
-                .in('tier', ['vip', 'vvip'])
+                .in('tier', ['vip', 'vvip', 'network', 'network_vip'])
                 .order('updated_at', { ascending: false });
             if (data) {
                 premiumCustomersList.value = data;
@@ -1631,7 +1755,7 @@ createApp({
                 net = floor2(perGram * w);
             } else if (tForm.type === 'silver') {
                 const sp = gp;
-                const perGram = Math.floor(sp / 1000);
+                const perGram = Math.floor((sp + premium) / 1000);
                 const withPercent = Math.floor(perGram * (p / 100));
                 net = Math.floor(withPercent * w);
             }
@@ -1681,7 +1805,7 @@ createApp({
             }
 
             let savePremium = Number(tForm.premium_amount) || 0;
-            if (tForm.type !== 'tong_lom') {
+            if (tForm.type !== 'tong_lom' && tForm.type !== 'silver') {
                 savePremium = 0;
             }
 
@@ -2406,10 +2530,22 @@ createApp({
                 console.log('Loaded customer data');
             }
             
-            if (customer.id_card) {
+            if (customer.id_card && !customer.id_card.startsWith('NO_ID_')) {
                 const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', customer.id_card).single();
                 if (custData && custData.tier) {
                     calcForm.value.customerTier = custData.tier;
+                } else {
+                    calcForm.value.customerTier = 'normal';
+                }
+            } else if (customer.customer_name) {
+                const { data } = await supabase.from('customers').select('tier').eq('customer_name', customer.customer_name.trim());
+                if (data && data.length > 0) {
+                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip' || c.tier === 'network' || c.tier === 'network_vip');
+                    if (vipTier) {
+                        calcForm.value.customerTier = vipTier.tier;
+                    } else {
+                        calcForm.value.customerTier = 'normal';
+                    }
                 } else {
                     calcForm.value.customerTier = 'normal';
                 }
@@ -2427,10 +2563,22 @@ createApp({
             if (customer.signature) lastSignature.value = fixUrl(customer.signature);
             isOldCustomer.value = true;
             
-            if (customer.id_card) {
+            if (customer.id_card && !customer.id_card.startsWith('NO_ID_')) {
                 const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', customer.id_card).single();
                 if (custData && custData.tier) {
                     calcForm.value.customerTier = custData.tier;
+                } else {
+                    calcForm.value.customerTier = 'normal';
+                }
+            } else if (customer.customer_name) {
+                const { data } = await supabase.from('customers').select('tier').eq('customer_name', customer.customer_name.trim());
+                if (data && data.length > 0) {
+                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip' || c.tier === 'network' || c.tier === 'network_vip');
+                    if (vipTier) {
+                        calcForm.value.customerTier = vipTier.tier;
+                    } else {
+                        calcForm.value.customerTier = 'normal';
+                    }
                 } else {
                     calcForm.value.customerTier = 'normal';
                 }
@@ -2456,7 +2604,7 @@ createApp({
             if (newVal && newVal.trim().length >= 2) {
                 const { data } = await supabase.from('customers').select('tier').eq('customer_name', newVal.trim());
                 if (data && data.length > 0) {
-                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip');
+                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip' || c.tier === 'network' || c.tier === 'network_vip');
                     if (vipTier) {
                         calcForm.value.customerTier = vipTier.tier;
                     } else {
@@ -3804,6 +3952,18 @@ createApp({
             resolveModal,
             silverDeduction,
             useSilverDeduction,
+            silverPremiumAmountVip,
+            silverPremiumAmountVvip,
+            silverPremiumAmountNetwork,
+            silverPremiumAmountNetworkVip,
+            networkGoldPremiumAmount_25_49,
+            networkGoldPremiumPercent_25_49,
+            networkGoldPremiumAmount_50_100,
+            networkGoldPremiumPercent_50_100,
+            networkVipGoldPremiumAmount_25_49,
+            networkVipGoldPremiumPercent_25_49,
+            networkVipGoldPremiumAmount_50_100,
+            networkVipGoldPremiumPercent_50_100,
             manualSilverPrice,
             useManualSilverPrice,
             isSilverPriceSetToday,
