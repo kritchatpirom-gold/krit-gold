@@ -898,9 +898,9 @@ createApp({
 
         watch([() => calcForm.value.weight, () => calcForm.value.type, () => calcForm.value.customerTier], ([w, t, tier]) => {
             if (w !== null && w !== undefined && w !== '') {
-                // พนักงานให้กรอกทศนิยม 2 ตำแหน่งได้เฉพาะลูกค้า VIP/VVIP/Network/Network VIP หรือ ทองหลอม ส่วน Admin ได้ 2 ตำแหน่งเสมอ
+                // พนักงานให้กรอกทศนิยม 2 ตำแหน่งได้เฉพาะลูกค้า VIP/VVIP/Network/Network VIP หรือ ทองหลอม/ทองแท่ง ส่วน Admin ได้ 2 ตำแหน่งเสมอ
                 let decimalPoints = 1;
-                if (isAdmin.value || tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip' || t === 'tong_lom') {
+                if (isAdmin.value || tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip' || t === 'tong_lom' || t === 'tong_tang') {
                     decimalPoints = 2;
                 }
 
