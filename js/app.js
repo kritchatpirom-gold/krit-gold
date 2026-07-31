@@ -898,9 +898,9 @@ createApp({
 
         watch([() => calcForm.value.weight, () => calcForm.value.type, () => calcForm.value.customerTier], ([w, t, tier]) => {
             if (w !== null && w !== undefined && w !== '') {
-                // พนักงานให้กรอกทศนิยม 2 ตำแหน่งได้เฉพาะลูกค้า VIP/VVIP/Network/Network VIP (ทั้งเงินและทอง) ส่วน Admin ได้ 2 ตำแหน่งเสมอ
+                // พนักงานให้กรอกทศนิยม 2 ตำแหน่งได้เฉพาะลูกค้า VIP/VVIP/Network/Network VIP หรือ ทองหลอม ส่วน Admin ได้ 2 ตำแหน่งเสมอ
                 let decimalPoints = 1;
-                if (isAdmin.value || tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip') {
+                if (isAdmin.value || tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip' || t === 'tong_lom') {
                     decimalPoints = 2;
                 }
 
@@ -944,6 +944,8 @@ createApp({
                 let rawPremium = 0;
                 let rawPercent = 0;
 
+                let premiumType = 'fixed';
+
                 if (tForm.customerTier === 'network' && meetsWeightReq) {
                     if (p >= 25 && p < 50) {
                         rawPremium = Number(networkGoldPremiumAmount_25_49.value) || 0;
@@ -952,6 +954,7 @@ createApp({
                         rawPremium = Number(networkGoldPremiumAmount_50_100.value) || 0;
                         rawPercent = Number(networkGoldPremiumPercent_50_100.value) || 0;
                     }
+                    premiumType = rawPercent > 0 ? 'percent' : 'fixed';
                 } else if (tForm.customerTier === 'network_vip' && meetsWeightReq) {
                     if (p >= 25 && p < 50) {
                         rawPremium = Number(networkVipGoldPremiumAmount_25_49.value) || 0;
@@ -960,7 +963,9 @@ createApp({
                         rawPremium = Number(networkVipGoldPremiumAmount_50_100.value) || 0;
                         rawPercent = Number(networkVipGoldPremiumPercent_50_100.value) || 0;
                     }
+                    premiumType = rawPercent > 0 ? 'percent' : 'fixed';
                 } else if (activePremium && meetsWeightReq) {
+                    premiumType = activePremium.premium_type;
                     if (tForm.customerTier === 'vip') {
                         rawPremium = Number(activePremium.premium_amount_vip) || 0;
                         rawPercent = Number(activePremium.premium_percent_vip) || 0;
@@ -973,7 +978,7 @@ createApp({
                     }
                 }
                 
-                if (rawPercent > 0 && meetsWeightReq) {
+                if (premiumType === 'percent' && meetsWeightReq) {
                     premium = Math.floor(base * (rawPercent / 100));
                 } else {
                     premium = rawPremium;
