@@ -1356,8 +1356,20 @@ createApp({
             user.value = data.session?.user || null;
             if (user.value) {
                 if (isAdmin.value && currentTab.value === 'history') loadTransactions();
-                setupRealtimeRequests();
-                if (isAdmin.value) loadPendingRequests();
+                
+                try {
+                    setupRealtimeRequests();
+                } catch (e) {
+                    console.error('Error setting up realtime (checkAuth):', e);
+                }
+                
+                if (isAdmin.value) {
+                    try {
+                        loadPendingRequests();
+                    } catch (e) {
+                        console.error('Error loading pending requests (checkAuth):', e);
+                    }
+                }
             }
         };
 
@@ -1375,10 +1387,24 @@ createApp({
             } else {
                 user.value = data.user;
                 if (isAdmin.value && currentTab.value === 'history') loadTransactions();
-                setupRealtimeRequests();
-                if (isAdmin.value) loadPendingRequests();
+                
+                try {
+                    setupRealtimeRequests();
+                } catch (e) {
+                    console.error('Error setting up realtime:', e);
+                }
+                
+                if (isAdmin.value) {
+                    try {
+                        loadPendingRequests();
+                    } catch (e) {
+                        console.error('Error loading pending requests:', e);
+                    }
+                }
+                
                 showAuth.value = false;
                 currentTab.value = 'calculator';
+                await showAppModal('alert', 'สำเร็จ', 'เข้าสู่ระบบสำเร็จ');
             }
         };
 
