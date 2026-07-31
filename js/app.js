@@ -1281,12 +1281,83 @@ createApp({
             if (input) input.value = '';
         };
 
+        // --- Price Edit Requests ---
+        const priceEditStatus = ref(null); // null, 'pending', 'approved', 'rejected'
+        const currentPriceEditRequestId = ref(null);
+        const adminPendingRequests = ref([]);
+        
+        const requestPriceEdit = async () => {
+            if (!user.value || isAdmin.value) return;
+            priceEditStatus.value = 'pending';
+            const { data, error } = await supabase.from('price_edit_requests').insert({
+                status: 'pending'
+            }).select().single();
+            
+            if (data) {
+                currentPriceEditRequestId.value = data.id;
+            } else if (error) {
+                console.error("Error requesting price edit:", error);
+                priceEditStatus.value = null;
+            }
+        };
+
+        const approvePriceEdit = async (id) => {
+            await supabase.from('price_edit_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', id);
+        };
+        
+        const rejectPriceEdit = async (id) => {
+            await supabase.from('price_edit_requests').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', id);
+        };
+
+        const setupRealtimeRequests = () => {
+            supabase.channel('price_edit_requests')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'price_edit_requests' }, payload => {
+                    const req = payload.new;
+                    
+                    if (isAdmin.value) {
+                        if (payload.eventType === 'INSERT' && req.status === 'pending') {
+                            adminPendingRequests.value.push(req);
+                        } else if (payload.eventType === 'UPDATE') {
+                            const index = adminPendingRequests.value.findIndex(r => r.id === req.id);
+                            if (req.status !== 'pending') {
+                                if (index !== -1) adminPendingRequests.value.splice(index, 1);
+                            } else if (index === -1) {
+                                adminPendingRequests.value.push(req);
+                            }
+                        } else if (payload.eventType === 'DELETE') {
+                            adminPendingRequests.value = adminPendingRequests.value.filter(r => r.id !== payload.old.id);
+                        }
+                    } 
+                    
+                    if (!isAdmin.value && currentPriceEditRequestId.value === req.id && payload.eventType === 'UPDATE') {
+                        priceEditStatus.value = req.status;
+                        if (req.status === 'approved') {
+                            // Don't show modal, just change UI state to avoid interrupting flow
+                        } else if (req.status === 'rejected') {
+                            currentPriceEditRequestId.value = null;
+                            priceEditStatus.value = null;
+                        }
+                    }
+                })
+                .subscribe();
+        };
+
+        const loadPendingRequests = async () => {
+            if (!isAdmin.value) return;
+            const { data } = await supabase.from('price_edit_requests').select('*').eq('status', 'pending');
+            if (data) {
+                adminPendingRequests.value = data;
+            }
+        };
+
         // Auth
         const checkAuth = async () => {
             const { data } = await supabase.auth.getSession();
             user.value = data.session?.user || null;
             if (user.value) {
                 if (isAdmin.value && currentTab.value === 'history') loadTransactions();
+                setupRealtimeRequests();
+                if (isAdmin.value) loadPendingRequests();
             }
         };
 
@@ -1303,6 +1374,9 @@ createApp({
                 authError.value = error.message;
             } else {
                 user.value = data.user;
+                if (isAdmin.value && currentTab.value === 'history') loadTransactions();
+                setupRealtimeRequests();
+                if (isAdmin.value) loadPendingRequests();
                 showAuth.value = false;
                 currentTab.value = 'calculator';
             }
@@ -2225,6 +2299,13 @@ createApp({
                 afterPrintExecuted = true;
                 
                 window.removeEventListener('afterprint', handleAfterPrint);
+
+                if (currentPriceEditRequestId.value) {
+                    supabase.from('price_edit_requests').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', currentPriceEditRequestId.value).then(() => {
+                        priceEditStatus.value = null;
+                        currentPriceEditRequestId.value = null;
+                    });
+                }
 
                 if (paidCash > 0) {
                     const breakdown = getBanknoteBreakdown(paidCash, preDeductBalance);
@@ -4104,7 +4185,13 @@ createApp({
             deleteExtraProfit,
             extraProfitDateFilterMode,
             extraProfitStartDate,
-            extraProfitEndDate
+            extraProfitEndDate,
+            priceEditStatus,
+            currentPriceEditRequestId,
+            adminPendingRequests,
+            requestPriceEdit,
+            approvePriceEdit,
+            rejectPriceEdit
         };
     }
 }).mount('#app');
