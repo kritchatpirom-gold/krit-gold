@@ -88,6 +88,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
@@ -1891,6 +1892,12 @@
                                             title="เปิดลิ้นชักเก็บเงิน">
                                             <i class="fa-solid fa-vault text-xl group-hover:scale-110 transition-transform"></i>
                                         </button>
+                                        <button v-if="isLoggedIn" @click="reprintLatestReceipt"
+                                            class="w-16 py-4 rounded-xl bg-gray-800 border border-gray-700 text-blue-400 hover:bg-gray-700 transition-all flex flex-col justify-center items-center group shadow-lg"
+                                            title="ปริ้นย้อนหลัง (ลูกค้าคนล่าสุด)">
+                                            <i class="fa-solid fa-clock-rotate-left text-xl group-hover:scale-110 transition-transform mb-1"></i>
+                                            <span class="text-[9px]">ใหม่ล่าสุด</span>
+                                        </button>
                                         <button @click="saveAndPrint" :disabled="(!isPrintReady && !isAdmin) || saving || (isLoggedIn && cashAmountToPay > drawerTotal)"
                                             :class="(!isPrintReady && !isAdmin) || saving || (isLoggedIn && cashAmountToPay > drawerTotal) ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'"
                                             class="flex-1 py-4 rounded-xl font-bold text-lg transition-all flex justify-center items-center">
@@ -2590,6 +2597,34 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- LINE Messaging API Settings -->
+                    <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+                            <h3 class="font-bold text-xl text-white"><i class="fa-brands fa-line mr-2 text-green-500"></i> การแจ้งเตือนผ่าน LINE (Messaging API)</h3>
+                            <button @click="saveLineNotifyToken" :disabled="saving"
+                                class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
+                        </div>
+                        <div class="bg-dark-base p-6 rounded-xl border border-gray-800 space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-1">Channel Access Token (Long-lived)</label>
+                                <input type="password" v-model="lineNotifyToken" placeholder="กรอก Token ของ LINE OA (ทิ้งว่างเพื่อปิดใช้งาน)"
+                                    class="w-full px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none text-md">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-1">Target ID (User ID / Group ID)</label>
+                                <input type="text" v-model="lineTargetId" placeholder="กรอกรหัสของห้องแชทที่จะให้บอทส่งข้อความไป"
+                                    class="w-full px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none text-md">
+                                <p class="text-xs text-gray-500 mt-1">รหัสนี้ได้จากหน้า Basic Settings (Your user ID) หรือรับจาก Webhook ตอนดึงบอทเข้ากลุ่ม</p>
+                            </div>
+                            <div class="pt-4 flex justify-end border-t border-gray-800">
+                                <button @click="testLineNotify" :disabled="!lineNotifyToken || !lineTargetId || testingLine"
+                                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold rounded-lg transition disabled:opacity-50">
+                                    <i class="fa-solid fa-bell mr-1"></i> ทดสอบส่งข้อความ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     
                     <!-- Customer Tier Management -->
                     <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
@@ -3161,7 +3196,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.31" type="module"></script>
+    <script src="/js/app.js?v=1.0.33" type="module"></script>
 </body>
 
 </html>

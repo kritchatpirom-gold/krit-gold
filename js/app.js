@@ -25,6 +25,7 @@ createApp({
         const authError = ref('');
         const authLoading = ref(false);
         const mobileMenuOpen = ref(false);
+        let pauseCustomerWatch = false;
         const lastSignature = ref(null);
         const productPhoto = ref(null);
         const viewingPhoto = ref(null);
@@ -78,6 +79,11 @@ createApp({
         
         // Attendance State
         const lateDeductionRate = ref(1);
+        
+        // LINE Notify State
+        const lineNotifyToken = ref('');
+        const lineTargetId = ref('');
+        const testingLine = ref(false);
         const attendanceData = ref({ idCard: '', name: '', photo: '' });
         const attendanceLoading = ref(false);
         const submittingAttendance = ref(false);
@@ -728,19 +734,17 @@ createApp({
         const isOldCustomer = ref(false);
 
         const resetForm = () => {
-            calcForm.value = {
-                type: 'tong_lom',
-                weight: null,
-                percent: null,
-                customerName: '',
-                phone: '',
-                idCard: '',
-                address: '',
-                idCardPhoto: '',
-                expireDate: '',
-                manualPrice: null,
-                manualPremium: null
-            };
+            calcForm.value.type = 'tong_lom';
+            calcForm.value.weight = null;
+            calcForm.value.percent = null;
+            calcForm.value.customerName = '';
+            calcForm.value.phone = '';
+            calcForm.value.idCard = '';
+            calcForm.value.address = '';
+            calcForm.value.idCardPhoto = '';
+            calcForm.value.expireDate = '';
+            calcForm.value.manualPrice = null;
+            calcForm.value.manualPremium = null;
             transferAmount.value = 0;
             clearSignature();
             isOldCustomer.value = false;
@@ -1445,6 +1449,14 @@ createApp({
                     if (lateRateSetting && lateRateSetting.value !== null) {
                         lateDeductionRate.value = Number(lateRateSetting.value);
                     }
+                    const lineNotifySetting = settingsData.find(s => s.key === 'line_channel_access_token');
+                    if (lineNotifySetting && lineNotifySetting.value_text) {
+                        lineNotifyToken.value = lineNotifySetting.value_text;
+                    }
+                    const lineTargetSetting = settingsData.find(s => s.key === 'line_target_id');
+                    if (lineTargetSetting && lineTargetSetting.value_text) {
+                        lineTargetId.value = lineTargetSetting.value_text;
+                    }
                     const silverSetting = settingsData.find(s => s.key === 'silver_deduction');
                     if (silverSetting && silverSetting.value !== null) {
                         silverDeduction.value = Number(silverSetting.value);
@@ -1547,6 +1559,66 @@ createApp({
                 alert('เกิดข้อผิดพลาดในการบันทึก');
             } finally {
                 saving.value = false;
+            }
+        };
+
+        const saveLineNotifyToken = async () => {
+            saving.value = true;
+            try {
+                await supabase.from('global_settings').upsert([
+                    { key: 'line_channel_access_token', value: 0, value_text: lineNotifyToken.value || '' },
+                    { key: 'line_target_id', value: 0, value_text: lineTargetId.value || '' }
+                ]);
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่า LINE สำเร็จ');
+            } catch(e) {
+                console.error(e);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกการตั้งค่า LINE ได้');
+            } finally {
+                saving.value = false;
+            }
+        };
+
+        const sendLineNotify = async (message) => {
+            if (!lineNotifyToken.value || !lineTargetId.value) return;
+            try {
+                await fetch('/api/line_notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: lineNotifyToken.value,
+                        targetId: lineTargetId.value,
+                        message: message
+                    })
+                });
+            } catch(e) {
+                console.error('LINE Notify Error:', e);
+            }
+        };
+
+        const testLineNotify = async () => {
+            testingLine.value = true;
+            try {
+                const res = await fetch('/api/line_notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: lineNotifyToken.value,
+                        targetId: lineTargetId.value,
+                        message: '✅ ทดสอบการเชื่อมต่อ LINE Messaging API จากระบบ Krit-Gold สำเร็จ!'
+                    })
+                });
+                
+                if (res.ok) {
+                    await showAppModal('alert', 'สำเร็จ', 'ส่งข้อความทดสอบสำเร็จ กรุณาตรวจสอบใน LINE');
+                } else {
+                    const errorData = await res.json();
+                    await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ส่งไม่สำเร็จ: ' + (errorData.error || res.statusText));
+                }
+            } catch(e) {
+                console.error(e);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อ API ได้');
+            } finally {
+                testingLine.value = false;
             }
         };
 
@@ -1772,7 +1844,7 @@ createApp({
             });
         };
 
-        const reprintGroup = async (g) => {
+        const reprintGroup = async (g, clearAfter = false) => {
             const backupBillItems = [...billItems.value];
             const backupCalcForm = { ...calcForm.value };
             const backupTransferAmount = transferAmount.value;
@@ -1787,6 +1859,8 @@ createApp({
                 premium: parseFloat(t.premium_amount) || 0,
                 netPrice: parseFloat(t.net_price) || 0
             }));
+
+            pauseCustomerWatch = true;
 
             calcForm.value.customerName = g.customer_name || '';
             calcForm.value.phone = g.phone || '';
@@ -1805,18 +1879,107 @@ createApp({
                     if (restored) return;
                     restored = true;
                     window.removeEventListener('afterprint', restoreData);
-                    billItems.value = backupBillItems;
-                    calcForm.value = backupCalcForm;
-                    transferAmount.value = backupTransferAmount;
-                    lastSignature.value = backupSignature;
+                    document.removeEventListener('click', restoreData);
+                    document.removeEventListener('touchstart', restoreData);
+                    
+                    // ALWAYS clear the form. Never restore backup data.
+                    billItems.value = [];
+                    transferAmount.value = 0;
+                    resetForm();
+                    clearSignature();
+                    removePhoto();
+                    
+                    // Double ensure Vue reactivity queue is flushed
+                    setTimeout(() => {
+                        resetForm();
+                        clearSignature();
+                        removePhoto();
+                        pauseCustomerWatch = false;
+                    }, 500);
                 };
                 
                 window.addEventListener('afterprint', restoreData);
+                const mql = window.matchMedia('print');
+                const mqlListener = (e) => {
+                    if (!e.matches) {
+                        restoreData();
+                        mql.removeEventListener('change', mqlListener);
+                    }
+                };
+                mql.addEventListener('change', mqlListener);
+                
+                const focusHandler = () => {
+                    restoreData();
+                    window.removeEventListener('focus', focusHandler);
+                };
+                setTimeout(() => {
+                    window.addEventListener('focus', focusHandler);
+                    // iOS fallback: user interacting with page means print dialog is closed
+                    document.addEventListener('click', restoreData);
+                    document.addEventListener('touchstart', restoreData);
+                }, 1000);
+
                 window.print();
                 
                 // Fallback for mobile
-                setTimeout(restoreData, 30000);
+                setTimeout(restoreData, 15000);
             }, 200); // Already preloaded, short delay for layout
+        };
+
+        const reprintLatestReceipt = async () => {
+            try {
+                // Fetch the latest 10 transactions (to capture the whole bill)
+                const { data, error } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+                
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    await showAppModal('alert', 'ไม่พบข้อมูล', 'ไม่มีรายการล่าสุดให้ปริ้นย้อนหลัง');
+                    return;
+                }
+                
+                // Group them exactly like groupedTransactions
+                const groups = {};
+                data.forEach(t => {
+                    const dateKey = t.created_at ? t.created_at.substring(0, 16) : 'unknown';
+                    const key = `${dateKey}_${t.customer_name || 'noname'}_${t.phone || 'nophone'}`;
+                    
+                    if (!groups[key]) {
+                        groups[key] = {
+                            key: key,
+                            ids: [],
+                            created_at: t.created_at,
+                            customer_name: t.customer_name,
+                            phone: t.phone,
+                            address: t.address,
+                            signature: t.signature,
+                            photo: t.photo,
+                            id_card_photo: t.id_card_photo,
+                            items: [],
+                            net_price: 0
+                        };
+                    } else {
+                        if (t.signature) groups[key].signature = t.signature;
+                        if (t.photo) groups[key].photo = t.photo;
+                        if (t.id_card_photo) groups[key].id_card_photo = t.id_card_photo;
+                    }
+                    groups[key].ids.push(t.id);
+                    groups[key].items.push(t);
+                    groups[key].net_price += parseFloat(t.net_price) || 0;
+                });
+                
+                const groupList = Object.values(groups).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                
+                if (groupList.length > 0) {
+                    await reprintGroup(groupList[0], true);
+                }
+            } catch (err) {
+                console.error("Error reprinting latest receipt:", err);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถปริ้นย้อนหลังได้: ' + err.message);
+            }
         };
 
         const editTrxModal = ref({
@@ -2326,6 +2489,14 @@ createApp({
                 
                 window.removeEventListener('afterprint', handleAfterPrint);
 
+                // Clear all state immediately after print dialog closes
+                // so the user can start the next queue right away
+                billItems.value = [];
+                transferAmount.value = 0;
+                resetForm();
+                clearSignature();
+                removePhoto();
+
                 if (currentPriceEditRequestId.value) {
                     supabase.from('price_edit_requests').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', currentPriceEditRequestId.value).then(() => {
                         priceEditStatus.value = null;
@@ -2351,25 +2522,47 @@ createApp({
                 } else if (paidTransfer > 0) {
                     await showAppModal('alert', 'เสร็จสิ้นการทำรายการ', `บันทึกข้อมูลและพิมพ์บิลเรียบร้อยแล้ว!\n\nยอดชำระผ่านการโอนทั้งหมด: ${formatCurrency(paidTransfer)} บาท`);
                 }
-
-                // Clear all state
-                billItems.value = [];
-                transferAmount.value = 0;
-                resetForm();
-                clearSignature();
-                removePhoto();
             };
 
             const triggerPrint = async () => {
                 await preloadImage(lastSignature.value);
                 window.addEventListener('afterprint', handleAfterPrint);
+                const mql = window.matchMedia('print');
+                const mqlListener = (e) => {
+                    if (!e.matches) {
+                        handleAfterPrint();
+                        mql.removeEventListener('change', mqlListener);
+                    }
+                };
+                mql.addEventListener('change', mqlListener);
+                
+                // Fallback for mobile Safari where afterprint does not fire reliably.
+                // Mobile Safari print dialog opens in a separate view, causing window to lose focus.
+                const focusHandler = () => {
+                    handleAfterPrint();
+                    window.removeEventListener('focus', focusHandler);
+                };
+                
+                const interactionHandler = () => {
+                    handleAfterPrint();
+                    document.removeEventListener('click', interactionHandler);
+                    document.removeEventListener('touchstart', interactionHandler);
+                };
+
+                setTimeout(() => {
+                    window.addEventListener('focus', focusHandler);
+                    document.addEventListener('click', interactionHandler);
+                    document.addEventListener('touchstart', interactionHandler);
+                }, 1000);
+
                 window.print();
 
-                // Fallback for mobile browsers that don't block JS execution
-                // and might not reliably fire afterprint, giving them 30 secs to render PDF.
+                // Hard fallback
                 setTimeout(() => {
                     handleAfterPrint();
-                }, 30000);
+                    document.removeEventListener('click', interactionHandler);
+                    document.removeEventListener('touchstart', interactionHandler);
+                }, 15000);
             };
 
             // If completely public guest (no login), just print without calling DB
@@ -2423,6 +2616,41 @@ createApp({
                 const { data: insertedTrxs, error } = await supabase.from('transactions').insert(trData).select();
                 if (error) throw error;
                 const transactionId = insertedTrxs && insertedTrxs.length > 0 ? insertedTrxs[0].id : null;
+
+                // Send LINE Notify
+                if (lineNotifyToken.value) {
+                    try {
+                        let notifyMsg = '\n🔔 รายการใหม่!\n';
+                        notifyMsg += `ลูกค้า: ${trData[0].customer_name}\n`;
+                        if (trData[0].phone) notifyMsg += `เบอร์โทร: ${trData[0].phone}\n`;
+                        notifyMsg += `----------------\n`;
+                        
+                        trData.forEach((item, index) => {
+                            let tName = item.type;
+                            if (item.type === 'tong_lom') tName = 'ทองหลอม';
+                            if (item.type === 'tong_roop') tName = 'ทองรูปพรรณ';
+                            if (item.type === 'tong_tang') tName = 'ทองแท่ง';
+                            if (item.type === 'silver') tName = 'เงิน';
+                            if (item.type === 'silver_jewelry') tName = 'เครื่องประดับเงิน';
+                            if (item.type === 'platinum') tName = 'ทองคำขาว';
+                            
+                            notifyMsg += `${index + 1}. ${tName}\n`;
+                            if (item.weight) notifyMsg += `⚖️ น้ำหนัก: ${item.weight} กรัม\n`;
+                            if (item.percent) notifyMsg += `✨ เปอร์เซ็นต์: ${item.percent}%\n`;
+                            notifyMsg += `💎 ราคาทอง(ฐาน): ${formatCurrency(item.base_price)} ฿\n`;
+                            notifyMsg += `💰 ยอดสุทธิ: ${formatCurrency(item.net_price)} ฿\n`;
+                            notifyMsg += `----------------\n`;
+                        });
+                        
+                        notifyMsg += `📌 รวมทั้งบิล: ${formatCurrency(billTotal.value)} ฿\n`;
+                        if (cashAmountToPay.value > 0) notifyMsg += `💵 เงินสด: ${formatCurrency(cashAmountToPay.value)} ฿\n`;
+                        if (transferAmount.value > 0) notifyMsg += `📱 โอนเงิน: ${formatCurrency(transferAmount.value)} ฿`;
+                        
+                        sendLineNotify(notifyMsg);
+                    } catch(err) {
+                        console.error('Error sending line notify:', err);
+                    }
+                }
 
                 // Deduct drawer balance
                 preDeductBalance = await deductDrawerBalance(cashAmountToPay.value, transactionId);
@@ -2702,6 +2930,7 @@ createApp({
         };
 
         watch(() => calcForm.value.phone, (newVal) => {
+            if (pauseCustomerWatch) return;
             clearTimeout(fetchCustomerTimeout);
             if (newVal && newVal.length >= 9) { // Trigger search when phone is almost complete
                 fetchCustomerTimeout = setTimeout(() => {
@@ -2711,6 +2940,7 @@ createApp({
         });
 
         watch(() => calcForm.value.customerName, async (newVal) => {
+            if (pauseCustomerWatch) return;
             clearTimeout(fetchCustomerTimeout);
             
             if (newVal && newVal.trim().length >= 2) {
@@ -3994,6 +4224,11 @@ createApp({
             attendanceSummary,
             loadingAttendanceSummary,
             lateDeductionRate,
+            lineNotifyToken,
+            lineTargetId,
+            testingLine,
+            saveLineNotifyToken,
+            testLineNotify,
             loadAttendanceSummary,
             resetAttendanceData,
             readCardForAttendance,
@@ -4122,6 +4357,7 @@ createApp({
               onEditBasePrice,
               saveEditTransaction,
               reprintGroup,
+              reprintLatestReceipt,
               loadTransactions,
             deleteSelected,
             exportCSV,

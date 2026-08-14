@@ -1,6 +1,47 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
+// api/line_notify.js
+async function onRequestPost({ request }) {
+  try {
+    const { message, token, targetId } = await request.json();
+    if (!message || !token || !targetId) {
+      return new Response(JSON.stringify({ error: "Missing message, token, or targetId" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const payload = {
+      to: targetId,
+      messages: [
+        {
+          type: "text",
+          text: message
+        }
+      ]
+    };
+    const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    const responseData = await lineResponse.json();
+    return new Response(JSON.stringify(responseData), {
+      status: lineResponse.status,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+__name(onRequestPost, "onRequestPost");
+
 // api/gold.js
 async function onRequest(context) {
   try {
@@ -87,8 +128,15 @@ async function onRequest2(context) {
 }
 __name(onRequest2, "onRequest");
 
-// ../.wrangler/tmp/pages-wK3QR4/functionsRoutes-0.8775446808037493.mjs
+// ../.wrangler/tmp/pages-bQCi3M/functionsRoutes-0.7188242618684836.mjs
 var routes = [
+  {
+    routePath: "/api/line_notify",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost]
+  },
   {
     routePath: "/api/gold",
     mountPath: "/api",
@@ -592,7 +640,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-DwGYxu/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-bFUVja/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -624,7 +672,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-DwGYxu/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-bFUVja/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -724,4 +772,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.898454485665415.mjs.map
+//# sourceMappingURL=functionsWorker-0.7296033614245719.mjs.map

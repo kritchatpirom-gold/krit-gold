@@ -66,11 +66,16 @@ WITH CHECK (bucket_id = 'transaction_assets'::text);
 -- Table: global_settings
 CREATE TABLE IF NOT EXISTS global_settings (
   key TEXT PRIMARY KEY,
-  value NUMERIC NOT NULL
+  value NUMERIC NOT NULL,
+  value_text TEXT
 );
 
 -- Insert default silver deduction (13%)
 INSERT INTO global_settings (key, value) VALUES ('silver_deduction', 13) ON CONFLICT (key) DO NOTHING;
+
+-- Insert default LINE settings
+INSERT INTO global_settings (key, value, value_text) VALUES ('line_channel_access_token', 0, '') ON CONFLICT (key) DO NOTHING;
+INSERT INTO global_settings (key, value, value_text) VALUES ('line_target_id', 0, '') ON CONFLICT (key) DO NOTHING;
 
 -- Setup RLS for global_settings
 ALTER TABLE global_settings ENABLE ROW LEVEL SECURITY;

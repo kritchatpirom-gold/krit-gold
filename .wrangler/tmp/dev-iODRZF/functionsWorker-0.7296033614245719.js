@@ -1,9 +1,49 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/pages-wK3QR4/functionsWorker-0.898454485665415.mjs
+// .wrangler/tmp/pages-bQCi3M/functionsWorker-0.7296033614245719.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
+async function onRequestPost({ request }) {
+  try {
+    const { message, token, targetId } = await request.json();
+    if (!message || !token || !targetId) {
+      return new Response(JSON.stringify({ error: "Missing message, token, or targetId" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const payload = {
+      to: targetId,
+      messages: [
+        {
+          type: "text",
+          text: message
+        }
+      ]
+    };
+    const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    const responseData = await lineResponse.json();
+    return new Response(JSON.stringify(responseData), {
+      status: lineResponse.status,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+__name(onRequestPost, "onRequestPost");
+__name2(onRequestPost, "onRequestPost");
 async function onRequest(context) {
   try {
     const response = await fetch("https://gold.kritgold.workers.dev", {
@@ -89,6 +129,13 @@ async function onRequest2(context) {
 __name(onRequest2, "onRequest2");
 __name2(onRequest2, "onRequest");
 var routes = [
+  {
+    routePath: "/api/line_notify",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost]
+  },
   {
     routePath: "/api/gold",
     mountPath: "/api",
@@ -769,7 +816,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-aeCron/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-CThNJ1/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -801,7 +848,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-aeCron/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-CThNJ1/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -901,4 +948,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.898454485665415.js.map
+//# sourceMappingURL=functionsWorker-0.7296033614245719.js.map
