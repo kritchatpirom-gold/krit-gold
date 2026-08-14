@@ -1896,7 +1896,7 @@
                                             class="w-16 py-4 rounded-xl bg-gray-800 border border-gray-700 text-blue-400 hover:bg-gray-700 transition-all flex flex-col justify-center items-center group shadow-lg"
                                             title="ปริ้นย้อนหลัง (ลูกค้าคนล่าสุด)">
                                             <i class="fa-solid fa-clock-rotate-left text-xl group-hover:scale-110 transition-transform mb-1"></i>
-                                            <span class="text-[9px]">ใหม่ล่าสุด</span>
+                                            <span class="text-[9px]">บิลล่าสุด</span>
                                         </button>
                                         <button @click="saveAndPrint" :disabled="(!isPrintReady && !isAdmin) || saving || (isLoggedIn && cashAmountToPay > drawerTotal)"
                                             :class="(!isPrintReady && !isAdmin) || saving || (isLoggedIn && cashAmountToPay > drawerTotal) ? 'opacity-50 cursor-not-allowed bg-gray-700 text-gray-400' : 'bg-gradient-to-r from-gold-600 to-gold-400 hover:from-gold-500 hover:to-gold-300 text-black shadow-lg hover-glow'"
