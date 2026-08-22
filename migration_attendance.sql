@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS attendance (
   name TEXT NOT NULL,
   date DATE NOT NULL DEFAULT CURRENT_DATE,
   check_in_time TIME NOT NULL DEFAULT CURRENT_TIME,
+  check_out_time TIME,
   late_minutes INTEGER DEFAULT 0,
+  ot_minutes INTEGER DEFAULT 0,
   deduction_amount NUMERIC DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
@@ -18,3 +20,7 @@ CREATE POLICY "Allow authenticated full access to attendance" ON attendance FOR 
 
 -- Insert default late deduction rate (1 baht per minute)
 INSERT INTO global_settings (key, value) VALUES ('late_deduction_rate', 1) ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE attendance 
+ADD COLUMN check_out_time TIME,
+ADD COLUMN ot_minutes INTEGER DEFAULT 0;

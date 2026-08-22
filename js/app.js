@@ -1299,6 +1299,14 @@ createApp({
             
             if (data) {
                 currentPriceEditRequestId.value = data.id;
+                
+                if (lineNotifyToken.value) {
+                    const employeeName = user.value.email ? user.value.email.split('@')[0] : 'พนักงาน';
+                    let notifyMsg = `\n🔔 ขออนุมัติแก้ไขราคาทอง\n`;
+                    notifyMsg += `พนักงาน: ${employeeName}\n`;
+                    notifyMsg += `กรุณาตรวจสอบในระบบ`;
+                    sendLineNotify(notifyMsg);
+                }
             } else if (error) {
                 console.error("Error requesting price edit:", error);
                 priceEditStatus.value = null;
@@ -3179,6 +3187,67 @@ createApp({
             }
         };
 
+        const submitCheckOut = async () => {
+            if (submittingAttendance.value || !attendanceData.value.idCard) return;
+            submittingAttendance.value = true;
+            try {
+                const now = new Date();
+                const bkkTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+                const checkOutTimeStr = String(bkkTime.getHours()).padStart(2, '0') + ':' + String(bkkTime.getMinutes()).padStart(2, '0') + ':' + String(bkkTime.getSeconds()).padStart(2, '0');
+                const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
+
+                // Check if checked in today
+                const { data: existingData, error: findError } = await supabase
+                    .from('attendance')
+                    .select('*')
+                    .eq('id_card', attendanceData.value.idCard)
+                    .eq('date', todayStr)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (findError || !existingData) {
+                    alert('ไม่พบข้อมูลการเข้างานของวันนี้ กรุณาบันทึกเวลาเข้างานก่อน');
+                    return;
+                }
+
+                // Calculate OT
+                // ถ้าเกิน 17:30 ไป 15 นาทีให้เริ่มนับเวลาทำ ot ตั้งแต่นาทีที่ 17:30
+                let otMinutes = 0;
+                const currentMins = bkkTime.getHours() * 60 + bkkTime.getMinutes();
+                const otStartMins = 17 * 60 + 30; // 17:30
+                const otThresholdMins = otStartMins + 15; // 17:45
+
+                if (currentMins >= otThresholdMins) {
+                    otMinutes = currentMins - otStartMins;
+                }
+
+                const { error: updateError } = await supabase
+                    .from('attendance')
+                    .update({
+                        check_out_time: checkOutTimeStr,
+                        ot_minutes: otMinutes
+                    })
+                    .eq('id', existingData.id);
+
+                if (updateError) throw updateError;
+                
+                let alertMessage = 'บันทึกเวลาออกงานเรียบร้อยแล้ว\nเวลาออกงานของคุณคือ: ' + checkOutTimeStr;
+                if (otMinutes > 0 && isAdmin.value) {
+                    alertMessage += `\n\n🕒 ทำ OT ไปทั้งหมด ${otMinutes} นาที`;
+                }
+                
+                await showAppModal('alert', 'สำเร็จ', alertMessage);
+                resetAttendanceData();
+                loadTodayAttendance();
+            } catch (err) {
+                console.error('Error submitting checkout', err);
+                alert('เกิดข้อผิดพลาดในการบันทึกเวลาออกงาน');
+            } finally {
+                submittingAttendance.value = false;
+            }
+        };
+
         const loadAttendanceSummary = async () => {
             if (!isAdmin.value) return;
             loadingAttendanceSummary.value = true;
@@ -3203,6 +3272,7 @@ createApp({
                             id_card: log.id_card,
                             name: log.name,
                             total_late_minutes: 0,
+                            total_ot_minutes: 0,
                             total_deduction: 0,
                             late_days: 0,
                             total_days: 0
@@ -3213,6 +3283,9 @@ createApp({
                         summaryMap[log.id_card].total_late_minutes += log.late_minutes;
                         summaryMap[log.id_card].total_deduction += Number(log.deduction_amount) || 0;
                         summaryMap[log.id_card].late_days += 1;
+                    }
+                    if (log.ot_minutes > 0) {
+                        summaryMap[log.id_card].total_ot_minutes += log.ot_minutes;
                     }
                 });
                 
@@ -4235,6 +4308,7 @@ createApp({
             loadTodayAttendance,
             deleteAttendance,
             submitCheckIn,
+            submitCheckOut,
             saveAttendanceSettings,
             showTopUpModal,
             savingTopUp,
