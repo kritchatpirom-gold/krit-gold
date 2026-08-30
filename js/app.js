@@ -11,8 +11,10 @@ const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // Robust truncation helper to skip floating-point binary gaps (like .42999... becoming .43)
 const floor2 = (v) => {
-    if (v === null || v === undefined) return 0;
-    const s = Number(v).toFixed(4); // Rounds to 4th decimal to clean ghost bits
+    if (v === null || v === undefined || v === '') return 0;
+    const num = Number(v);
+    if (isNaN(num)) return 0;
+    const s = num.toFixed(4); // Rounds to 4th decimal to clean ghost bits
     return Number(s.slice(0, -2)); // Truncates to 2nd decimal
 };
 
@@ -89,6 +91,10 @@ createApp({
         const submittingAttendance = ref(false);
         const todayAttendance = ref([]);
         const loadingAttendanceList = ref(false);
+        const attendanceFilterMode = ref('today'); // 'today', 'yesterday', 'week', 'month', 'range', 'all'
+        const attendanceStartDate = ref(new Date().toLocaleDateString('en-CA'));
+        const attendanceEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        const attendanceSearchQuery = ref('');
         const attendanceSummaryMonth = ref(new Date().toISOString().substring(0, 7)); // YYYY-MM
         const attendanceSummary = ref([]);
         const loadingAttendanceSummary = ref(false);
@@ -802,12 +808,52 @@ createApp({
             }
         });
 
-        const isBaseValid = computed(() => {
-            if (calcForm.value.type === 'tong_roop' || calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') {
-                return calcForm.value.weight > 0;
-            } else {
-                return calcForm.value.weight > 0 && calcForm.value.percent !== null && calcForm.value.percent !== '';
+        const isMerchantCustomer = computed(() => {
+            const tier = calcForm.value.customerTier;
+            const isTierMerchant = tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip';
+            const isNameMerchant = Boolean(calcForm.value.customerName && calcForm.value.customerName.includes('พ่อค้า'));
+            return isTierMerchant || isNameMerchant;
+        });
+
+        const isPercentValid = computed(() => {
+            const type = calcForm.value.type;
+            if (type === 'redeem' || type === 'tong_tang') {
+                return true;
             }
+            if (calcForm.value.percent === null || calcForm.value.percent === undefined || calcForm.value.percent === '') {
+                return false;
+            }
+            const num = Number(calcForm.value.percent);
+            if (isNaN(num) || num <= 0 || num > 100) {
+                return false;
+            }
+
+            // บังคับพนักงานกรอกทศนิยม 2 ตำแหน่งเมื่อเป็นทองหลอมและลูกค้าเป็นพ่อค้า
+            if (!isAdmin.value && type === 'tong_lom' && isMerchantCustomer.value) {
+                const strVal = String(calcForm.value.percent).trim();
+                return /^\d+(\.\d{2})$/.test(strVal);
+            }
+
+            return true;
+        });
+
+        const isWeightValid = computed(() => {
+            const w = calcForm.value.weight;
+            if (w === null || w === undefined || w === '') return false;
+            const num = Number(w);
+            if (isNaN(num) || num <= 0) return false;
+
+            // บังคับพนักงานกรอกทศนิยม 1 ตำแหน่งเมื่อเป็นเงินและลูกค้าเป็นพ่อค้า
+            if (!isAdmin.value && calcForm.value.type === 'silver' && isMerchantCustomer.value) {
+                const strVal = String(w).trim();
+                return /^\d+(\.\d{1})$/.test(strVal);
+            }
+
+            return true;
+        });
+
+        const isBaseValid = computed(() => {
+            return isWeightValid.value && isPercentValid.value;
         });
 
         const isFormValid = computed(() => {
@@ -857,24 +903,54 @@ createApp({
         watch(() => calcForm.value.type, (newType) => {
             calcForm.value.manualPrice = null;
             if (newType === 'tong_roop') {
-                calcForm.value.percent = 96.00;
+                calcForm.value.percent = isMerchantCustomer.value ? '96.50' : '96';
             } else if (newType === 'redeem' || newType === 'tong_tang') {
                 calcForm.value.percent = null;
+            }
+        });
+
+        watch(isMerchantCustomer, (isMerchant) => {
+            if (calcForm.value.type === 'tong_roop') {
+                if (isMerchant && (calcForm.value.percent === '96.00' || calcForm.value.percent === '96' || !calcForm.value.percent)) {
+                    calcForm.value.percent = '96.50';
+                } else if (!isMerchant && (calcForm.value.percent === '96.50' || calcForm.value.percent === '96.5')) {
+                    calcForm.value.percent = '96';
+                }
             }
         });
 
         // Enforce integer for percent (all types) and 2 decimals for weight (all types)
         watch(() => calcForm.value.percent, (val, oldVal) => {
             if (val !== null && val !== undefined && val !== '') {
-                let v = val;
+                // If it's a string, clean up any invalid characters (keep only numbers and one decimal point)
+                let strVal = String(val).trim();
                 
-                if (v > 100) {
-                    v = (oldVal !== null && oldVal !== undefined && oldVal !== '') ? oldVal : 100;
-                    if (val !== v) calcForm.value.percent = v;
+                // Remove any character that is not a digit or decimal point
+                strVal = strVal.replace(/[^0-9.]/g, '');
+                
+                // Keep only the first decimal point
+                const dotIndex = strVal.indexOf('.');
+                if (dotIndex !== -1) {
+                    strVal = strVal.substring(0, dotIndex + 1) + strVal.substring(dotIndex + 1).replace(/\./g, '');
+                }
+
+                if (strVal === '') {
+                    if (val !== '') calcForm.value.percent = '';
                     return;
                 }
-                const tier = calcForm.value.customerTier;
-                const isPremium = tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip';
+
+                let num = parseFloat(strVal);
+                if (isNaN(num)) {
+                    if (val !== '') calcForm.value.percent = '';
+                    return;
+                }
+
+                if (num > 100) {
+                    calcForm.value.percent = 100;
+                    return;
+                }
+
+                const isPremium = isMerchantCustomer.value;
                 const type = calcForm.value.type;
 
                 let allowDecimal = false;
@@ -888,33 +964,58 @@ createApp({
 
                 if (allowDecimal) {
                     // Allow decimals up to 2 places, max 100
-                    if (v < 1) v = 1;
-                    v = Number(Number(v).toFixed(2));
+                    if (strVal.includes('.')) {
+                        const parts = strVal.split('.');
+                        if (parts[1] && parts[1].length > 2) {
+                            strVal = parts[0] + '.' + parts[1].substring(0, 2);
+                        }
+                    }
+                    if (val !== strVal) calcForm.value.percent = strVal;
                 } else {
                     // Enforce integer, max 100
-                    if (v < 1) v = 1;
-                    v = Math.floor(v);
+                    if (num < 1 && num > 0) num = 1;
+                    const intStr = String(Math.floor(num));
+                    if (val !== intStr) calcForm.value.percent = intStr;
                 }
-
-                if (val !== v) calcForm.value.percent = v;
             }
         });
 
-        watch([() => calcForm.value.weight, () => calcForm.value.type, () => calcForm.value.customerTier], ([w, t, tier]) => {
+        watch([() => calcForm.value.weight, () => calcForm.value.type, () => calcForm.value.customerTier, () => calcForm.value.customerName], ([w, t, tier]) => {
             if (w !== null && w !== undefined && w !== '') {
-                // พนักงานให้กรอกทศนิยม 2 ตำแหน่งได้เฉพาะลูกค้า VIP/VVIP/Network/Network VIP หรือ ทองหลอม/ทองแท่ง ส่วน Admin ได้ 2 ตำแหน่งเสมอ
+                // If it's a string, clean up any invalid characters (keep only numbers and one decimal point)
+                let strVal = String(w).trim().replace(/[^0-9.]/g, '');
+                const dotIndex = strVal.indexOf('.');
+                if (dotIndex !== -1) {
+                    strVal = strVal.substring(0, dotIndex + 1) + strVal.substring(dotIndex + 1).replace(/\./g, '');
+                }
+
+                if (strVal === '') {
+                    if (w !== '') calcForm.value.weight = '';
+                    return;
+                }
+
+                let numW = parseFloat(strVal);
+                if (isNaN(numW)) {
+                    if (w !== '') calcForm.value.weight = '';
+                    return;
+                }
+
+                // พนักงานให้กรอกทศนิยม 2 ตำแหน่งได้เฉพาะลูกค้า VIP/VVIP/Network/Network VIP/ชื่อพ่อค้า หรือ ทองหลอม/ทองแท่ง ส่วน Admin ได้ 2 ตำแหน่งเสมอ
+                // แต่ถ้าเป็นเงิน (silver) ของพ่อค้า ให้จำกัดทศนิยม 1 ตำแหน่ง
                 let decimalPoints = 1;
-                if (isAdmin.value || tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip' || t === 'tong_lom' || t === 'tong_tang') {
+                if (t === 'silver' && isMerchantCustomer.value) {
+                    decimalPoints = 1;
+                } else if (isAdmin.value || isMerchantCustomer.value || t === 'tong_lom' || t === 'tong_tang') {
                     decimalPoints = 2;
                 }
 
-                const multiplier = Math.pow(10, decimalPoints);
-
-                // Clean up binary ghost bits (e.g. 2.3 * 100 becoming 229.999...) 
-                // by rounding slightly before floor
-                const fixed = Math.floor(Math.round(w * multiplier * 1e6) / 1e6) / multiplier;
-
-                if (w !== fixed) calcForm.value.weight = fixed;
+                if (strVal.includes('.')) {
+                    const parts = strVal.split('.');
+                    if (parts[1] && parts[1].length > decimalPoints) {
+                        strVal = parts[0] + '.' + parts[1].substring(0, decimalPoints);
+                    }
+                }
+                if (w !== strVal) calcForm.value.weight = strVal;
             }
         });
 
@@ -1032,14 +1133,21 @@ createApp({
         });
 
         const addToBill = () => {
-            if (!isFormValid.value) return;
+            if (!isFormValid.value) {
+                if (!isAdmin.value && calcForm.value.type === 'tong_lom' && isMerchantCustomer.value && !isPercentValid.value) {
+                    showAppModal('alert', 'แจ้งเตือน', 'สำหรับลูกค้าพ่อค้า ต้องกรอกความบริสุทธิ์ (%) ของทองหลอมเป็นทศนิยม 2 ตำแหน่ง (เช่น 96.50 หรือ 96.00) ก่อนเพิ่มเข้าบิล');
+                } else if (!isAdmin.value && calcForm.value.type === 'silver' && isMerchantCustomer.value && !isWeightValid.value) {
+                    showAppModal('alert', 'แจ้งเตือน', 'สำหรับลูกค้าพ่อค้า ต้องกรอกน้ำหนักของเงินเป็นทศนิยม 1 ตำแหน่ง (เช่น 100.0 หรือ 50.5) ก่อนเพิ่มเข้าบิล');
+                }
+                return;
+            }
             const isEditing = false; // We can add edit logic later if needed
             
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
-                percent: (calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') ? 96.5 : calcForm.value.percent,
-                weight: calcForm.value.weight,
+                percent: (calcForm.value.type === 'redeem' || calcForm.value.type === 'tong_tang') ? 96.5 : Number(calcForm.value.percent),
+                weight: Number(calcForm.value.weight),
                 basePrice: calculatedResult.value.basePrice,
                 premium: calculatedResult.value.premium,
                 netPrice: calculatedResult.value.netPrice,
@@ -1082,7 +1190,10 @@ createApp({
         });
 
         const formatCurrency = (val) => {
-            return Number(val || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (val === null || val === undefined || val === '') return '0.00';
+            const num = Number(val);
+            if (isNaN(num)) return '0.00';
+            return num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         };
 
         const formatDate = (dateStr) => {
@@ -1092,7 +1203,10 @@ createApp({
 
         const formatPricePerGram = (val, type) => {
             const digits = type === 'silver' ? 0 : 2;
-            return Number(val || 0).toLocaleString('th-TH', {
+            if (val === null || val === undefined || val === '') return digits === 0 ? '0' : '0.00';
+            const num = Number(val);
+            if (isNaN(num)) return digits === 0 ? '0' : '0.00';
+            return num.toLocaleString('th-TH', {
                 minimumFractionDigits: digits,
                 maximumFractionDigits: digits
             });
@@ -2006,6 +2120,9 @@ createApp({
 
         const calculateEditTrxNetPrice = () => {
             const tForm = editTrxModal.value;
+            if (tForm.type === 'tong_roop' && (!tForm.percent || tForm.percent <= 0)) {
+                tForm.percent = 96.00;
+            }
             const w = Number(tForm.weight) || 0;
             const p = Number(tForm.percent) || 0;
             const base = Number(tForm.base_price) || 0;
@@ -2056,6 +2173,7 @@ createApp({
         };
 
         const editTransaction = (t) => {
+            const parsedPercent = parseFloat(t.percent);
             editTrxModal.value = {
                 show: true,
                 id: t.id,
@@ -2064,7 +2182,7 @@ createApp({
                 type: t.type || 'tong_lom',
                 base_price: parseFloat(t.base_price) || 0,
                 premium_amount: parseFloat(t.premium_amount) || 0,
-                percent: parseFloat(t.percent) || 0,
+                percent: (parsedPercent > 0) ? parsedPercent : (t.type === 'tong_roop' ? 96.00 : 0),
                 weight: parseFloat(t.weight) || 0,
                 net_price: parseFloat(t.net_price) || 0,
                 original_net_price: parseFloat(t.net_price) || 0
@@ -3119,17 +3237,103 @@ createApp({
             }
         };
 
+        const filteredAttendanceList = computed(() => {
+            if (!attendanceSearchQuery.value || !attendanceSearchQuery.value.trim()) {
+                return todayAttendance.value;
+            }
+            const q = attendanceSearchQuery.value.trim().toLowerCase();
+            return todayAttendance.value.filter(log => 
+                (log.name && log.name.toLowerCase().includes(q)) ||
+                (log.id_card && log.id_card.toLowerCase().includes(q))
+            );
+        });
+
+        const attendanceStats = computed(() => {
+            const list = filteredAttendanceList.value;
+            let lateCount = 0;
+            let lateMins = 0;
+            let otMins = 0;
+            let totalDeduction = 0;
+
+            list.forEach(item => {
+                if (item.late_minutes > 0) {
+                    lateCount++;
+                    lateMins += Number(item.late_minutes) || 0;
+                    totalDeduction += Number(item.deduction_amount) || 0;
+                }
+                if (item.ot_minutes > 0) {
+                    otMins += Number(item.ot_minutes) || 0;
+                }
+            });
+
+            return {
+                totalCount: list.length,
+                lateCount,
+                lateMins,
+                otMins,
+                totalDeduction
+            };
+        });
+
         const loadTodayAttendance = async () => {
             loadingAttendanceList.value = true;
             try {
-                const bkkTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
-                const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
-                
-                const { data, error } = await supabase
+                let query = supabase
                     .from('attendance')
                     .select('*')
-                    .eq('date', todayStr)
+                    .order('date', { ascending: false })
                     .order('created_at', { ascending: false });
+
+                const now = new Date();
+                const bkkTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+                const getBkkDateStr = (d) => {
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                };
+
+                let startStr = '';
+                let endStr = '';
+
+                if (attendanceFilterMode.value === 'today') {
+                    startStr = getBkkDateStr(bkkTime);
+                    endStr = startStr;
+                } else if (attendanceFilterMode.value === 'yesterday') {
+                    const yDate = new Date(bkkTime);
+                    yDate.setDate(yDate.getDate() - 1);
+                    startStr = getBkkDateStr(yDate);
+                    endStr = startStr;
+                } else if (attendanceFilterMode.value === 'week') {
+                    const wStart = new Date(bkkTime);
+                    const day = wStart.getDay();
+                    const diff = wStart.getDate() - day + (day === 0 ? -6 : 1); // Monday
+                    wStart.setDate(diff);
+                    startStr = getBkkDateStr(wStart);
+                    endStr = getBkkDateStr(bkkTime);
+                } else if (attendanceFilterMode.value === 'month') {
+                    const mStart = new Date(bkkTime.getFullYear(), bkkTime.getMonth(), 1);
+                    const mEnd = new Date(bkkTime.getFullYear(), bkkTime.getMonth() + 1, 0);
+                    startStr = getBkkDateStr(mStart);
+                    endStr = getBkkDateStr(mEnd);
+                } else if (attendanceFilterMode.value === 'range') {
+                    startStr = attendanceStartDate.value;
+                    endStr = attendanceEndDate.value;
+                }
+
+                if (attendanceFilterMode.value !== 'all') {
+                    if (startStr && endStr) {
+                        query = query.gte('date', startStr).lte('date', endStr);
+                    } else if (startStr) {
+                        query = query.gte('date', startStr);
+                    } else if (endStr) {
+                        query = query.lte('date', endStr);
+                    }
+                } else {
+                    query = query.limit(300);
+                }
+
+                const { data, error } = await query;
                 if (error) throw error;
                 todayAttendance.value = data || [];
             } catch (err) {
@@ -3157,10 +3361,12 @@ createApp({
                 }
                 
                 const deduction = lateMinutes * lateDeductionRate.value;
+                const empName = attendanceData.value.name || 'ไม่ระบุชื่อ';
+                const idCard = attendanceData.value.idCard || '-';
 
                 const { error } = await supabase.from('attendance').insert([{
-                    id_card: attendanceData.value.idCard,
-                    name: attendanceData.value.name,
+                    id_card: idCard,
+                    name: empName,
                     date: todayStr,
                     check_in_time: checkInTimeStr,
                     late_minutes: lateMinutes,
@@ -3169,6 +3375,23 @@ createApp({
 
                 if (error) throw error;
                 
+                // ส่งการแจ้งเตือนทาง LINE
+                try {
+                    let notifyMsg = `⏰ แจ้งเตือน: ลงเวลาเข้างาน\n`;
+                    notifyMsg += `👤 พนักงาน: ${empName}\n`;
+                    notifyMsg += `🆔 รหัสบัตร: ${idCard}\n`;
+                    notifyMsg += `📅 วันที่: ${todayStr}\n`;
+                    notifyMsg += `🕒 เวลาเข้างาน: ${checkInTimeStr} น.\n`;
+                    if (lateMinutes > 0) {
+                        notifyMsg += `⚠️ สถานะ: มาสาย ${lateMinutes} นาที (หัก ${deduction} บาท)`;
+                    } else {
+                        notifyMsg += `✅ สถานะ: ตรงเวลา`;
+                    }
+                    sendLineNotify(notifyMsg);
+                } catch (lineErr) {
+                    console.error('Error sending check-in line notify:', lineErr);
+                }
+
                 let alertMessage = 'บันทึกเวลาเข้างานเรียบร้อยแล้ว\nเวลาเข้างานของคุณคือ: ' + checkInTimeStr;
                 if (lateMinutes > 0) {
                     alertMessage += `\n\n⚠️ คุณมาสาย ${lateMinutes} นาที\nยอดหัก: ${deduction} บาท`;
@@ -3211,12 +3434,11 @@ createApp({
                     return;
                 }
 
-                // Calculate OT
-                // ถ้าเกิน 17:30 ไป 15 นาทีให้เริ่มนับเวลาทำ ot ตั้งแต่นาทีที่ 17:30
+                // Calculate OT: เมื่อออกงานตั้งแต่ 18:00 น. เป็นต้นไป ให้นับ OT ตั้งแต่เวลา 17:30 น.
                 let otMinutes = 0;
                 const currentMins = bkkTime.getHours() * 60 + bkkTime.getMinutes();
+                const otThresholdMins = 18 * 60; // 18:00
                 const otStartMins = 17 * 60 + 30; // 17:30
-                const otThresholdMins = otStartMins + 15; // 17:45
 
                 if (currentMins >= otThresholdMins) {
                     otMinutes = currentMins - otStartMins;
@@ -3232,6 +3454,28 @@ createApp({
 
                 if (updateError) throw updateError;
                 
+                // ส่งการแจ้งเตือนทาง LINE
+                try {
+                    const empName = attendanceData.value.name || existingData.name || 'ไม่ระบุชื่อ';
+                    const idCard = attendanceData.value.idCard || existingData.id_card || '-';
+                    let notifyMsg = `🚪 แจ้งเตือน: ลงเวลาออกงาน\n`;
+                    notifyMsg += `👤 พนักงาน: ${empName}\n`;
+                    notifyMsg += `🆔 รหัสบัตร: ${idCard}\n`;
+                    notifyMsg += `📅 วันที่: ${todayStr}\n`;
+                    notifyMsg += `🕒 เวลาออกงาน: ${checkOutTimeStr} น.\n`;
+                    if (existingData.check_in_time) {
+                        notifyMsg += `⏰ เวลาเข้างาน: ${existingData.check_in_time} น.\n`;
+                    }
+                    if (otMinutes > 0) {
+                        notifyMsg += `🕒 OT: ${otMinutes} นาที`;
+                    } else {
+                        notifyMsg += `✅ สถานะ: ออกงานปกติ`;
+                    }
+                    sendLineNotify(notifyMsg);
+                } catch (lineErr) {
+                    console.error('Error sending check-out line notify:', lineErr);
+                }
+
                 let alertMessage = 'บันทึกเวลาออกงานเรียบร้อยแล้ว\nเวลาออกงานของคุณคือ: ' + checkOutTimeStr;
                 if (otMinutes > 0 && isAdmin.value) {
                     alertMessage += `\n\n🕒 ทำ OT ไปทั้งหมด ${otMinutes} นาที`;
@@ -3300,6 +3544,12 @@ createApp({
         watch(attendanceSummaryMonth, () => {
             if (currentTab.value === 'attendance' && isAdmin.value) {
                 loadAttendanceSummary();
+            }
+        });
+
+        watch(attendanceFilterMode, (newVal) => {
+            if (newVal !== 'range') {
+                loadTodayAttendance();
             }
         });
 
@@ -4293,6 +4543,12 @@ createApp({
             submittingAttendance,
             todayAttendance,
             loadingAttendanceList,
+            attendanceFilterMode,
+            attendanceStartDate,
+            attendanceEndDate,
+            attendanceSearchQuery,
+            filteredAttendanceList,
+            attendanceStats,
             attendanceSummaryMonth,
             attendanceSummary,
             loadingAttendanceSummary,
@@ -4445,6 +4701,9 @@ createApp({
             resetForm,
             isFormValid,
             isBaseValid,
+            isMerchantCustomer,
+            isPercentValid,
+            isWeightValid,
             currentAssetPrice,
             calculatedResult,
             isPhoneValid,
