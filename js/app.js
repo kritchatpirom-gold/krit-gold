@@ -18,6 +18,13 @@ const floor2 = (v) => {
     return Number(s.slice(0, -2)); // Truncates to 2nd decimal
 };
 
+const floor1 = (v) => {
+    if (v === null || v === undefined || v === '') return 0;
+    const num = Number(v);
+    if (isNaN(num)) return 0;
+    return Math.floor((num + 0.00001) * 10) / 10;
+};
+
 createApp({
     setup() {
         const currentTab = ref('home');
@@ -64,7 +71,7 @@ createApp({
         const silverPremiumAmountVip = ref(0);
         const silverPremiumAmountVvip = ref(0);
         const silverPremiumAmountNetwork = ref(0);
-        
+
         const networkGoldPremiumAmount_25_49 = ref(0);
         const networkGoldPremiumPercent_25_49 = ref(0);
         const networkGoldPremiumAmount_50_100 = ref(0);
@@ -78,14 +85,20 @@ createApp({
         const manualSilverPrice = ref(0);
         const useManualSilverPrice = ref(false);
         const employeeLastSilverUpdate = ref(null);
-        
+
         // Attendance State
         const lateDeductionRate = ref(1);
-        
-        // LINE Notify State
+
+        // Notification State (Telegram & LINE)
+        const telegramBotToken = ref('8915365709:AAGzgbId-uku0yJomcppOSrInA2H_6ct-ao');
+        const telegramChatId = ref('');
+        const testingTelegram = ref(false);
+        const detectingTelegramChat = ref(false);
         const lineNotifyToken = ref('');
         const lineTargetId = ref('');
         const testingLine = ref(false);
+        const lineQuotaInfo = ref(null);
+        const loadingLineQuota = ref(false);
         const attendanceData = ref({ idCard: '', name: '', photo: '' });
         const attendanceLoading = ref(false);
         const submittingAttendance = ref(false);
@@ -128,27 +141,27 @@ createApp({
             b1000: '', b500: '', b100: '', b50: '', b20: '',
             c10: '', c5: '', c1: ''
         });
-        
+
         const topUpTotal = computed(() => {
             return (topUpForm.value.b1000 * 1000) +
-                   (topUpForm.value.b500 * 500) +
-                   (topUpForm.value.b100 * 100) +
-                   (topUpForm.value.b50 * 50) +
-                   (topUpForm.value.b20 * 20) +
-                   (topUpForm.value.c10 * 10) +
-                   (topUpForm.value.c5 * 5) +
-                   (topUpForm.value.c1 * 1);
+                (topUpForm.value.b500 * 500) +
+                (topUpForm.value.b100 * 100) +
+                (topUpForm.value.b50 * 50) +
+                (topUpForm.value.b20 * 20) +
+                (topUpForm.value.c10 * 10) +
+                (topUpForm.value.c5 * 5) +
+                (topUpForm.value.c1 * 1);
         });
 
         const drawerTotal = computed(() => {
             return (drawerBalance.value.b1000 * 1000) +
-                   (drawerBalance.value.b500 * 500) +
-                   (drawerBalance.value.b100 * 100) +
-                   (drawerBalance.value.b50 * 50) +
-                   (drawerBalance.value.b20 * 20) +
-                   (drawerBalance.value.c10 * 10) +
-                   (drawerBalance.value.c5 * 5) +
-                   (drawerBalance.value.c1 * 1);
+                (drawerBalance.value.b500 * 500) +
+                (drawerBalance.value.b100 * 100) +
+                (drawerBalance.value.b50 * 50) +
+                (drawerBalance.value.b20 * 20) +
+                (drawerBalance.value.c10 * 10) +
+                (drawerBalance.value.c5 * 5) +
+                (drawerBalance.value.c1 * 1);
         });
 
         const loadDrawerLogs = async () => {
@@ -172,13 +185,13 @@ createApp({
         const getDrawerTotalFromObj = (obj) => {
             if (!obj) return 0;
             return (obj.b1000 || 0) * 1000 +
-                   (obj.b500 || 0) * 500 +
-                   (obj.b100 || 0) * 100 +
-                   (obj.b50 || 0) * 50 +
-                   (obj.b20 || 0) * 20 +
-                   (obj.c10 || 0) * 10 +
-                   (obj.c5 || 0) * 5 +
-                   (obj.c1 || 0) * 1;
+                (obj.b500 || 0) * 500 +
+                (obj.b100 || 0) * 100 +
+                (obj.b50 || 0) * 50 +
+                (obj.b20 || 0) * 20 +
+                (obj.c10 || 0) * 10 +
+                (obj.c5 || 0) * 5 +
+                (obj.c1 || 0) * 1;
         };
 
         const getDrawerDiff = (oldB, newB) => {
@@ -283,12 +296,12 @@ createApp({
                 const { data: oldData } = await supabase.from('drawer_balance').select('*').eq('id', 1).single();
                 const oldBalance = oldData ? { ...oldData } : null;
                 const newBalance = { ...drawerBalance.value };
-                
+
                 let oldTotal = 0;
                 if (oldBalance) {
-                    oldTotal = (oldBalance.b1000||0)*1000 + (oldBalance.b500||0)*500 + (oldBalance.b100||0)*100 + (oldBalance.b50||0)*50 + (oldBalance.b20||0)*20 + (oldBalance.c10||0)*10 + (oldBalance.c5||0)*5 + (oldBalance.c1||0)*1;
+                    oldTotal = (oldBalance.b1000 || 0) * 1000 + (oldBalance.b500 || 0) * 500 + (oldBalance.b100 || 0) * 100 + (oldBalance.b50 || 0) * 50 + (oldBalance.b20 || 0) * 20 + (oldBalance.c10 || 0) * 10 + (oldBalance.c5 || 0) * 5 + (oldBalance.c1 || 0) * 1;
                 }
-                const newTotal = (newBalance.b1000||0)*1000 + (newBalance.b500||0)*500 + (newBalance.b100||0)*100 + (newBalance.b50||0)*50 + (newBalance.b20||0)*20 + (newBalance.c10||0)*10 + (newBalance.c5||0)*5 + (newBalance.c1||0)*1;
+                const newTotal = (newBalance.b1000 || 0) * 1000 + (newBalance.b500 || 0) * 500 + (newBalance.b100 || 0) * 100 + (newBalance.b50 || 0) * 50 + (newBalance.b20 || 0) * 20 + (newBalance.c10 || 0) * 10 + (newBalance.c5 || 0) * 5 + (newBalance.c1 || 0) * 1;
                 const diffAmount = newTotal - oldTotal;
 
                 const { error } = await supabase.from('drawer_balance').update({
@@ -302,11 +315,11 @@ createApp({
                     c1: newBalance.c1,
                     updated_at: new Date().toISOString()
                 }).eq('id', 1);
-                
+
                 if (error) throw error;
-                
+
                 await logDrawerAction('MANUAL_UPDATE', diffAmount, oldBalance, newBalance);
-                
+
                 await showAppModal('alert', 'สำเร็จ', 'บันทึกยอดเงินในลิ้นชักเรียบร้อยแล้ว');
             } catch (err) {
                 console.error("Error saving drawer balance:", err);
@@ -322,10 +335,10 @@ createApp({
         const savingWithdraw = ref(false);
         const withdrawForm = ref({ b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' });
         const withdrawTotal = computed(() => {
-            return (withdrawForm.value.b1000 || 0) * 1000 + (withdrawForm.value.b500 || 0) * 500 + 
-                   (withdrawForm.value.b100 || 0) * 100 + (withdrawForm.value.b50 || 0) * 50 + 
-                   (withdrawForm.value.b20 || 0) * 20 + (withdrawForm.value.c10 || 0) * 10 + 
-                   (withdrawForm.value.c5 || 0) * 5 + (withdrawForm.value.c1 || 0) * 1;
+            return (withdrawForm.value.b1000 || 0) * 1000 + (withdrawForm.value.b500 || 0) * 500 +
+                (withdrawForm.value.b100 || 0) * 100 + (withdrawForm.value.b50 || 0) * 50 +
+                (withdrawForm.value.b20 || 0) * 20 + (withdrawForm.value.c10 || 0) * 10 +
+                (withdrawForm.value.c5 || 0) * 5 + (withdrawForm.value.c1 || 0) * 1;
         });
 
         const openTopUpModal = () => {
@@ -344,12 +357,12 @@ createApp({
                 await showAppModal('alert', 'ไม่สามารถเติมเงินได้', 'กรุณาระบุจำนวนเงินที่ต้องการเติม');
                 return;
             }
-            
+
             savingTopUp.value = true;
             try {
                 const { data: oldData } = await supabase.from('drawer_balance').select('*').eq('id', 1).single();
                 const oldBalance = oldData ? { ...oldData } : null;
-                
+
                 const newBalance = {
                     b1000: (oldBalance?.b1000 || 0) + (topUpForm.value.b1000 || 0),
                     b500: (oldBalance?.b500 || 0) + (topUpForm.value.b500 || 0),
@@ -365,13 +378,13 @@ createApp({
                     ...newBalance,
                     updated_at: new Date().toISOString()
                 }).eq('id', 1);
-                
+
                 if (error) throw error;
-                
+
                 drawerBalance.value = newBalance;
-                
+
                 await logDrawerAction('TOP_UP', topUpTotal.value, oldBalance, newBalance);
-                
+
                 showTopUpModal.value = false;
                 await showAppModal('alert', 'สำเร็จ', `เติมเงินเข้าลิ้นชัก ${formatCurrency(topUpTotal.value)} บาท เรียบร้อยแล้ว`);
             } catch (err) {
@@ -388,12 +401,12 @@ createApp({
                 await showAppModal('alert', 'ไม่สามารถนำเงินออกได้', 'กรุณาระบุจำนวนเงินที่ต้องการนำออก');
                 return;
             }
-            
+
             savingWithdraw.value = true;
             try {
                 const { data: oldData } = await supabase.from('drawer_balance').select('*').eq('id', 1).single();
                 const oldBalance = oldData ? { ...oldData } : null;
-                
+
                 if (!oldBalance) throw new Error("ไม่พบข้อมูลลิ้นชักเงิน");
 
                 const newBalance = {
@@ -418,14 +431,14 @@ createApp({
                     ...newBalance,
                     updated_at: new Date().toISOString()
                 }).eq('id', 1);
-                
+
                 if (error) throw error;
-                
+
                 drawerBalance.value = newBalance;
-                
+
                 // Note: diff amount is negative for deduction
                 await logDrawerAction('WITHDRAW', -withdrawTotal.value, oldBalance, newBalance);
-                
+
                 showWithdrawModal.value = false;
                 await showAppModal('alert', 'สำเร็จ', `นำเงินออกจากลิ้นชัก ${formatCurrency(withdrawTotal.value)} บาท เรียบร้อยแล้ว`);
             } catch (err) {
@@ -439,11 +452,11 @@ createApp({
         const deductDrawerBalance = async (totalAmount, transactionId = null) => {
             let amount = Math.ceil(totalAmount);
             if (amount <= 0) return null;
-            
+
             // Reload fresh balance before deduction
             await loadDrawerBalance();
             const oldBalance = { ...drawerBalance.value };
-            
+
             // Greedy deduction
             const denoms = [
                 { key: 'b1000', val: 1000 },
@@ -455,10 +468,10 @@ createApp({
                 { key: 'c5', val: 5 },
                 { key: 'c1', val: 1 }
             ];
-            
+
             const newBalance = { ...drawerBalance.value };
             let amountDeducted = 0;
-            
+
             for (const d of denoms) {
                 if (amount >= d.val && newBalance[d.key] > 0) {
                     const needed = Math.floor(amount / d.val);
@@ -468,7 +481,7 @@ createApp({
                     amountDeducted += (take * d.val);
                 }
             }
-            
+
             // Update DB with new balance
             try {
                 const { error } = await supabase.from('drawer_balance').update({
@@ -482,13 +495,13 @@ createApp({
                     c1: newBalance.c1,
                     updated_at: new Date().toISOString()
                 }).eq('id', 1);
-                
+
                 if (!error) {
                     drawerBalance.value = newBalance;
                     await logDrawerAction('TRANSACTION_DEDUCT', -amountDeducted, oldBalance, newBalance, transactionId);
                 }
             } catch (err) {
-                 console.error("Exception deducting drawer balance:", err);
+                console.error("Exception deducting drawer balance:", err);
             }
             return oldBalance;
         };
@@ -496,14 +509,14 @@ createApp({
         const restoreDrawerBalance = async (totalAmount, transactionId = null) => {
             let amount = Math.ceil(totalAmount);
             if (amount <= 0) return;
-            
+
             // Reload fresh balance before adding
             await loadDrawerBalance();
             const oldBalance = { ...drawerBalance.value };
             const newBalance = { ...drawerBalance.value };
             let amountRestored = 0;
             let exactRestoreDone = false;
-            
+
             if (transactionId) {
                 // Try to find the exact deduction from drawer_logs
                 const { data: logs, error } = await supabase
@@ -520,7 +533,7 @@ createApp({
                         const denomKeys = ['b1000', 'b500', 'b100', 'b50', 'b20', 'c10', 'c5', 'c1'];
                         let diffTotal = 0;
                         const toRestore = {};
-                        
+
                         for (const k of denomKeys) {
                             const diff = (log.old_balance[k] || 0) - (log.new_balance[k] || 0);
                             if (diff > 0) {
@@ -531,7 +544,7 @@ createApp({
                                 toRestore[k] = 0;
                             }
                         }
-                        
+
                         // Verify that the exact bills match the refund amount
                         if (diffTotal === amount) {
                             for (const k of denomKeys) {
@@ -544,7 +557,7 @@ createApp({
                     }
                 }
             }
-            
+
             if (!exactRestoreDone) {
                 // Greedy addition fallback
                 const denoms = [
@@ -557,7 +570,7 @@ createApp({
                     { key: 'c5', val: 5 },
                     { key: 'c1', val: 1 }
                 ];
-                
+
                 for (const d of denoms) {
                     if (amount >= d.val) {
                         const addNotes = Math.floor(amount / d.val);
@@ -567,7 +580,7 @@ createApp({
                     }
                 }
             }
-            
+
             // Update DB with new balance
             try {
                 const { error } = await supabase.from('drawer_balance').update({
@@ -581,30 +594,30 @@ createApp({
                     c1: newBalance.c1,
                     updated_at: new Date().toISOString()
                 }).eq('id', 1);
-                
+
                 if (!error) {
                     drawerBalance.value = newBalance;
                     await logDrawerAction('TRANSACTION_RESTORE', amountRestored, oldBalance, newBalance, transactionId);
                 }
             } catch (err) {
-                 console.error("Exception restoring drawer balance:", err);
+                console.error("Exception restoring drawer balance:", err);
             }
         };
 
         const refundDrawerLog = async (log) => {
             if (!isAdmin.value) return;
-            
+
             // Only allow refunding negative amounts (money taken out)
             if (log.amount >= 0) {
                 await showAppModal('alert', 'ไม่สามารถทำรายการได้', 'สามารถคืนเงินได้เฉพาะรายการที่มีการนำเงินออกเท่านั้น');
                 return;
             }
-            
+
             const amountToRefund = Math.abs(log.amount);
-            
+
             const confirm = await showAppModal('prompt', 'ยืนยันการคืนเงิน', `ต้องการคืนเงินจำนวน ${formatCurrency(amountToRefund)} บาท เข้าลิ้นชักใช่หรือไม่?\n\n(อ้างอิงรายการ: ${log.action})`, [], 'ยืนยัน', 'ยกเลิก');
             if (!confirm) return;
-            
+
             try {
                 savingDrawer.value = true;
                 // Use action TRANSACTION_RESTORE for refund, or create a new action type like REFUND if needed, 
@@ -646,7 +659,7 @@ createApp({
         const toggleGoldCategory = () => {
             const goldTypes = ['tong_lom', 'tong_roop', 'tong_tang', 'redeem'];
             const allGoldSelected = goldTypes.every(t => filter.value.type.includes(t));
-            
+
             if (allGoldSelected) {
                 // Remove all gold types
                 filter.value.type = filter.value.type.filter(t => !goldTypes.includes(t));
@@ -884,7 +897,7 @@ createApp({
             } else if (calcForm.value.type === 'silver') {
                 const multiplier = useSilverDeduction.value ? (100 - (Number(silverDeduction.value) || 0)) / 100 : 1;
                 let price = Math.floor((Number(manualSilverPrice.value) || 0) * multiplier);
-                
+
                 if (calcForm.value.customerTier === 'vip') {
                     price += (Number(silverPremiumAmountVip.value) || 0);
                 } else if (calcForm.value.customerTier === 'vvip') {
@@ -894,7 +907,7 @@ createApp({
                 } else if (calcForm.value.customerTier === 'network_vip') {
                     price += (Number(silverPremiumAmountNetworkVip.value) || 0);
                 }
-                
+
                 return price;
             }
             return 0;
@@ -924,10 +937,10 @@ createApp({
             if (val !== null && val !== undefined && val !== '') {
                 // If it's a string, clean up any invalid characters (keep only numbers and one decimal point)
                 let strVal = String(val).trim();
-                
+
                 // Remove any character that is not a digit or decimal point
                 strVal = strVal.replace(/[^0-9.]/g, '');
-                
+
                 // Keep only the first decimal point
                 const dotIndex = strVal.indexOf('.');
                 if (dotIndex !== -1) {
@@ -1045,7 +1058,7 @@ createApp({
                 const totalWeightForPremium = accumulatedGoldWeight.value + w;
                 const isVipOrVvip = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip');
                 const meetsWeightReq = isVipOrVvip || totalWeightForPremium >= 5 || isOldCustomer.value;
-                
+
                 let rawPremium = 0;
                 let rawPercent = 0;
 
@@ -1082,13 +1095,13 @@ createApp({
                         rawPercent = Number(activePremium.premium_percent) || 0;
                     }
                 }
-                
+
                 if (premiumType === 'percent' && meetsWeightReq) {
                     premium = Math.floor(base * (rawPercent / 100));
                 } else {
                     premium = rawPremium;
                 }
-                
+
                 if (isAdmin.value && tForm.manualPremium !== null && tForm.manualPremium !== '') {
                     premium = Number(tForm.manualPremium);
                 }
@@ -1113,16 +1126,22 @@ createApp({
             } else if (tForm.type === 'silver') {
                 const deduct13 = sp;
                 base = deduct13;
-                
+
                 premium = 0;
 
                 if (isAdmin.value && tForm.manualPremium !== null && tForm.manualPremium !== '') {
                     premium = Number(tForm.manualPremium);
                 }
 
-                const perGram = Math.floor((base + premium) / 1000);
-                const withPercent = Math.floor(perGram * (p / 100));
-                net = Math.floor(withPercent * w);
+                if (isMerchantCustomer.value) {
+                    const rawPerGram = ((base + premium) / 1000) * (p / 100);
+                    const perGram = floor1(rawPerGram);
+                    net = floor2(perGram * w);
+                } else {
+                    const perGram = Math.floor((base + premium) / 1000);
+                    const withPercent = Math.floor(perGram * (p / 100));
+                    net = Math.floor(withPercent * w);
+                }
             }
 
             return {
@@ -1142,7 +1161,7 @@ createApp({
                 return;
             }
             const isEditing = false; // We can add edit logic later if needed
-            
+
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
@@ -1154,7 +1173,9 @@ createApp({
                 customerName: calcForm.value.customerName,
                 phone: calcForm.value.phone,
                 idCard: calcForm.value.idCard,
-                address: calcForm.value.address
+                address: calcForm.value.address,
+                isMerchant: isMerchantCustomer.value,
+                customerTier: calcForm.value.customerTier
             });
             calcForm.value.weight = null;
             calcForm.value.percent = null;
@@ -1201,11 +1222,14 @@ createApp({
             return new Date(dateStr).toLocaleString('th-TH');
         };
 
-        const formatPricePerGram = (val, type) => {
-            const digits = type === 'silver' ? 0 : 2;
-            if (val === null || val === undefined || val === '') return digits === 0 ? '0' : '0.00';
+        const formatPricePerGram = (val, type, isMerchant = false) => {
+            let digits = 2;
+            if (type === 'silver') {
+                digits = isMerchant ? 1 : 0;
+            }
+            if (val === null || val === undefined || val === '') return digits === 0 ? '0' : (digits === 1 ? '0.0' : '0.00');
             const num = Number(val);
-            if (isNaN(num)) return digits === 0 ? '0' : '0.00';
+            if (isNaN(num)) return digits === 0 ? '0' : (digits === 1 ? '0.0' : '0.00');
             return num.toLocaleString('th-TH', {
                 minimumFractionDigits: digits,
                 maximumFractionDigits: digits
@@ -1403,23 +1427,23 @@ createApp({
         const priceEditStatus = ref(null); // null, 'pending', 'approved', 'rejected'
         const currentPriceEditRequestId = ref(null);
         const adminPendingRequests = ref([]);
-        
+
         const requestPriceEdit = async () => {
             if (!user.value || isAdmin.value) return;
             priceEditStatus.value = 'pending';
             const { data, error } = await supabase.from('price_edit_requests').insert({
                 status: 'pending'
             }).select().single();
-            
+
             if (data) {
                 currentPriceEditRequestId.value = data.id;
-                
-                if (lineNotifyToken.value) {
-                    const employeeName = user.value.email ? user.value.email.split('@')[0] : 'พนักงาน';
-                    let notifyMsg = `\n🔔 ขออนุมัติแก้ไขราคาทอง\n`;
-                    notifyMsg += `พนักงาน: ${employeeName}\n`;
-                    notifyMsg += `กรุณาตรวจสอบในระบบ`;
-                    sendLineNotify(notifyMsg);
+
+                if (telegramBotToken.value || lineNotifyToken.value) {
+                    const employeeName = user.value && user.value.email ? user.value.email.split('@')[0] : 'พนักงาน';
+                    let notifyMsg = `🔔 ขออนุมัติแก้ไขราคาทอง\n`;
+                    notifyMsg += `👤 พนักงาน: ${employeeName}\n`;
+                    notifyMsg += `📱 กรุณาตรวจสอบและอนุมัติในระบบ`;
+                    sendAppNotification(notifyMsg);
                 }
             } else if (error) {
                 console.error("Error requesting price edit:", error);
@@ -1430,7 +1454,7 @@ createApp({
         const approvePriceEdit = async (id) => {
             await supabase.from('price_edit_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', id);
         };
-        
+
         const rejectPriceEdit = async (id) => {
             await supabase.from('price_edit_requests').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', id);
         };
@@ -1439,7 +1463,7 @@ createApp({
             supabase.channel('price_edit_requests')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'price_edit_requests' }, payload => {
                     const req = payload.new;
-                    
+
                     if (isAdmin.value) {
                         if (payload.eventType === 'INSERT' && req.status === 'pending') {
                             adminPendingRequests.value.push(req);
@@ -1453,8 +1477,8 @@ createApp({
                         } else if (payload.eventType === 'DELETE') {
                             adminPendingRequests.value = adminPendingRequests.value.filter(r => r.id !== payload.old.id);
                         }
-                    } 
-                    
+                    }
+
                     if (!isAdmin.value && currentPriceEditRequestId.value === req.id && payload.eventType === 'UPDATE') {
                         priceEditStatus.value = req.status;
                         if (req.status === 'approved') {
@@ -1482,13 +1506,13 @@ createApp({
             user.value = data.session?.user || null;
             if (user.value) {
                 if (isAdmin.value && currentTab.value === 'history') loadTransactions();
-                
+
                 try {
                     setupRealtimeRequests();
                 } catch (e) {
                     console.error('Error setting up realtime (checkAuth):', e);
                 }
-                
+
                 if (isAdmin.value) {
                     try {
                         loadPendingRequests();
@@ -1513,13 +1537,13 @@ createApp({
             } else {
                 user.value = data.user;
                 if (isAdmin.value && currentTab.value === 'history') loadTransactions();
-                
+
                 try {
                     setupRealtimeRequests();
                 } catch (e) {
                     console.error('Error setting up realtime:', e);
                 }
-                
+
                 if (isAdmin.value) {
                     try {
                         loadPendingRequests();
@@ -1527,7 +1551,7 @@ createApp({
                         console.error('Error loading pending requests:', e);
                     }
                 }
-                
+
                 showAuth.value = false;
                 currentTab.value = 'calculator';
                 await showAppModal('alert', 'สำเร็จ', 'เข้าสู่ระบบสำเร็จ');
@@ -1571,6 +1595,14 @@ createApp({
                     if (lateRateSetting && lateRateSetting.value !== null) {
                         lateDeductionRate.value = Number(lateRateSetting.value);
                     }
+                    const tgTokenSetting = settingsData.find(s => s.key === 'telegram_bot_token');
+                    if (tgTokenSetting && tgTokenSetting.value_text) {
+                        telegramBotToken.value = tgTokenSetting.value_text;
+                    }
+                    const tgChatSetting = settingsData.find(s => s.key === 'telegram_chat_id');
+                    if (tgChatSetting && tgChatSetting.value_text) {
+                        telegramChatId.value = tgChatSetting.value_text;
+                    }
                     const lineNotifySetting = settingsData.find(s => s.key === 'line_channel_access_token');
                     if (lineNotifySetting && lineNotifySetting.value_text) {
                         lineNotifyToken.value = lineNotifySetting.value_text;
@@ -1609,7 +1641,7 @@ createApp({
                     silverPremiumAmountVvip.value = getSetting('silver_premium_amount_vvip', 0);
                     silverPremiumAmountNetwork.value = getSetting('silver_premium_amount_network', 0);
                     silverPremiumAmountNetworkVip.value = getSetting('silver_premium_amount_network_vip', 0);
-                    
+
                     networkGoldPremiumAmount_25_49.value = getSetting('network_gold_amount_25_49', 0);
                     networkGoldPremiumPercent_25_49.value = getSetting('network_gold_percent_25_49', 0);
                     networkGoldPremiumAmount_50_100.value = getSetting('network_gold_amount_50_100', 0);
@@ -1620,7 +1652,7 @@ createApp({
                     networkVipGoldPremiumAmount_50_100.value = getSetting('network_vip_gold_amount_50_100', 0);
                     networkVipGoldPremiumPercent_50_100.value = getSetting('network_vip_gold_percent_50_100', 0);
                 }
-                
+
                 await loadPremiumCustomers();
             } catch (err) {
                 console.error("Critical error loading premiums/settings:", err);
@@ -1634,7 +1666,7 @@ createApp({
             // Save Gold Premiums
             for (const p of premiums.value) {
                 if (p.id) {
-                    await supabase.from('gold_premiums').update({ 
+                    await supabase.from('gold_premiums').update({
                         premium_amount: p.premium_amount,
                         premium_percent: p.premium_percent || 0,
                         premium_type: p.premium_type || 'fixed',
@@ -1676,11 +1708,116 @@ createApp({
                     { key: 'late_deduction_rate', value: Number(lateDeductionRate.value) || 0 }
                 ]);
                 await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่าลงเวลาสำเร็จ');
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
                 alert('เกิดข้อผิดพลาดในการบันทึก');
             } finally {
                 saving.value = false;
+            }
+        };
+
+        const saveTelegramSettings = async () => {
+            saving.value = true;
+            try {
+                await supabase.from('global_settings').upsert([
+                    { key: 'telegram_bot_token', value: 0, value_text: telegramBotToken.value || '' },
+                    { key: 'telegram_chat_id', value: 0, value_text: telegramChatId.value || '' }
+                ]);
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่า Telegram สำเร็จ');
+            } catch (e) {
+                console.error(e);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกการตั้งค่า Telegram ได้');
+            } finally {
+                saving.value = false;
+            }
+        };
+
+        const detectTelegramChatId = async () => {
+            if (!telegramBotToken.value) {
+                await showAppModal('alert', 'แจ้งเตือน', 'กรุณากรอก Telegram Bot Token ก่อน');
+                return;
+            }
+            detectingTelegramChat.value = true;
+            try {
+                const res = await fetch('/api/telegram_get_updates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: telegramBotToken.value })
+                });
+                const data = await res.json();
+                if (data.ok && data.result && data.result.length > 0) {
+                    const messages = data.result
+                        .map(u => u.message || u.channel_post || (u.my_chat_member ? { chat: u.my_chat_member.chat } : null))
+                        .filter(Boolean);
+
+                    if (messages.length > 0) {
+                        const lastMsg = messages[messages.length - 1];
+                        const chat = lastMsg.chat;
+                        telegramChatId.value = String(chat.id);
+                        const chatName = chat.title || (chat.first_name ? `${chat.first_name} ${chat.last_name || ''}`.trim() : '') || chat.username || 'แชทนี้';
+                        await showAppModal('alert', 'ดึง Chat ID สำเร็จ 🎉', `พบ Chat ID: ${chat.id}\nชื่อแชท: ${chatName}\n\nกรุณากด "บันทึก" เพื่อยืนยันการใช้งาน`);
+                    } else {
+                        await showAppModal('alert', 'ไม่พบข้อความ', 'ยังไม่มีการส่งข้อความหาบอท\n\n📌 วิธีทำให้บอทเห็นแชท:\n1. กด Start ในแชท @Krit_Gold_bot หรือ\n2. ดึงบอทเข้ากลุ่มแล้วพิมพ์ข้อความอะไรก็ได้ 1 ข้อความ\n3. แล้วกลับมากดปุ่มนี้ใหม่อีกครั้ง');
+                    }
+                } else {
+                    await showAppModal('alert', 'ยังไม่พบข้อความ', 'ยังไม่มีข้อความส่งเข้ามาในบอท\n\n📌 วิธีทำให้บอทเห็นแชท:\n1. เข้าแชท @Krit_Gold_bot ใน Telegram แล้วกดปุ่ม Start\n(หรือถ้าเป็นกลุ่ม ให้ดึงบอทเข้ากลุ่มแล้วส่งข้อความในกลุ่ม 1 ข้อความ)\n2. จากนั้นกดปุ่ม "ดึง Chat ID อัตโนมัติ" อีกครั้ง');
+                }
+            } catch (e) {
+                console.error(e);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อ Telegram ได้: ' + e.message);
+            } finally {
+                detectingTelegramChat.value = false;
+            }
+        };
+
+        const testTelegramNotify = async () => {
+            if (!telegramBotToken.value || !telegramChatId.value) {
+                await showAppModal('alert', 'แจ้งเตือน', 'กรุณากรอก Bot Token และ Chat ID ให้ครบถ้วน');
+                return;
+            }
+            testingTelegram.value = true;
+            try {
+                const res = await fetch('/api/telegram_notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: telegramBotToken.value,
+                        chatId: telegramChatId.value,
+                        message: '✅ ทดสอบการเชื่อมต่อ Telegram Bot จากระบบ Krit-Gold สำเร็จ!\nระบบแจ้งเตือน Telegram พร้อมใช้งานแล้ว 🪙✨'
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    await showAppModal('alert', 'สำเร็จ 🎉', 'ส่งข้อความทดสอบเข้า Telegram เรียบร้อยแล้ว! กรุณาตรวจสอบใน Telegram');
+                } else {
+                    await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ส่งไม่สำเร็จ: ' + (data.description || res.statusText));
+                }
+            } catch (e) {
+                console.error(e);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถส่งข้อความได้: ' + e.message);
+            } finally {
+                testingTelegram.value = false;
+            }
+        };
+
+        const sendTelegramNotify = async (message) => {
+            if (!telegramBotToken.value || !telegramChatId.value) return;
+            try {
+                const res = await fetch('/api/telegram_notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: telegramBotToken.value,
+                        chatId: telegramChatId.value,
+                        message: message
+                    })
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    console.warn('Telegram Notify Failed:', res.status, errData);
+                }
+            } catch (e) {
+                console.error('Telegram Notify Error:', e);
             }
         };
 
@@ -1692,7 +1829,7 @@ createApp({
                     { key: 'line_target_id', value: 0, value_text: lineTargetId.value || '' }
                 ]);
                 await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่า LINE สำเร็จ');
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
                 await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกการตั้งค่า LINE ได้');
             } finally {
@@ -1712,7 +1849,7 @@ createApp({
                         message: message
                     })
                 });
-            } catch(e) {
+            } catch (e) {
                 console.error('LINE Notify Error:', e);
             }
         };
@@ -1729,18 +1866,37 @@ createApp({
                         message: '✅ ทดสอบการเชื่อมต่อ LINE Messaging API จากระบบ Krit-Gold สำเร็จ!'
                     })
                 });
-                
+
                 if (res.ok) {
                     await showAppModal('alert', 'สำเร็จ', 'ส่งข้อความทดสอบสำเร็จ กรุณาตรวจสอบใน LINE');
                 } else {
-                    const errorData = await res.json();
-                    await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ส่งไม่สำเร็จ: ' + (errorData.error || res.statusText));
+                    const errorData = await res.json().catch(() => ({}));
+                    let rawMsg = errorData.message || errorData.error || res.statusText || 'ไม่ทราบสาเหตุ';
+                    let displayMsg = rawMsg;
+                    if (res.status === 429 || rawMsg.toLowerCase().includes('limit')) {
+                        displayMsg = 'โควตาการส่งข้อความของ LINE ในเดือนนี้เต็มแล้ว (300 ข้อความ/เดือน สำหรับแพ็กเกจฟรี)\n\n' +
+                                     '💡 สาเหตุ: โควตาส่งข้อความเดือนนี้ถูกใช้ครบ 300 ข้อความแล้ว ระบบจะรีเซ็ตโควตาใหม่อัตโนมัติในวันพรุ่งนี้ (ขึ้นเดือนใหม่) หรือเปลี่ยนไปใช้ Telegram ที่ส่งได้ไม่จำกัด';
+                    }
+                    await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ส่งไม่สำเร็จ: ' + displayMsg);
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
-                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อ API ได้');
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อ API ได้: ' + e.message);
             } finally {
                 testingLine.value = false;
+            }
+        };
+
+        const sendAppNotification = async (message) => {
+            const tasks = [];
+            if (telegramBotToken.value && telegramChatId.value) {
+                tasks.push(sendTelegramNotify(message));
+            }
+            if (lineNotifyToken.value && lineTargetId.value) {
+                tasks.push(sendLineNotify(message));
+            }
+            if (tasks.length > 0) {
+                await Promise.allSettled(tasks);
             }
         };
 
@@ -1770,20 +1926,20 @@ createApp({
                 }
                 const todayStr = new Date().toLocaleDateString('en-CA');
                 const todayNum = parseInt(todayStr.replace(/-/g, ''));
-                
+
                 saving.value = true;
                 const { error } = await supabase.from('global_settings').upsert([
                     { key: 'manual_silver_price', value: Number(manualSilverPrice.value) || 0 },
                     { key: 'use_manual_silver_price', value: useManualSilverPrice.value ? 1 : 0 },
                     { key: 'employee_last_silver_update', value: todayNum }
                 ]);
-                
+
                 if (error) {
                     saving.value = false;
                     await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกได้: ' + error.message);
                     return;
                 }
-                
+
                 employeeLastSilverUpdate.value = todayNum;
                 saving.value = false;
                 await showAppModal('alert', 'สำเร็จ', 'พนักงานอัพเดทราคาซิลเวอร์ประจำวันสำเร็จ');
@@ -1799,9 +1955,9 @@ createApp({
 
         let autoSaveTimeout;
         watch([
-            silverDeduction, useSilverDeduction, manualSilverPrice, useManualSilverPrice, 
+            silverDeduction, useSilverDeduction, manualSilverPrice, useManualSilverPrice,
             silverPremiumAmountVip, silverPremiumAmountVvip, silverPremiumAmountNetwork, silverPremiumAmountNetworkVip,
-            networkGoldPremiumAmount_25_49, networkGoldPremiumPercent_25_49, 
+            networkGoldPremiumAmount_25_49, networkGoldPremiumPercent_25_49,
             networkGoldPremiumAmount_50_100, networkGoldPremiumPercent_50_100,
             networkVipGoldPremiumAmount_25_49, networkVipGoldPremiumPercent_25_49,
             networkVipGoldPremiumAmount_50_100, networkVipGoldPremiumPercent_50_100
@@ -1815,14 +1971,14 @@ createApp({
         const searchOldCustomers = async () => {
             if (!customerSearchQuery.value) return;
             customerSearchAttempted.value = false;
-            
+
             const { data, error } = await supabase
                 .from('transactions')
                 .select('id_card, customer_name')
                 .or(`customer_name.ilike.%${customerSearchQuery.value}%,id_card.ilike.%${customerSearchQuery.value}%`)
                 // Allow empty id_card, order by newest
                 .order('created_at', { ascending: false });
-                
+
             customerSearchAttempted.value = true;
             if (data) {
                 const unique = [];
@@ -1845,7 +2001,7 @@ createApp({
                 await showAppModal('alert', 'ไม่สามารถเพิ่มได้', 'ลูกค้าจำเป็นต้องมีชื่อ');
                 return;
             }
-            
+
             let finalIdCard = customer.id_card;
             if (!finalIdCard || finalIdCard.trim() === '') {
                 finalIdCard = 'NO_ID_' + customer.customer_name.trim();
@@ -1931,7 +2087,7 @@ createApp({
                                 return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
                             }
                             return url;
-                        } catch(e) {
+                        } catch (e) {
                             if (url.includes('storage/v1/object/public/')) {
                                 const match = url.match(/\/storage\/v1\/object\/public\/(.*)/);
                                 if (match && match[1]) return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
@@ -1971,7 +2127,7 @@ createApp({
             const backupCalcForm = { ...calcForm.value };
             const backupTransferAmount = transferAmount.value;
             const backupSignature = lastSignature.value;
-            
+
             billItems.value = g.items.map(t => ({
                 id: t.id,
                 type: t.type,
@@ -1988,13 +2144,13 @@ createApp({
             calcForm.value.phone = g.phone || '';
             calcForm.value.idCard = g.id_card || '';
             calcForm.value.address = g.address || '';
-            
+
             transferAmount.value = g.items.reduce((sum, t) => sum + (parseFloat(t.transfer_amount) || 0), 0);
             lastSignature.value = g.signature ? fixUrl(g.signature) : null;
 
             await nextTick();
             await preloadImage(lastSignature.value);
-            
+
             setTimeout(() => {
                 let restored = false;
                 const restoreData = () => {
@@ -2003,14 +2159,14 @@ createApp({
                     window.removeEventListener('afterprint', restoreData);
                     document.removeEventListener('click', restoreData);
                     document.removeEventListener('touchstart', restoreData);
-                    
+
                     // ALWAYS clear the form. Never restore backup data.
                     billItems.value = [];
                     transferAmount.value = 0;
                     resetForm();
                     clearSignature();
                     removePhoto();
-                    
+
                     // Double ensure Vue reactivity queue is flushed
                     setTimeout(() => {
                         resetForm();
@@ -2019,7 +2175,7 @@ createApp({
                         pauseCustomerWatch = false;
                     }, 500);
                 };
-                
+
                 window.addEventListener('afterprint', restoreData);
                 const mql = window.matchMedia('print');
                 const mqlListener = (e) => {
@@ -2029,7 +2185,7 @@ createApp({
                     }
                 };
                 mql.addEventListener('change', mqlListener);
-                
+
                 const focusHandler = () => {
                     restoreData();
                     window.removeEventListener('focus', focusHandler);
@@ -2042,7 +2198,7 @@ createApp({
                 }, 1000);
 
                 window.print();
-                
+
                 // Fallback for mobile
                 setTimeout(restoreData, 15000);
             }, 200); // Already preloaded, short delay for layout
@@ -2056,19 +2212,19 @@ createApp({
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(10);
-                
+
                 if (error) throw error;
                 if (!data || data.length === 0) {
                     await showAppModal('alert', 'ไม่พบข้อมูล', 'ไม่มีรายการล่าสุดให้ปริ้นย้อนหลัง');
                     return;
                 }
-                
+
                 // Group them exactly like groupedTransactions
                 const groups = {};
                 data.forEach(t => {
                     const dateKey = t.created_at ? t.created_at.substring(0, 16) : 'unknown';
                     const key = `${dateKey}_${t.customer_name || 'noname'}_${t.phone || 'nophone'}`;
-                    
+
                     if (!groups[key]) {
                         groups[key] = {
                             key: key,
@@ -2092,9 +2248,9 @@ createApp({
                     groups[key].items.push(t);
                     groups[key].net_price += parseFloat(t.net_price) || 0;
                 });
-                
+
                 const groupList = Object.values(groups).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                
+
                 if (groupList.length > 0) {
                     await reprintGroup(groupList[0], true);
                 }
@@ -2148,9 +2304,16 @@ createApp({
                 net = floor2(perGram * w);
             } else if (tForm.type === 'silver') {
                 const sp = gp;
-                const perGram = Math.floor((sp + premium) / 1000);
-                const withPercent = Math.floor(perGram * (p / 100));
-                net = Math.floor(withPercent * w);
+                const isMerchant = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip' || (tForm.customer_name && tForm.customer_name.includes('พ่อค้า')));
+                if (isMerchant) {
+                    const rawPerGram = ((sp + premium) / 1000) * (p / 100);
+                    const perGram = floor1(rawPerGram);
+                    net = floor2(perGram * w);
+                } else {
+                    const perGram = Math.floor((sp + premium) / 1000);
+                    const withPercent = Math.floor(perGram * (p / 100));
+                    net = Math.floor(withPercent * w);
+                }
             }
 
             tForm.net_price = floor2(Math.max(0, net));
@@ -2160,7 +2323,7 @@ createApp({
             const tForm = editTrxModal.value;
             const p = Number(tForm.percent) || 0;
             const base = Number(tForm.base_price) || 0;
-            
+
             if (tForm.type === 'tong_lom') {
                 let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
                 if (activePremium) {
@@ -2235,7 +2398,7 @@ createApp({
                 const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
                 // Fetch the transaction to get net_price and transfer_amount
                 const { data: trx } = await supabase.from('transactions').select('net_price, transfer_amount').eq('id', id).single();
-                
+
                 // Delete assets from storage first
                 await deleteTransactionAssets(id, deleteAssets);
                 const { error } = await supabase.from('transactions').delete().eq('id', id);
@@ -2261,10 +2424,10 @@ createApp({
                 const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
                 // Fetch the transaction to get net_price and transfer_amount
                 const { data: trxs } = await supabase.from('transactions').select('net_price, transfer_amount').in('id', ids);
-                
+
                 await deleteTransactionAssets(ids, deleteAssets);
                 const { error } = await supabase.from('transactions').delete().in('id', ids);
-                
+
                 if (!error) {
                     if (trxs && trxs.length > 0) {
                         let totalRefund = 0;
@@ -2291,7 +2454,7 @@ createApp({
             if (await showAppModal('confirm', 'ยืนยันการลบ', `ยืนยันการลบรายการที่เลือกจำนวน ${selectedTransactions.value.length} รายการ ใช่หรือไม่?`)) {
                 const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
                 loadingTransactions.value = true;
-                
+
                 // Fetch to get net prices and transfer amounts
                 const { data: trxs } = await supabase.from('transactions').select('net_price, transfer_amount').in('id', selectedTransactions.value);
                 const totalRefund = trxs ? trxs.reduce((sum, t) => {
@@ -2365,7 +2528,7 @@ createApp({
             transactions.value.forEach(t => {
                 const dateKey = t.created_at ? t.created_at.substring(0, 16) : 'unknown';
                 const key = `${dateKey}_${t.customer_name || 'noname'}_${t.phone || 'nophone'}`;
-                
+
                 if (!groups[key]) {
                     groups[key] = {
                         key: key,
@@ -2551,7 +2714,7 @@ createApp({
             const getBanknoteBreakdown = (totalAmount, customBalance = null) => {
                 let amount = Math.ceil(totalAmount);
                 const breakdown = [];
-                
+
                 const denoms = [
                     { label: 'แบงก์ 1,000', key: 'b1000', val: 1000 },
                     { label: 'แบงก์ 500', key: 'b500', val: 500 },
@@ -2612,7 +2775,7 @@ createApp({
             const handleAfterPrint = async () => {
                 if (afterPrintExecuted) return;
                 afterPrintExecuted = true;
-                
+
                 window.removeEventListener('afterprint', handleAfterPrint);
 
                 // Clear all state immediately after print dialog closes
@@ -2638,12 +2801,12 @@ createApp({
                     breakdown.forEach(item => {
                         msg += `- ${item.label}: ${item.count} ${item.label.includes('เหรียญ') ? 'เหรียญ' : 'ใบ'}\n`;
                     });
-                    
+
                     // Open the cash drawer immediately as the payment window is displayed (only if logged in)
                     if (isLoggedIn.value) {
                         openDrawer();
                     }
-                    
+
                     await showAppModal('alert', 'ตรวจสอบการจ่ายเงินสด', msg);
                 } else if (paidTransfer > 0) {
                     await showAppModal('alert', 'เสร็จสิ้นการทำรายการ', `บันทึกข้อมูลและพิมพ์บิลเรียบร้อยแล้ว!\n\nยอดชำระผ่านการโอนทั้งหมด: ${formatCurrency(paidTransfer)} บาท`);
@@ -2661,14 +2824,14 @@ createApp({
                     }
                 };
                 mql.addEventListener('change', mqlListener);
-                
+
                 // Fallback for mobile Safari where afterprint does not fire reliably.
                 // Mobile Safari print dialog opens in a separate view, causing window to lose focus.
                 const focusHandler = () => {
                     handleAfterPrint();
                     window.removeEventListener('focus', focusHandler);
                 };
-                
+
                 const interactionHandler = () => {
                     handleAfterPrint();
                     document.removeEventListener('click', interactionHandler);
@@ -2743,14 +2906,14 @@ createApp({
                 if (error) throw error;
                 const transactionId = insertedTrxs && insertedTrxs.length > 0 ? insertedTrxs[0].id : null;
 
-                // Send LINE Notify
-                if (lineNotifyToken.value) {
+                // Send Notification (Telegram / LINE)
+                if (telegramBotToken.value || lineNotifyToken.value) {
                     try {
-                        let notifyMsg = '\n🔔 รายการใหม่!\n';
-                        notifyMsg += `ลูกค้า: ${trData[0].customer_name}\n`;
-                        if (trData[0].phone) notifyMsg += `เบอร์โทร: ${trData[0].phone}\n`;
+                        let notifyMsg = '🔔 รายการใหม่ (บิลซื้อขาย)\n';
+                        notifyMsg += `👤 ลูกค้า: ${trData[0].customer_name}\n`;
+                        if (trData[0].phone) notifyMsg += `📞 เบอร์โทร: ${trData[0].phone}\n`;
                         notifyMsg += `----------------\n`;
-                        
+
                         trData.forEach((item, index) => {
                             let tName = item.type;
                             if (item.type === 'tong_lom') tName = 'ทองหลอม';
@@ -2759,7 +2922,7 @@ createApp({
                             if (item.type === 'silver') tName = 'เงิน';
                             if (item.type === 'silver_jewelry') tName = 'เครื่องประดับเงิน';
                             if (item.type === 'platinum') tName = 'ทองคำขาว';
-                            
+
                             notifyMsg += `${index + 1}. ${tName}\n`;
                             if (item.weight) notifyMsg += `⚖️ น้ำหนัก: ${item.weight} กรัม\n`;
                             if (item.percent) notifyMsg += `✨ เปอร์เซ็นต์: ${item.percent}%\n`;
@@ -2767,14 +2930,14 @@ createApp({
                             notifyMsg += `💰 ยอดสุทธิ: ${formatCurrency(item.net_price)} ฿\n`;
                             notifyMsg += `----------------\n`;
                         });
-                        
+
                         notifyMsg += `📌 รวมทั้งบิล: ${formatCurrency(billTotal.value)} ฿\n`;
                         if (cashAmountToPay.value > 0) notifyMsg += `💵 เงินสด: ${formatCurrency(cashAmountToPay.value)} ฿\n`;
                         if (transferAmount.value > 0) notifyMsg += `📱 โอนเงิน: ${formatCurrency(transferAmount.value)} ฿`;
-                        
-                        sendLineNotify(notifyMsg);
-                    } catch(err) {
-                        console.error('Error sending line notify:', err);
+
+                        sendAppNotification(notifyMsg);
+                    } catch (err) {
+                        console.error('Error sending notification:', err);
                     }
                 }
 
@@ -2838,18 +3001,18 @@ createApp({
                                 .eq('id_card', data.cid)
                                 .order('created_at', { ascending: false })
                                 .limit(10);
-                                
+
                             if (!error && pastTx && pastTx.length > 0) {
                                 isOldCustomer.value = true;
                                 const validPhoneTx = pastTx.find(tx => tx.phone && tx.phone.trim() !== '' && tx.phone !== 'null' && tx.phone !== 'undefined');
                                 const validSigTx = pastTx.find(tx => tx.signature && tx.signature.trim() !== '' && tx.signature !== 'null' && tx.signature !== 'undefined');
-                                
+
                                 if (validPhoneTx) calcForm.value.phone = validPhoneTx.phone;
                                 if (validSigTx) lastSignature.value = fixUrl(validSigTx.signature);
-                                
+
                                 if (validPhoneTx || validSigTx) console.log('Loaded previous customer data');
                             }
-                            
+
                             const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', data.cid).single();
                             if (custData && custData.tier) {
                                 calcForm.value.customerTier = custData.tier;
@@ -2875,7 +3038,7 @@ createApp({
         let fetchCustomerTimeout = null;
         const showCustomerSearch = ref(false);
         const customerSearchResults = ref([]);
-        
+
         const fixUrl = (url) => {
             if (!url || url === 'null' || url === 'undefined' || typeof url !== 'string') return null;
             if (url.startsWith('data:')) return url;
@@ -2886,7 +3049,7 @@ createApp({
                     return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
                 }
                 return url;
-            } catch(e) {
+            } catch (e) {
                 if (url.includes('storage/v1/object/public/')) {
                     const match = url.match(/\/storage\/v1\/object\/public\/(.*)/);
                     if (match && match[1]) return `${supabaseUrl}/storage/v1/object/public/${match[1]}`;
@@ -2909,7 +3072,7 @@ createApp({
                     .select('customer_name, phone, id_card, id_card_photo, signature, address')
                     .order('created_at', { ascending: false })
                     .limit(50);
-                    
+
                 if (field === 'customer_name') {
                     query = query.ilike('customer_name', `%${value.trim()}%`);
                 } else {
@@ -2917,7 +3080,7 @@ createApp({
                 }
 
                 const { data: pastTx, error } = await query;
-                    
+
                 if (!error && pastTx && pastTx.length > 0) {
                     const uniqueCustomersMap = new Map();
                     pastTx.forEach(tx => {
@@ -2925,7 +3088,7 @@ createApp({
                         const key = tx.id_card ? tx.id_card : (tx.phone ? tx.phone : tx.customer_name);
                         if (!uniqueCustomersMap.has(key)) {
                             const customerTxs = pastTx.filter(t => (t.id_card && t.id_card === key) || (t.phone && t.phone === key) || (t.customer_name === key));
-                            
+
                             const latestPhone = customerTxs.find(t => t.phone && t.phone.trim() !== '' && t.phone !== 'null' && t.phone !== 'undefined');
                             const latestIdCardTx = customerTxs.find(t => t.id_card && t.id_card.trim() !== '' && t.id_card !== 'null' && t.id_card !== 'undefined');
                             const latestPhotoTx = customerTxs.find(t => t.id_card_photo && t.id_card_photo.trim() !== '' && t.id_card_photo !== 'null' && t.id_card_photo !== 'undefined');
@@ -2964,7 +3127,7 @@ createApp({
 
         const applyCustomerData = async (customer, field) => {
             let loadedAny = false;
-            
+
             // Overwrite with full name if different
             if (customer.customer_name && calcForm.value.customerName !== customer.customer_name) {
                 calcForm.value.customerName = customer.customer_name;
@@ -2995,7 +3158,7 @@ createApp({
                 isOldCustomer.value = true;
                 console.log('Loaded customer data');
             }
-            
+
             if (customer.id_card && !customer.id_card.startsWith('NO_ID_')) {
                 const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', customer.id_card).single();
                 if (custData && custData.tier) {
@@ -3028,7 +3191,7 @@ createApp({
             if (customer.id_card_photo) calcForm.value.idCardPhoto = fixUrl(customer.id_card_photo);
             if (customer.signature) lastSignature.value = fixUrl(customer.signature);
             isOldCustomer.value = true;
-            
+
             if (customer.id_card && !customer.id_card.startsWith('NO_ID_')) {
                 const { data: custData } = await supabase.from('customers').select('tier').eq('id_card', customer.id_card).single();
                 if (custData && custData.tier) {
@@ -3051,7 +3214,7 @@ createApp({
             } else {
                 calcForm.value.customerTier = 'normal';
             }
-            
+
             showCustomerSearch.value = false;
         };
 
@@ -3068,7 +3231,7 @@ createApp({
         watch(() => calcForm.value.customerName, async (newVal) => {
             if (pauseCustomerWatch) return;
             clearTimeout(fetchCustomerTimeout);
-            
+
             if (newVal && newVal.trim().length >= 2) {
                 const { data } = await supabase.from('customers').select('tier').eq('customer_name', newVal.trim());
                 if (data && data.length > 0) {
@@ -3221,11 +3384,11 @@ createApp({
             if (!isAdmin.value) return;
             const confirmDelete = await showAppModal('confirm', 'ยืนยันการลบ', 'คุณต้องการลบข้อมูลการลงเวลานี้ใช่หรือไม่?', [], 'ลบข้อมูล', 'ยกเลิก');
             if (!confirmDelete) return;
-            
+
             try {
                 const { error } = await supabase.from('attendance').delete().eq('id', id);
                 if (error) throw error;
-                
+
                 // Reload data
                 loadTodayAttendance();
                 if (isAdmin.value && currentTab.value === 'attendance') {
@@ -3242,7 +3405,7 @@ createApp({
                 return todayAttendance.value;
             }
             const q = attendanceSearchQuery.value.trim().toLowerCase();
-            return todayAttendance.value.filter(log => 
+            return todayAttendance.value.filter(log =>
                 (log.name && log.name.toLowerCase().includes(q)) ||
                 (log.id_card && log.id_card.toLowerCase().includes(q))
             );
@@ -3285,7 +3448,7 @@ createApp({
                     .order('created_at', { ascending: false });
 
                 const now = new Date();
-                const bkkTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+                const bkkTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
                 const getBkkDateStr = (d) => {
                     const year = d.getFullYear();
                     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -3348,7 +3511,7 @@ createApp({
             submittingAttendance.value = true;
             try {
                 const now = new Date();
-                const bkkTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+                const bkkTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
                 const checkInTimeStr = String(bkkTime.getHours()).padStart(2, '0') + ':' + String(bkkTime.getMinutes()).padStart(2, '0') + ':' + String(bkkTime.getSeconds()).padStart(2, '0');
                 const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
 
@@ -3359,7 +3522,7 @@ createApp({
                 if (currentMins > targetMins) {
                     lateMinutes = currentMins - targetMins;
                 }
-                
+
                 const deduction = lateMinutes * lateDeductionRate.value;
                 const empName = attendanceData.value.name || 'ไม่ระบุชื่อ';
                 const idCard = attendanceData.value.idCard || '-';
@@ -3374,8 +3537,8 @@ createApp({
                 }]);
 
                 if (error) throw error;
-                
-                // ส่งการแจ้งเตือนทาง LINE
+
+                // ส่งการแจ้งเตือน
                 try {
                     let notifyMsg = `⏰ แจ้งเตือน: ลงเวลาเข้างาน\n`;
                     notifyMsg += `👤 พนักงาน: ${empName}\n`;
@@ -3387,9 +3550,9 @@ createApp({
                     } else {
                         notifyMsg += `✅ สถานะ: ตรงเวลา`;
                     }
-                    sendLineNotify(notifyMsg);
-                } catch (lineErr) {
-                    console.error('Error sending check-in line notify:', lineErr);
+                    sendAppNotification(notifyMsg);
+                } catch (notifyErr) {
+                    console.error('Error sending check-in notify:', notifyErr);
                 }
 
                 let alertMessage = 'บันทึกเวลาเข้างานเรียบร้อยแล้ว\nเวลาเข้างานของคุณคือ: ' + checkInTimeStr;
@@ -3398,7 +3561,7 @@ createApp({
                 } else {
                     alertMessage += '\n\n✅ วันนี้คุณมาตรงเวลาเยี่ยมมากครับ!';
                 }
-                
+
                 await showAppModal('alert', 'สำเร็จ', alertMessage);
                 resetAttendanceData();
                 loadTodayAttendance();
@@ -3415,7 +3578,7 @@ createApp({
             submittingAttendance.value = true;
             try {
                 const now = new Date();
-                const bkkTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+                const bkkTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
                 const checkOutTimeStr = String(bkkTime.getHours()).padStart(2, '0') + ':' + String(bkkTime.getMinutes()).padStart(2, '0') + ':' + String(bkkTime.getSeconds()).padStart(2, '0');
                 const todayStr = bkkTime.getFullYear() + '-' + String(bkkTime.getMonth() + 1).padStart(2, '0') + '-' + String(bkkTime.getDate()).padStart(2, '0');
 
@@ -3453,8 +3616,8 @@ createApp({
                     .eq('id', existingData.id);
 
                 if (updateError) throw updateError;
-                
-                // ส่งการแจ้งเตือนทาง LINE
+
+                // ส่งการแจ้งเตือน
                 try {
                     const empName = attendanceData.value.name || existingData.name || 'ไม่ระบุชื่อ';
                     const idCard = attendanceData.value.idCard || existingData.id_card || '-';
@@ -3471,16 +3634,16 @@ createApp({
                     } else {
                         notifyMsg += `✅ สถานะ: ออกงานปกติ`;
                     }
-                    sendLineNotify(notifyMsg);
-                } catch (lineErr) {
-                    console.error('Error sending check-out line notify:', lineErr);
+                    sendAppNotification(notifyMsg);
+                } catch (notifyErr) {
+                    console.error('Error sending check-out notify:', notifyErr);
                 }
 
                 let alertMessage = 'บันทึกเวลาออกงานเรียบร้อยแล้ว\nเวลาออกงานของคุณคือ: ' + checkOutTimeStr;
                 if (otMinutes > 0 && isAdmin.value) {
                     alertMessage += `\n\n🕒 ทำ OT ไปทั้งหมด ${otMinutes} นาที`;
                 }
-                
+
                 await showAppModal('alert', 'สำเร็จ', alertMessage);
                 resetAttendanceData();
                 loadTodayAttendance();
@@ -3506,9 +3669,9 @@ createApp({
                     .select('*')
                     .gte('date', startDate)
                     .lte('date', endDate);
-                    
+
                 if (error) throw error;
-                
+
                 const summaryMap = {};
                 (data || []).forEach(log => {
                     if (!summaryMap[log.id_card]) {
@@ -3532,9 +3695,9 @@ createApp({
                         summaryMap[log.id_card].total_ot_minutes += log.ot_minutes;
                     }
                 });
-                
+
                 attendanceSummary.value = Object.values(summaryMap).sort((a, b) => b.total_deduction - a.total_deduction);
-            } catch(e) {
+            } catch (e) {
                 console.error("Error loading attendance summary:", e);
             } finally {
                 loadingAttendanceSummary.value = false;
@@ -3710,12 +3873,12 @@ createApp({
         const stockDateFilterMode = ref('all');
         const stockStartDate = ref(new Date().toLocaleDateString('en-CA'));
         const stockEndDate = ref(new Date().toLocaleDateString('en-CA'));
-        
+
         const historyDateFilterMode = ref('all');
         const historyStartDate = ref(new Date().toLocaleDateString('en-CA'));
         const historyEndDate = ref(new Date().toLocaleDateString('en-CA'));
         const historyStatusFilter = ref('all');
-        
+
         const selectedTransactionIds = ref([]);
 
         const extraProfits = ref([]);
@@ -3728,7 +3891,7 @@ createApp({
         const extraProfitDateFilterMode = ref('all');
         const extraProfitStartDate = ref(new Date().toLocaleDateString('en-CA'));
         const extraProfitEndDate = ref(new Date().toLocaleDateString('en-CA'));
-        
+
         const extraProfitSumForHistoryPeriod = ref(0);
 
         const loadDeliveryData = async () => {
@@ -3765,7 +3928,7 @@ createApp({
                     'gold_1_24': { label: 'ทอง (1-24%)', items: [] },
                     'silver': { label: 'เงิน', items: [] }
                 };
-                
+
                 unsentTransactions.value.forEach(t => {
                     let key = '';
                     if (t.type === 'silver') {
@@ -3814,13 +3977,13 @@ createApp({
                 // 3. Fetch rounds history (Admin ONLY)
                 if (isAdmin.value) {
                     let roundsQuery = supabase.from('delivery_rounds').select('*, delivery_ingots(*, transactions(net_price, weight, percent))').order('created_at', { ascending: false });
-                    
+
                     if (historyStatusFilter.value !== 'all') {
                         roundsQuery = roundsQuery.eq('status', historyStatusFilter.value);
                     }
-                    
+
                     let epQuery = supabase.from('extra_profits').select('amount');
-                    
+
                     if (historyDateFilterMode.value !== 'all') {
                         let start = new Date();
                         let end = new Date();
@@ -3842,9 +4005,9 @@ createApp({
                             start = new Date(historyStartDate.value + 'T00:00:00+07:00');
                             end = new Date(historyEndDate.value + 'T23:59:59+07:00');
                         }
-                        
+
                         roundsQuery = roundsQuery.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
-                        
+
                         const startStr = start.toLocaleDateString('en-CA');
                         const endStr = end.toLocaleDateString('en-CA');
                         epQuery = epQuery.gte('profit_date', startStr).lte('profit_date', endStr);
@@ -3852,9 +4015,9 @@ createApp({
                         roundsQuery = roundsQuery.limit(30);
                         epQuery = epQuery.limit(1000);
                     }
-                    
+
                     const [roundsRes, epRes] = await Promise.all([roundsQuery, epQuery]);
-                    
+
                     const rounds = roundsRes.data;
                     if (rounds) {
                         rounds.forEach(r => {
@@ -3892,7 +4055,7 @@ createApp({
                         });
                     }
                     deliveryRoundsHistory.value = rounds || [];
-                    
+
                     const epData = epRes.data;
                     extraProfitSumForHistoryPeriod.value = epData ? epData.reduce((sum, item) => sum + Number(item.amount || 0), 0) : 0;
                 } else {
@@ -3935,7 +4098,7 @@ createApp({
                         start = new Date(extraProfitStartDate.value + 'T00:00:00+07:00');
                         end = new Date(extraProfitEndDate.value + 'T23:59:59+07:00');
                     }
-                    
+
                     const startStr = start.toLocaleDateString('en-CA');
                     const endStr = end.toLocaleDateString('en-CA');
                     query = query.gte('profit_date', startStr).lte('profit_date', endStr);
@@ -3966,7 +4129,7 @@ createApp({
                     }])
                     .select();
                 if (error) throw error;
-                
+
                 newExtraProfit.value.amount = '';
                 newExtraProfit.value.note = '';
                 await loadExtraProfits();
@@ -3991,7 +4154,7 @@ createApp({
                 alert('เกิดข้อผิดพลาดในการลบ: ' + err.message);
             }
         };
-        
+
         watch([stockDateFilterMode, stockStartDate, stockEndDate, historyDateFilterMode, historyStartDate, historyEndDate, historyStatusFilter, extraProfitDateFilterMode, extraProfitStartDate, extraProfitEndDate], () => {
             loadDeliveryData();
         });
@@ -4023,7 +4186,7 @@ createApp({
             let totalWeight = 0;
             let weightedPercentSum = 0;
             let totalCost = 0;
-            
+
             selected.forEach(i => {
                 const w = Number(i.weight) || 0;
                 const p = Number(i.percent) || 0;
@@ -4031,7 +4194,7 @@ createApp({
                 weightedPercentSum += (w * p);
                 totalCost += Number(i.net_price) || 0;
             });
-            
+
             return {
                 count: selected.length,
                 weight: totalWeight,
@@ -4044,7 +4207,7 @@ createApp({
             const group = groupedUnsent.value[category];
             const groupIds = group.items.map(i => i.id);
             const allSelected = groupIds.length > 0 && groupIds.every(id => selectedTransactionIds.value.includes(id));
-            
+
             if (allSelected) {
                 selectedTransactionIds.value = selectedTransactionIds.value.filter(id => !groupIds.includes(id));
             } else {
@@ -4061,7 +4224,7 @@ createApp({
                 await showAppModal('alert', 'แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการหลอม');
                 return;
             }
-            
+
             const selectedItems = unsentTransactions.value.filter(i => selectedTransactionIds.value.includes(i.id));
             const hasSilver = selectedItems.some(i => i.type === 'silver');
             const hasGold = selectedItems.some(i => i.type !== 'silver');
@@ -4071,7 +4234,7 @@ createApp({
             else if (hasSilver && hasGold) {
                 const confirmed = await showAppModal('confirm', 'ยืนยัน', 'คุณเลือกทั้งเงินและทองรวมกัน ต้องการหลอมรวมกันจริงๆ ใช่หรือไม่?');
                 if (!confirmed) return;
-                
+
                 const userInput = await showAppModal('prompt', 'ระบุประเภท', 'กรุณาระบุประเภทก้อนหลอม (พิมพ์ gold หรือ silver):', [
                     { label: 'ประเภท (gold/silver)', type: 'text', defaultValue: 'gold' }
                 ]);
@@ -4088,7 +4251,7 @@ createApp({
                     category: category,
                     status: 'melting'
                 }]).select();
-                
+
                 if (ingotError) throw ingotError;
                 const newIngotId = ingotData[0].id;
 
@@ -4106,19 +4269,19 @@ createApp({
 
         const completeMelting = async (ingot) => {
             const isAllTongTang = ingot.transactions && ingot.transactions.every(i => i.type === 'tong_tang');
-            
+
             const defaultWeight = ingot.raw_weight > 0 ? parseFloat(ingot.raw_weight.toFixed(2)) : '';
             const defaultPercent = isAllTongTang ? '96.5' : '';
-            
+
             const inputs = await showAppModal('prompt', 'ข้อมูลก้อนหลอม', 'กรุณาระบุน้ำหนักและเปอร์เซ็นต์ของก้อนที่หลอมเสร็จแล้ว:', [
                 { label: 'น้ำหนัก (กรัม)', type: 'number', defaultValue: defaultWeight },
                 { label: 'เปอร์เซ็นต์ (%)', type: 'number', defaultValue: defaultPercent }
             ]);
-            
+
             if (!inputs || inputs.length < 2) return;
             const weight = inputs[0];
             const percent = inputs[1];
-            
+
             if (!weight || !percent) return;
 
             const isSilver = ingot.category && ingot.category.includes('เงิน');
@@ -4138,9 +4301,9 @@ createApp({
                     melted_weight: parseFloat(weight),
                     melted_percent: parseFloat(percent)
                 }).eq('id', ingot.id);
-                
+
                 if (updateError) throw updateError;
-                
+
                 await loadDeliveryData();
             } catch (err) {
                 console.error("Error completing melting:", err);
@@ -4154,7 +4317,7 @@ createApp({
                 await showAppModal('alert', 'แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการเก็บโชว์ในตู้');
                 return;
             }
-            
+
             const productName = await showAppModal('prompt', 'โชว์ในตู้', `ต้องการเก็บรายการที่เลือกจำนวน ${selectedTransactionIds.value.length} รายการเข้าตู้โชว์\n\nกรุณาระบุชื่อสินค้า (สามารถเว้นว่างได้):`, [
                 { label: 'ชื่อสินค้า', type: 'text', defaultValue: '' }
             ]);
@@ -4197,10 +4360,10 @@ createApp({
 
                 const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
                     status: 'completed',
-                    gold_payment: totalCost, 
+                    gold_payment: totalCost,
                     created_at: new Date().toISOString()
                 }]).select();
-                
+
                 if (roundError) throw roundError;
                 const roundId = roundData[0].id;
 
@@ -4264,13 +4427,13 @@ createApp({
                 await showAppModal('alert', 'แจ้งเตือน', 'ไม่มีก้อนหลอมให้ส่ง');
                 return;
             }
-            
+
             const dateInput = await showAppModal('prompt', 'จัดส่งรอบนี้', 'กรุณาเลือกวันที่จัดส่ง:', [
                 { label: 'วันที่จัดส่ง', type: 'date', defaultValue: new Date().toLocaleDateString('en-CA') }
             ]);
-            
+
             if (!dateInput) return; // User cancelled
-            
+
             // Allow override of created_at
             let createdAtIso = new Date().toISOString();
             if (dateInput) {
@@ -4326,7 +4489,7 @@ createApp({
             const gold = parseFloat(goldAmount) || 0;
             const silver = parseFloat(silverAmount) || 0;
             if (gold === 0 && silver === 0) {
-                if(!confirm('ยอดเงินเป็น 0 ยืนยันการบันทึกใช่หรือไม่?')) return;
+                if (!confirm('ยอดเงินเป็น 0 ยืนยันการบันทึกใช่หรือไม่?')) return;
             }
 
             loadingDeliveryData.value = true;
@@ -4418,7 +4581,7 @@ createApp({
             if (totalWeight <= 0) return 0;
             const gp = Math.floor(goldPrice.value || 0);
             const sp = Math.floor(manualSilverPrice.value || 0);
-            
+
             if (isGold) {
                 let base = gp;
                 let premium = 0;
@@ -4437,7 +4600,7 @@ createApp({
             } else {
                 const multiplier = useSilverDeduction.value ? (100 - (Number(silverDeduction.value) || 0)) / 100 : 1;
                 const spDeducted = Math.floor(sp * multiplier);
-                
+
                 const perGram = Math.floor(spDeducted / 1000);
                 const withPercent = Math.floor(perGram * (avgPercent / 100));
                 return Math.floor(withPercent * totalWeight);
@@ -4553,6 +4716,13 @@ createApp({
             attendanceSummary,
             loadingAttendanceSummary,
             lateDeductionRate,
+            telegramBotToken,
+            telegramChatId,
+            testingTelegram,
+            detectingTelegramChat,
+            saveTelegramSettings,
+            detectTelegramChatId,
+            testTelegramNotify,
             lineNotifyToken,
             lineTargetId,
             testingLine,
@@ -4676,19 +4846,19 @@ createApp({
             uploadToBucket,
             formatCurrency,
             formatThaiDateTime,
-              filter,
+            filter,
             toggleGoldCategory,
-              isFilterActive,
-              deleteTransaction,
-              deleteGroup,
-              editTransaction,
-              editTrxModal,
-              calculateEditTrxNetPrice,
-              onEditBasePrice,
-              saveEditTransaction,
-              reprintGroup,
-              reprintLatestReceipt,
-              loadTransactions,
+            isFilterActive,
+            deleteTransaction,
+            deleteGroup,
+            editTransaction,
+            editTrxModal,
+            calculateEditTrxNetPrice,
+            onEditBasePrice,
+            saveEditTransaction,
+            reprintGroup,
+            reprintLatestReceipt,
+            loadTransactions,
             deleteSelected,
             exportCSV,
             selectedTransactions,
@@ -4738,7 +4908,7 @@ createApp({
             closeSignatureModal,
             clearModalSignature,
             saveModalSignature,
-            
+
             groupedUnsent,
             pendingIngots,
             meltingIngots,

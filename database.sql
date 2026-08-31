@@ -73,9 +73,11 @@ CREATE TABLE IF NOT EXISTS global_settings (
 -- Insert default silver deduction (13%)
 INSERT INTO global_settings (key, value) VALUES ('silver_deduction', 13) ON CONFLICT (key) DO NOTHING;
 
--- Insert default LINE settings
+-- Insert default LINE & Telegram settings
 INSERT INTO global_settings (key, value, value_text) VALUES ('line_channel_access_token', 0, '') ON CONFLICT (key) DO NOTHING;
 INSERT INTO global_settings (key, value, value_text) VALUES ('line_target_id', 0, '') ON CONFLICT (key) DO NOTHING;
+INSERT INTO global_settings (key, value, value_text) VALUES ('telegram_bot_token', 0, '8915365709:AAGzgbId-uku0yJomcppOSrInA2H_6ct-ao') ON CONFLICT (key) DO NOTHING;
+INSERT INTO global_settings (key, value, value_text) VALUES ('telegram_chat_id', 0, '') ON CONFLICT (key) DO NOTHING;
 
 -- Setup RLS for global_settings
 ALTER TABLE global_settings ENABLE ROW LEVEL SECURITY;

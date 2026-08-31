@@ -44,6 +44,64 @@ async function onRequestPost({ request }) {
 }
 __name(onRequestPost, "onRequestPost");
 __name2(onRequestPost, "onRequestPost");
+async function onRequestPost2({ request }) {
+  try {
+    const { token } = await request.json();
+    if (!token) {
+      return new Response(JSON.stringify({ ok: false, description: "Missing token" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const telegramResponse = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+    const responseData = await telegramResponse.json();
+    return new Response(JSON.stringify(responseData), {
+      status: telegramResponse.status,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ ok: false, description: error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+__name(onRequestPost2, "onRequestPost2");
+__name2(onRequestPost2, "onRequestPost");
+async function onRequestPost3({ request }) {
+  try {
+    const { message, token, chatId } = await request.json();
+    if (!message || !token || !chatId) {
+      return new Response(JSON.stringify({ ok: false, description: "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E23\u0E30\u0E1A\u0E38 Token, Chat ID \u0E41\u0E25\u0E30\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+    const payload = {
+      chat_id: chatId,
+      text: message
+    };
+    const telegramResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    const responseData = await telegramResponse.json();
+    return new Response(JSON.stringify(responseData), {
+      status: telegramResponse.status,
+      headers: { "Content-Type": "application/json" }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ ok: false, description: error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+}
+__name(onRequestPost3, "onRequestPost3");
+__name2(onRequestPost3, "onRequestPost");
 async function onRequest(context) {
   try {
     const response = await fetch("https://gold.kritgold.workers.dev", {
@@ -135,6 +193,20 @@ var routes = [
     method: "POST",
     middlewares: [],
     modules: [onRequestPost]
+  },
+  {
+    routePath: "/api/telegram_get_updates",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost2]
+  },
+  {
+    routePath: "/api/telegram_notify",
+    mountPath: "/api",
+    method: "POST",
+    middlewares: [],
+    modules: [onRequestPost3]
   },
   {
     routePath: "/api/gold",
