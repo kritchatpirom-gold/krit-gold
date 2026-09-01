@@ -94,11 +94,7 @@ createApp({
         const telegramChatId = ref('');
         const testingTelegram = ref(false);
         const detectingTelegramChat = ref(false);
-        const lineNotifyToken = ref('');
-        const lineTargetId = ref('');
-        const testingLine = ref(false);
-        const lineQuotaInfo = ref(null);
-        const loadingLineQuota = ref(false);
+
         const attendanceData = ref({ idCard: '', name: '', photo: '' });
         const attendanceLoading = ref(false);
         const submittingAttendance = ref(false);
@@ -107,6 +103,29 @@ createApp({
         const attendanceFilterMode = ref('today'); // 'today', 'yesterday', 'week', 'month', 'range', 'all'
         const attendanceStartDate = ref(new Date().toLocaleDateString('en-CA'));
         const attendanceEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        const expenseRequests = ref([]);
+        const expenseReason = ref('');
+        const expenseBreakdownForm = ref({ b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' });
+        const expenseAmount = computed(() => {
+            return (expenseBreakdownForm.value.b1000 || 0) * 1000 + (expenseBreakdownForm.value.b500 || 0) * 500 +
+                (expenseBreakdownForm.value.b100 || 0) * 100 + (expenseBreakdownForm.value.b50 || 0) * 50 +
+                (expenseBreakdownForm.value.b20 || 0) * 20 + (expenseBreakdownForm.value.c10 || 0) * 10 +
+                (expenseBreakdownForm.value.c5 || 0) * 5 + (expenseBreakdownForm.value.c1 || 0) * 1;
+        });
+        const loadingExpenseRequests = ref(false);
+        const submittingExpense = ref(false);
+        const showExpenseRequestModal = ref(false);
+        const showApproveExpenseModal = ref(false);
+        const selectedExpense = ref(null);
+        const expenseApproveForm = ref({ b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' });
+        const expenseApproveTotal = computed(() => {
+            return (expenseApproveForm.value.b1000 || 0) * 1000 + (expenseApproveForm.value.b500 || 0) * 500 +
+                (expenseApproveForm.value.b100 || 0) * 100 + (expenseApproveForm.value.b50 || 0) * 50 +
+                (expenseApproveForm.value.b20 || 0) * 20 + (expenseApproveForm.value.c10 || 0) * 10 +
+                (expenseApproveForm.value.c5 || 0) * 5 + (expenseApproveForm.value.c1 || 0) * 1;
+        });
+        const savingExpenseApprove = ref(false);
+
         const attendanceSearchQuery = ref('');
         const attendanceSummaryMonth = ref(new Date().toISOString().substring(0, 7)); // YYYY-MM
         const attendanceSummary = ref([]);
@@ -446,6 +465,147 @@ createApp({
                 await showAppModal('alert', 'เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการนำเงินออก: ' + err.message);
             } finally {
                 savingWithdraw.value = false;
+            }
+        };
+
+        const fetchExpenseRequests = async () => {
+            loadingExpenseRequests.value = true;
+            try {
+                const { data, error } = await supabase
+                    .from('expense_requests')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(50);
+                if (error) throw error;
+                expenseRequests.value = data || [];
+            } catch (err) {
+                console.error("Error fetching expenses:", err);
+            } finally {
+                loadingExpenseRequests.value = false;
+            }
+        };
+
+        const submitExpenseRequest = async () => {
+            if (!expenseReason.value || !expenseAmount.value || expenseAmount.value <= 0) {
+                await showAppModal('alert', 'ข้อมูลไม่ครบ', 'กรุณาระบุเหตุผลและจำนวนเงินให้ถูกต้อง');
+                return;
+            }
+            submittingExpense.value = true;
+            try {
+                const reqName = user.value && user.value.email ? user.value.email.split('@')[0] : 'พนักงาน';
+                const { error } = await supabase.from('expense_requests').insert([{
+                    reason: expenseReason.value,
+                    amount: expenseAmount.value,
+                    breakdown: expenseBreakdownForm.value,
+                    requested_by: reqName,
+                    status: 'pending'
+                }]);
+                if (error) throw error;
+                
+                await fetchExpenseRequests();
+                
+                let notifyMsg = `🔔 ขออนุมัติเบิกค่าใช้จ่าย\n`;
+                notifyMsg += `👤 ผู้เบิก: ${reqName}\n`;
+                notifyMsg += `💸 จำนวนเงิน: ${formatCurrency(expenseAmount.value)} บาท\n`;
+                notifyMsg += `📝 เหตุผล: ${expenseReason.value}`;
+                sendAppNotification(notifyMsg);
+                
+                await showAppModal('alert', 'สำเร็จ', 'ส่งคำขอเบิกเงินเรียบร้อยแล้ว รอผู้ดูแลระบบอนุมัติ');
+                expenseReason.value = '';
+                expenseBreakdownForm.value = { b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' };
+                showExpenseRequestModal.value = false;
+            } catch (err) {
+                console.error(err);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถส่งคำขอเบิกเงินได้: ' + err.message);
+            } finally {
+                submittingExpense.value = false;
+            }
+        };
+
+        const openExpenseApproveModal = (expense) => {
+            selectedExpense.value = expense;
+            expenseApproveForm.value = expense.breakdown ? { ...expense.breakdown } : { b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' };
+            showApproveExpenseModal.value = true;
+        };
+
+        const confirmExpenseApproval = async () => {
+            if (expenseApproveTotal.value !== Number(selectedExpense.value.amount)) {
+                await showAppModal('alert', 'ยอดเงินไม่ตรงกัน', `กรุณาระบุจำนวนแบงค์ให้รวมกันได้ตรงกับยอดเบิก (${formatCurrency(selectedExpense.value.amount)} บาท)`);
+                return;
+            }
+
+            savingExpenseApprove.value = true;
+            try {
+                await loadDrawerBalance();
+                const oldBalance = { ...drawerBalance.value };
+
+                const newBalance = {
+                    b1000: (oldBalance.b1000 || 0) - (expenseApproveForm.value.b1000 || 0),
+                    b500: (oldBalance.b500 || 0) - (expenseApproveForm.value.b500 || 0),
+                    b100: (oldBalance.b100 || 0) - (expenseApproveForm.value.b100 || 0),
+                    b50: (oldBalance.b50 || 0) - (expenseApproveForm.value.b50 || 0),
+                    b20: (oldBalance.b20 || 0) - (expenseApproveForm.value.b20 || 0),
+                    c10: (oldBalance.c10 || 0) - (expenseApproveForm.value.c10 || 0),
+                    c5: (oldBalance.c5 || 0) - (expenseApproveForm.value.c5 || 0),
+                    c1: (oldBalance.c1 || 0) - (expenseApproveForm.value.c1 || 0)
+                };
+
+                for (const [key, val] of Object.entries(newBalance)) {
+                    if (val < 0) {
+                        throw new Error(`จำนวนเงินคงเหลือในลิ้นชักไม่เพียงพอสำหรับประเภท ${key.replace('b', 'แบงค์ ').replace('c', 'เหรียญ ')}`);
+                    }
+                }
+
+                const adminName = user.value && user.value.email ? user.value.email.split('@')[0] : 'admin';
+
+                const { error: updateError } = await supabase.from('expense_requests').update({
+                    status: 'approved',
+                    approved_by: adminName,
+                    updated_at: new Date().toISOString()
+                }).eq('id', selectedExpense.value.id);
+                if (updateError) throw updateError;
+
+                const { error: drawerError } = await supabase.from('drawer_balance').update({
+                    ...newBalance,
+                    updated_at: new Date().toISOString()
+                }).eq('id', 1);
+
+                if (drawerError) {
+                    await supabase.from('expense_requests').update({ status: 'pending' }).eq('id', selectedExpense.value.id);
+                    throw drawerError;
+                }
+
+                drawerBalance.value = newBalance;
+
+                await logDrawerAction('WITHDRAW', -expenseApproveTotal.value, oldBalance, newBalance, `อนุมัติเบิกเงิน: ${selectedExpense.value.reason}`);
+                
+                showApproveExpenseModal.value = false;
+                await fetchExpenseRequests();
+                await showAppModal('alert', 'สำเร็จ', `อนุมัติเบิกค่าใช้จ่ายและตัดลิ้นชักเรียบร้อยแล้ว`);
+            } catch (err) {
+                console.error("Error approving expense:", err);
+                await showAppModal('alert', 'เกิดข้อผิดพลาด', err.message);
+            } finally {
+                savingExpenseApprove.value = false;
+            }
+        };
+
+        const rejectExpenseRequest = async (expense) => {
+            if (await showAppModal('confirm', 'ปฏิเสธคำขอ', `คุณต้องการไม่อนุมัติคำขอเบิกเงิน "${expense.reason}" จำนวน ${formatCurrency(expense.amount)} บาท ใช่หรือไม่?`)) {
+                try {
+                    const adminName = user.value && user.value.email ? user.value.email.split('@')[0] : 'admin';
+                    const { error } = await supabase.from('expense_requests').update({
+                        status: 'rejected',
+                        approved_by: adminName,
+                        updated_at: new Date().toISOString()
+                    }).eq('id', expense.id);
+                    
+                    if (error) throw error;
+                    await fetchExpenseRequests();
+                } catch (err) {
+                    console.error("Error rejecting expense:", err);
+                    await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถปฏิเสธคำขอได้: ' + err.message);
+                }
             }
         };
 
@@ -1135,7 +1295,7 @@ createApp({
 
                 if (isMerchantCustomer.value) {
                     const rawPerGram = ((base + premium) / 1000) * (p / 100);
-                    const perGram = floor1(rawPerGram);
+                    const perGram = floor2(rawPerGram);
                     net = floor2(perGram * w);
                 } else {
                     const perGram = Math.floor((base + premium) / 1000);
@@ -1225,11 +1385,11 @@ createApp({
         const formatPricePerGram = (val, type, isMerchant = false) => {
             let digits = 2;
             if (type === 'silver') {
-                digits = isMerchant ? 1 : 0;
+                digits = isMerchant ? 2 : 0;
             }
-            if (val === null || val === undefined || val === '') return digits === 0 ? '0' : (digits === 1 ? '0.0' : '0.00');
+            if (val === null || val === undefined || val === '') return digits === 0 ? '0' : '0.00';
             const num = Number(val);
-            if (isNaN(num)) return digits === 0 ? '0' : (digits === 1 ? '0.0' : '0.00');
+            if (isNaN(num)) return digits === 0 ? '0' : '0.00';
             return num.toLocaleString('th-TH', {
                 minimumFractionDigits: digits,
                 maximumFractionDigits: digits
@@ -1438,7 +1598,7 @@ createApp({
             if (data) {
                 currentPriceEditRequestId.value = data.id;
 
-                if (telegramBotToken.value || lineNotifyToken.value) {
+                if (telegramBotToken.value) {
                     const employeeName = user.value && user.value.email ? user.value.email.split('@')[0] : 'พนักงาน';
                     let notifyMsg = `🔔 ขออนุมัติแก้ไขราคาทอง\n`;
                     notifyMsg += `👤 พนักงาน: ${employeeName}\n`;
@@ -1603,14 +1763,7 @@ createApp({
                     if (tgChatSetting && tgChatSetting.value_text) {
                         telegramChatId.value = tgChatSetting.value_text;
                     }
-                    const lineNotifySetting = settingsData.find(s => s.key === 'line_channel_access_token');
-                    if (lineNotifySetting && lineNotifySetting.value_text) {
-                        lineNotifyToken.value = lineNotifySetting.value_text;
-                    }
-                    const lineTargetSetting = settingsData.find(s => s.key === 'line_target_id');
-                    if (lineTargetSetting && lineTargetSetting.value_text) {
-                        lineTargetId.value = lineTargetSetting.value_text;
-                    }
+
                     const silverSetting = settingsData.find(s => s.key === 'silver_deduction');
                     if (silverSetting && silverSetting.value !== null) {
                         silverDeduction.value = Number(silverSetting.value);
@@ -1821,79 +1974,11 @@ createApp({
             }
         };
 
-        const saveLineNotifyToken = async () => {
-            saving.value = true;
-            try {
-                await supabase.from('global_settings').upsert([
-                    { key: 'line_channel_access_token', value: 0, value_text: lineNotifyToken.value || '' },
-                    { key: 'line_target_id', value: 0, value_text: lineTargetId.value || '' }
-                ]);
-                await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่า LINE สำเร็จ');
-            } catch (e) {
-                console.error(e);
-                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกการตั้งค่า LINE ได้');
-            } finally {
-                saving.value = false;
-            }
-        };
-
-        const sendLineNotify = async (message) => {
-            if (!lineNotifyToken.value || !lineTargetId.value) return;
-            try {
-                await fetch('/api/line_notify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        token: lineNotifyToken.value,
-                        targetId: lineTargetId.value,
-                        message: message
-                    })
-                });
-            } catch (e) {
-                console.error('LINE Notify Error:', e);
-            }
-        };
-
-        const testLineNotify = async () => {
-            testingLine.value = true;
-            try {
-                const res = await fetch('/api/line_notify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        token: lineNotifyToken.value,
-                        targetId: lineTargetId.value,
-                        message: '✅ ทดสอบการเชื่อมต่อ LINE Messaging API จากระบบ Krit-Gold สำเร็จ!'
-                    })
-                });
-
-                if (res.ok) {
-                    await showAppModal('alert', 'สำเร็จ', 'ส่งข้อความทดสอบสำเร็จ กรุณาตรวจสอบใน LINE');
-                } else {
-                    const errorData = await res.json().catch(() => ({}));
-                    let rawMsg = errorData.message || errorData.error || res.statusText || 'ไม่ทราบสาเหตุ';
-                    let displayMsg = rawMsg;
-                    if (res.status === 429 || rawMsg.toLowerCase().includes('limit')) {
-                        displayMsg = 'โควตาการส่งข้อความของ LINE ในเดือนนี้เต็มแล้ว (300 ข้อความ/เดือน สำหรับแพ็กเกจฟรี)\n\n' +
-                                     '💡 สาเหตุ: โควตาส่งข้อความเดือนนี้ถูกใช้ครบ 300 ข้อความแล้ว ระบบจะรีเซ็ตโควตาใหม่อัตโนมัติในวันพรุ่งนี้ (ขึ้นเดือนใหม่) หรือเปลี่ยนไปใช้ Telegram ที่ส่งได้ไม่จำกัด';
-                    }
-                    await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ส่งไม่สำเร็จ: ' + displayMsg);
-                }
-            } catch (e) {
-                console.error(e);
-                await showAppModal('alert', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อ API ได้: ' + e.message);
-            } finally {
-                testingLine.value = false;
-            }
-        };
 
         const sendAppNotification = async (message) => {
             const tasks = [];
             if (telegramBotToken.value && telegramChatId.value) {
                 tasks.push(sendTelegramNotify(message));
-            }
-            if (lineNotifyToken.value && lineTargetId.value) {
-                tasks.push(sendLineNotify(message));
             }
             if (tasks.length > 0) {
                 await Promise.allSettled(tasks);
@@ -2307,7 +2392,7 @@ createApp({
                 const isMerchant = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip' || (tForm.customer_name && tForm.customer_name.includes('พ่อค้า')));
                 if (isMerchant) {
                     const rawPerGram = ((sp + premium) / 1000) * (p / 100);
-                    const perGram = floor1(rawPerGram);
+                    const perGram = floor2(rawPerGram);
                     net = floor2(perGram * w);
                 } else {
                     const perGram = Math.floor((sp + premium) / 1000);
@@ -2906,8 +2991,8 @@ createApp({
                 if (error) throw error;
                 const transactionId = insertedTrxs && insertedTrxs.length > 0 ? insertedTrxs[0].id : null;
 
-                // Send Notification (Telegram / LINE)
-                if (telegramBotToken.value || lineNotifyToken.value) {
+                // Send Notification (Telegram)
+                if (telegramBotToken.value) {
                     try {
                         let notifyMsg = '🔔 รายการใหม่ (บิลซื้อขาย)\n';
                         notifyMsg += `👤 ลูกค้า: ${trData[0].customer_name}\n`;
@@ -3757,6 +3842,7 @@ createApp({
             loadPremiums();
             loadDrawerBalance();
             checkAuth();
+            fetchExpenseRequests();
 
             nextTick(() => {
                 setTimeout(() => {
@@ -4428,11 +4514,16 @@ createApp({
                 return;
             }
 
-            const dateInput = await showAppModal('prompt', 'จัดส่งรอบนี้', 'กรุณาเลือกวันที่จัดส่ง:', [
-                { label: 'วันที่จัดส่ง', type: 'date', defaultValue: new Date().toLocaleDateString('en-CA') }
+            const inputs = await showAppModal('prompt', 'จัดส่งรอบนี้', 'กรุณาเลือกวันที่จัดส่ง และชื่อผู้ส่ง:', [
+                { label: 'วันที่จัดส่ง', type: 'date', defaultValue: new Date().toLocaleDateString('en-CA') },
+                { label: 'ชื่อผู้ส่ง', type: 'text', defaultValue: '' }
             ]);
 
-            if (!dateInput) return; // User cancelled
+            if (!inputs || inputs.length < 2) return; // User cancelled
+            const dateInput = inputs[0];
+            const senderName = inputs[1] || '';
+
+            if (!dateInput) return;
 
             // Allow override of created_at
             let createdAtIso = new Date().toISOString();
@@ -4464,10 +4555,15 @@ createApp({
                 let targetRoundId;
                 if (existingRounds && existingRounds.length > 0) {
                     targetRoundId = existingRounds[0].id;
+                    // Update sender_name if provided
+                    if (senderName) {
+                        await supabase.from('delivery_rounds').update({ sender_name: senderName }).eq('id', targetRoundId);
+                    }
                 } else {
                     const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
                         status: 'pending',
-                        created_at: createdAtIso
+                        created_at: createdAtIso,
+                        sender_name: senderName || null
                     }]).select();
                     if (roundError) throw roundError;
                     targetRoundId = roundData[0].id;
@@ -4688,6 +4784,23 @@ createApp({
         };
 
         return {
+            expenseRequests,
+            expenseReason,
+            expenseBreakdownForm,
+            expenseAmount,
+            loadingExpenseRequests,
+            submittingExpense,
+            showExpenseRequestModal,
+            showApproveExpenseModal,
+            selectedExpense,
+            expenseApproveForm,
+            expenseApproveTotal,
+            savingExpenseApprove,
+            submitExpenseRequest,
+            openExpenseApproveModal,
+            confirmExpenseApproval,
+            rejectExpenseRequest,
+            fetchExpenseRequests,
             showTVModal,
             openTVMode,
             closeTVMode,
@@ -4723,11 +4836,7 @@ createApp({
             saveTelegramSettings,
             detectTelegramChatId,
             testTelegramNotify,
-            lineNotifyToken,
-            lineTargetId,
-            testingLine,
-            saveLineNotifyToken,
-            testLineNotify,
+
             loadAttendanceSummary,
             resetAttendanceData,
             readCardForAttendance,

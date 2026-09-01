@@ -73,9 +73,8 @@ CREATE TABLE IF NOT EXISTS global_settings (
 -- Insert default silver deduction (13%)
 INSERT INTO global_settings (key, value) VALUES ('silver_deduction', 13) ON CONFLICT (key) DO NOTHING;
 
--- Insert default LINE & Telegram settings
-INSERT INTO global_settings (key, value, value_text) VALUES ('line_channel_access_token', 0, '') ON CONFLICT (key) DO NOTHING;
-INSERT INTO global_settings (key, value, value_text) VALUES ('line_target_id', 0, '') ON CONFLICT (key) DO NOTHING;
+-- Insert default Telegram settings
+
 INSERT INTO global_settings (key, value, value_text) VALUES ('telegram_bot_token', 0, '8915365709:AAGzgbId-uku0yJomcppOSrInA2H_6ct-ao') ON CONFLICT (key) DO NOTHING;
 INSERT INTO global_settings (key, value, value_text) VALUES ('telegram_chat_id', 0, '') ON CONFLICT (key) DO NOTHING;
 
@@ -167,6 +166,7 @@ CREATE TABLE IF NOT EXISTS delivery_rounds (
   status TEXT DEFAULT 'pending',
   gold_payment NUMERIC DEFAULT 0,
   silver_payment NUMERIC DEFAULT 0,
+  sender_name TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
   completed_at TIMESTAMP WITH TIME ZONE
 );
@@ -187,6 +187,23 @@ CREATE TABLE IF NOT EXISTS delivery_ingots (
 
 ALTER TABLE delivery_ingots ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated full access to delivery_ingots" ON delivery_ingots FOR ALL USING (auth.role() = 'authenticated');
+
+-- Table: expense_requests
+CREATE TABLE IF NOT EXISTS expense_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reason TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  breakdown JSONB,
+  status TEXT DEFAULT 'pending',
+  requested_by TEXT,
+  approved_by TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE expense_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to expense_requests" ON expense_requests FOR ALL USING (auth.role() = 'authenticated');
+
 
 -- Add ingot_id to transactions table
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ingot_id UUID REFERENCES delivery_ingots(id) ON DELETE SET NULL;
@@ -214,3 +231,143 @@ ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read access to customers" ON customers FOR SELECT USING (true);
 CREATE POLICY "Allow authenticated full access to customers" ON customers FOR ALL USING (auth.role() = 'authenticated');
 
+
+
+-- From migration_attendance.sql --
+-- Table: attendance
+CREATE TABLE IF NOT EXISTS attendance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id_card TEXT NOT NULL,
+  name TEXT NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  check_in_time TIME NOT NULL DEFAULT CURRENT_TIME,
+  check_out_time TIME,
+  late_minutes INTEGER DEFAULT 0,
+  ot_minutes INTEGER DEFAULT 0,
+  deduction_amount NUMERIC DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Setup RLS for attendance
+ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
+
+-- Allow read/write access for authenticated users
+CREATE POLICY "Allow authenticated full access to attendance" ON attendance FOR ALL USING (auth.role() = 'authenticated');
+
+-- Insert default late deduction rate (1 baht per minute)
+INSERT INTO global_settings (key, value) VALUES ('late_deduction_rate', 1) ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE attendance 
+ADD COLUMN check_out_time TIME,
+ADD COLUMN ot_minutes INTEGER DEFAULT 0;
+
+
+-- From migration_delivery_rounds.sql --
+-- Migration script for Delivery Rounds & Ingots
+
+-- Create delivery_rounds table
+CREATE TABLE IF NOT EXISTS delivery_rounds (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status TEXT DEFAULT 'pending',
+  gold_payment NUMERIC DEFAULT 0,
+  silver_payment NUMERIC DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  completed_at TIMESTAMP WITH TIME ZONE
+);
+
+ALTER TABLE delivery_rounds ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to delivery_rounds" ON delivery_rounds FOR ALL USING (auth.role() = 'authenticated');
+
+-- Create delivery_ingots table
+CREATE TABLE IF NOT EXISTS delivery_ingots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  round_id UUID REFERENCES delivery_rounds(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,
+  melted_weight NUMERIC NOT NULL,
+  melted_percent NUMERIC NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE delivery_ingots ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to delivery_ingots" ON delivery_ingots FOR ALL USING (auth.role() = 'authenticated');
+
+-- Add ingot_id to transactions table
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ingot_id UUID REFERENCES delivery_ingots(id) ON DELETE SET NULL;
+
+
+-- From migration_expense_breakdown.sql --
+-- Migration: Add breakdown column to expense_requests
+ALTER TABLE expense_requests ADD COLUMN IF NOT EXISTS breakdown JSONB;
+
+
+-- From migration_expense_requests.sql --
+-- Migration: Create expense_requests table
+CREATE TABLE IF NOT EXISTS expense_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reason TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  status TEXT DEFAULT 'pending',
+  requested_by TEXT,
+  approved_by TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE expense_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated full access to expense_requests" ON expense_requests FOR ALL USING (auth.role() = 'authenticated');
+
+
+-- From migration_melting_status.sql --
+-- Migration script for adding 'melting' status to delivery_ingots
+
+-- 1. Add status column
+ALTER TABLE delivery_ingots ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'completed';
+
+-- 2. Allow nulls in melted_weight and melted_percent for the 'melting' state
+ALTER TABLE delivery_ingots ALTER COLUMN melted_weight DROP NOT NULL;
+ALTER TABLE delivery_ingots ALTER COLUMN melted_percent DROP NOT NULL;
+
+
+-- From migration_price_edit_requests.sql --
+-- Table: price_edit_requests
+CREATE TABLE IF NOT EXISTS price_edit_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected', 'completed'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+-- Setup RLS
+ALTER TABLE price_edit_requests ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read/write access so employees can request and admins can approve
+CREATE POLICY "Allow public full access to price_edit_requests" ON price_edit_requests FOR ALL USING (true);
+
+-- Enable real-time for this table
+alter publication supabase_realtime add table price_edit_requests;
+
+
+-- From migration_sender_name.sql --
+ALTER TABLE delivery_rounds ADD COLUMN sender_name TEXT;
+
+
+-- From migration_vip.sql --
+ALTER TABLE gold_premiums ADD COLUMN IF NOT EXISTS premium_amount_vip NUMERIC DEFAULT 0;
+ALTER TABLE gold_premiums ADD COLUMN IF NOT EXISTS premium_percent_vip NUMERIC DEFAULT 0;
+ALTER TABLE gold_premiums ADD COLUMN IF NOT EXISTS premium_amount_vvip NUMERIC DEFAULT 0;
+ALTER TABLE gold_premiums ADD COLUMN IF NOT EXISTS premium_percent_vvip NUMERIC DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS customers (
+  id_card TEXT PRIMARY KEY,
+  customer_name TEXT,
+  tier TEXT DEFAULT 'normal',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to customers" ON customers FOR SELECT USING (true);
+CREATE POLICY "Allow authenticated full access to customers" ON customers FOR ALL USING (auth.role() = 'authenticated');
+
+
+-- From tmp.sql --
+CREATE POLICY "Allow authenticated full access to drawer_balance" ON drawer_balance FOR ALL USING (auth.role() = 'authenticated');

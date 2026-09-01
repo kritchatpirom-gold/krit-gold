@@ -713,6 +713,12 @@
                                 <i class="fa-solid fa-minus-circle mr-2"></i>
                                 นำเงินออก
                             </button>
+                            <button v-if="isEmployee" @click="showExpenseRequestModal = true"
+                                class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-purple-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg"
+                                title="ขอเบิกค่าใช้จ่าย">
+                                <i class="fa-solid fa-hand-holding-dollar mr-2"></i>
+                                เบิกค่าใช้จ่าย
+                            </button>
                             <button v-if="isAdmin || isEmployee" @click="openTopUpModal"
                                 class="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-blue-400 border border-gray-700 font-bold transition-all flex items-center shadow-lg"
                                 title="เติมเงินเข้าลิ้นชัก">
@@ -726,6 +732,70 @@
                                 <i v-else class="fa-solid fa-save mr-2"></i>
                                 บันทึกยอดเงินในลิ้นชัก
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- ------------------------------------------------ -->
+                    <!-- NEW EXPENSE UI SECTIONS (Moved into Drawer Tab)  -->
+                    <!-- ------------------------------------------------ -->
+
+                    <!-- Admin Approval Section -->
+                    <div v-if="isAdmin && expenseRequests.some(r => r.status === 'pending')" class="glass p-6 rounded-2xl border border-yellow-800/50 relative bg-yellow-900/10 mt-6">
+                        <h2 class="text-2xl font-bold text-yellow-500 mb-6"><i class="fa-solid fa-bell mr-2 animate-pulse"></i> รายการเบิกเงินรออนุมัติ</h2>
+                        <div class="space-y-4">
+                            <div v-for="req in expenseRequests.filter(r => r.status === 'pending')" :key="req.id"
+                                class="bg-dark-base p-4 rounded-xl border border-gray-700 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                                <div>
+                                    <h3 class="text-white font-bold text-lg">{{ req.reason }}</h3>
+                                    <div class="text-gray-400 text-sm mt-1">
+                                        <span class="mr-3"><i class="fa-solid fa-user mr-1"></i> {{ req.requested_by }}</span>
+                                        <span><i class="fa-regular fa-clock mr-1"></i> {{ new Date(req.created_at).toLocaleString('th-TH') }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <div class="text-gold-400 font-bold text-xl font-mono">{{ formatCurrency(req.amount) }} ฿</div>
+                                    <div class="flex gap-2">
+                                        <button @click="openExpenseApproveModal(req)"
+                                            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors shadow-md">
+                                            อนุมัติ
+                                        </button>
+                                        <button @click="rejectExpenseRequest(req)"
+                                            class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-colors shadow-md">
+                                            ไม่อนุมัติ
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- History List -->
+                    <div class="glass p-6 rounded-2xl border border-gray-800 relative mt-6">
+                        <h2 class="text-2xl font-bold text-gray-300 mb-6"><i class="fa-solid fa-clock-rotate-left mr-2"></i> ประวัติการขอเบิกเงิน</h2>
+                        <div v-if="expenseRequests.length === 0" class="text-center text-gray-500 py-8">
+                            <p>ยังไม่มีประวัติการเบิกเงิน</p>
+                        </div>
+                        <div v-else class="space-y-3">
+                            <div v-for="req in expenseRequests" :key="req.id"
+                                class="bg-dark-base p-4 rounded-xl border border-gray-800 flex flex-col md:flex-row justify-between md:items-center gap-3 hover:border-gray-600 transition-colors">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span v-if="req.status === 'pending'" class="px-2 py-0.5 rounded text-xs font-bold bg-yellow-900/50 text-yellow-500 border border-yellow-700/50">รออนุมัติ</span>
+                                        <span v-else-if="req.status === 'approved'" class="px-2 py-0.5 rounded text-xs font-bold bg-emerald-900/50 text-emerald-500 border border-emerald-700/50">อนุมัติแล้ว</span>
+                                        <span v-else-if="req.status === 'rejected'" class="px-2 py-0.5 rounded text-xs font-bold bg-red-900/50 text-red-500 border border-red-700/50">ไม่อนุมัติ</span>
+                                        
+                                        <h3 class="text-gray-300 font-bold">{{ req.reason }}</h3>
+                                    </div>
+                                    <div class="text-gray-500 text-xs mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                                        <span><i class="fa-solid fa-user mr-1 text-gray-600"></i> ผู้เบิก: {{ req.requested_by }}</span>
+                                        <span><i class="fa-regular fa-clock mr-1 text-gray-600"></i> {{ new Date(req.created_at).toLocaleString('th-TH') }}</span>
+                                        <span v-if="req.approved_by" class="text-gold-500/70"><i class="fa-solid fa-user-check mr-1"></i> ตรวจสอบโดย: {{ req.approved_by }}</span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-gray-300 font-bold font-mono text-lg">{{ formatCurrency(req.amount) }} ฿</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1050,6 +1120,123 @@
                     </div>
                 </div>
             </transition>
+
+                    <!-- Expense Request Modal (For Employee) -->
+                    <div v-if="showExpenseRequestModal"
+                        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                        <div class="bg-dark-base rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-gray-700 shadow-2xl relative">
+                            <button @click="showExpenseRequestModal = false" class="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors z-10">
+                                <i class="fa-solid fa-xmark text-2xl"></i>
+                            </button>
+                            <div class="p-6">
+                                <h2 class="text-2xl font-bold text-gold-400 mb-6"><i class="fa-solid fa-hand-holding-dollar mr-2"></i> ขอเบิกค่าใช้จ่าย</h2>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-400 mb-1">เหตุผล / รายการที่เบิก</label>
+                                        <input type="text" v-model="expenseReason" placeholder="ระบุเหตุผล หรือเลือกจากตัวเลือกด้านล่าง"
+                                            class="w-full px-4 py-3 bg-dark-base border border-gray-700 text-white rounded-xl focus:border-gold-500 outline-none">
+                                        <div class="flex gap-2 mt-2">
+                                            <button @click="expenseReason = 'ค่าส่งคาร์โก้'" class="px-3 py-1.5 text-xs font-medium bg-gray-800 hover:bg-gold-500 hover:text-black text-gray-300 rounded-lg transition-colors border border-gray-700">ค่าส่งคาร์โก้</button>
+                                            <button @click="expenseReason = 'ค่าไถ่ถอน'" class="px-3 py-1.5 text-xs font-medium bg-gray-800 hover:bg-gold-500 hover:text-black text-gray-300 rounded-lg transition-colors border border-gray-700">ค่าไถ่ถอน</button>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4">
+                                        <label class="block text-sm font-medium text-gray-400 mb-1">ระบุจำนวนแบงค์/เหรียญที่จะหยิบออก</label>
+                                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">แบงค์ 1000</div>
+                                                <input type="number" v-model="expenseBreakdownForm.b1000" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">แบงค์ 500</div>
+                                                <input type="number" v-model="expenseBreakdownForm.b500" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">แบงค์ 100</div>
+                                                <input type="number" v-model="expenseBreakdownForm.b100" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">แบงค์ 50</div>
+                                                <input type="number" v-model="expenseBreakdownForm.b50" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">แบงค์ 20</div>
+                                                <input type="number" v-model="expenseBreakdownForm.b20" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">เหรียญ 10</div>
+                                                <input type="number" v-model="expenseBreakdownForm.c10" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">เหรียญ 5</div>
+                                                <input type="number" v-model="expenseBreakdownForm.c5" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                            <div>
+                                                <div class="text-xs text-gray-400 mb-1">เหรียญ 1</div>
+                                                <input type="number" v-model="expenseBreakdownForm.c1" min="0" placeholder="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none">
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
+                                            <span class="text-gray-400 font-medium">ยอดรวมที่ขอเบิก:</span>
+                                            <span class="text-2xl font-bold font-mono text-gold-400">{{ formatCurrency(expenseAmount) }} ฿</span>
+                                        </div>
+                                    </div>
+                                    <button @click="submitExpenseRequest" :disabled="submittingExpense || !expenseReason || !expenseAmount || expenseAmount <= 0"
+                                        class="w-full py-4 mt-2 bg-gradient-to-r from-gold-600 to-gold-500 hover:from-gold-500 hover:to-gold-400 text-black font-bold text-lg rounded-xl shadow-lg transition-all transform hover:-translate-y-1 hover:shadow-gold-500/25 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <i class="fa-solid fa-paper-plane mr-2" v-if="!submittingExpense"></i>
+                                        <i class="fa-solid fa-spinner fa-spin mr-2" v-else></i>
+                                        ส่งคำขอเบิกเงิน
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- Approve Modal (For Admin) -->
+                    <div v-if="showApproveExpenseModal"
+                        class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                        <div class="bg-dark-base rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-gray-700 shadow-2xl relative">
+                            <button @click="showApproveExpenseModal = false" class="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors z-10">
+                                <i class="fa-solid fa-xmark text-2xl"></i>
+                            </button>
+                            <div class="p-6">
+                                <h2 class="text-2xl font-bold text-gold-400 mb-6"><i class="fa-solid fa-check-to-slot mr-2"></i> อนุมัติเบิกเงิน: {{ selectedExpense?.reason }}</h2>
+                                
+                                <div class="bg-gray-800/50 p-4 rounded-xl border border-gray-700 space-y-4 mb-6">
+                                    <div class="text-gray-400 text-sm">ผู้เบิก: <span class="text-white font-bold">{{ selectedExpense?.requested_by }}</span></div>
+                                    <div class="text-gray-400 text-sm">ยอดเงิน: <span class="text-gold-400 font-bold font-mono text-xl">{{ formatCurrency(selectedExpense?.amount) }} ฿</span></div>
+                                    <hr class="border-gray-700">
+                                    <label class="block text-sm font-medium text-gray-400 mb-1">ตรวจสอบจำนวนแบงค์/เหรียญที่หยิบออก</label>
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div><div class="text-xs text-gray-400 mb-1">แบงค์ 1000</div><input type="number" v-model="expenseApproveForm.b1000" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                        <div><div class="text-xs text-gray-400 mb-1">แบงค์ 500</div><input type="number" v-model="expenseApproveForm.b500" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                        <div><div class="text-xs text-gray-400 mb-1">แบงค์ 100</div><input type="number" v-model="expenseApproveForm.b100" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                        <div><div class="text-xs text-gray-400 mb-1">แบงค์ 50</div><input type="number" v-model="expenseApproveForm.b50" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                        <div><div class="text-xs text-gray-400 mb-1">แบงค์ 20</div><input type="number" v-model="expenseApproveForm.b20" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                        <div><div class="text-xs text-gray-400 mb-1">เหรียญ 10</div><input type="number" v-model="expenseApproveForm.c10" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                        <div><div class="text-xs text-gray-400 mb-1">เหรียญ 5</div><input type="number" v-model="expenseApproveForm.c5" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                        <div><div class="text-xs text-gray-400 mb-1">เหรียญ 1</div><input type="number" v-model="expenseApproveForm.c1" min="0" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-center focus:border-gold-500 outline-none"></div>
+                                    </div>
+                                    <div class="mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
+                                        <span class="text-gray-400 font-medium">ยอดรวมที่ตรวจสอบ:</span>
+                                        <span class="text-2xl font-bold font-mono" :class="expenseApproveTotal === Number(selectedExpense?.amount) ? 'text-emerald-400' : 'text-red-400'">
+                                            {{ formatCurrency(expenseApproveTotal) }} ฿
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4">
+                                    <button @click="showApproveExpenseModal = false" class="flex-1 px-4 py-3 rounded-xl border border-gray-700 text-gray-300 hover:bg-gray-800 font-medium transition-colors">ยกเลิก</button>
+                                    <button @click="confirmExpenseApproval" :disabled="savingExpenseApprove || expenseApproveTotal !== Number(selectedExpense?.amount)" 
+                                        class="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold transition-all shadow-lg hover:shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <i class="fa-solid fa-check mr-2" v-if="!savingExpenseApprove"></i>
+                                        <i class="fa-solid fa-spinner fa-spin mr-2" v-else></i>
+                                        ยืนยันอนุมัติเบิกเงิน
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
             <transition name="slide-fade" mode="out-in">
                 <!-- Delivery & Profit -->
@@ -4159,7 +4346,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.34" type="module"></script>
+    <script src="/js/app.js?v=1.0.35" type="module"></script>
 </body>
 
 </html>

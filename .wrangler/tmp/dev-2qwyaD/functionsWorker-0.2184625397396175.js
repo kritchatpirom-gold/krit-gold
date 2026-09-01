@@ -6,46 +6,6 @@ var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 async function onRequestPost({ request }) {
   try {
-    const { message, token, targetId } = await request.json();
-    if (!message || !token || !targetId) {
-      return new Response(JSON.stringify({ error: "Missing message, token, or targetId" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-    const payload = {
-      to: targetId,
-      messages: [
-        {
-          type: "text",
-          text: message
-        }
-      ]
-    };
-    const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
-    const responseData = await lineResponse.json();
-    return new Response(JSON.stringify(responseData), {
-      status: lineResponse.status,
-      headers: { "Content-Type": "application/json" }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-}
-__name(onRequestPost, "onRequestPost");
-__name2(onRequestPost, "onRequestPost");
-async function onRequestPost2({ request }) {
-  try {
     const { token } = await request.json();
     if (!token) {
       return new Response(JSON.stringify({ ok: false, description: "Missing token" }), {
@@ -66,9 +26,9 @@ async function onRequestPost2({ request }) {
     });
   }
 }
-__name(onRequestPost2, "onRequestPost2");
-__name2(onRequestPost2, "onRequestPost");
-async function onRequestPost3({ request }) {
+__name(onRequestPost, "onRequestPost");
+__name2(onRequestPost, "onRequestPost");
+async function onRequestPost2({ request }) {
   try {
     const { message, token, chatId } = await request.json();
     if (!message || !token || !chatId) {
@@ -100,8 +60,8 @@ async function onRequestPost3({ request }) {
     });
   }
 }
-__name(onRequestPost3, "onRequestPost3");
-__name2(onRequestPost3, "onRequestPost");
+__name(onRequestPost2, "onRequestPost2");
+__name2(onRequestPost2, "onRequestPost");
 async function onRequest(context) {
   try {
     const response = await fetch("https://gold.kritgold.workers.dev", {
@@ -188,25 +148,18 @@ __name(onRequest2, "onRequest2");
 __name2(onRequest2, "onRequest");
 var routes = [
   {
-    routePath: "/api/line_notify",
+    routePath: "/api/telegram_get_updates",
     mountPath: "/api",
     method: "POST",
     middlewares: [],
     modules: [onRequestPost]
   },
   {
-    routePath: "/api/telegram_get_updates",
-    mountPath: "/api",
-    method: "POST",
-    middlewares: [],
-    modules: [onRequestPost2]
-  },
-  {
     routePath: "/api/telegram_notify",
     mountPath: "/api",
     method: "POST",
     middlewares: [],
-    modules: [onRequestPost3]
+    modules: [onRequestPost2]
   },
   {
     routePath: "/api/gold",
