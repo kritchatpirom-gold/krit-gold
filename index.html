@@ -113,7 +113,7 @@
                     </div>
 
                     <div class="hidden md:flex items-center space-x-6 shrink-0">
-                        <button @click="currentTab = 'calculator'"
+                        <button v-if="!isMerchant" @click="currentTab = 'calculator'"
                             :class="currentTab === 'calculator' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ระบบคำนวณบิล</button>
 
@@ -121,29 +121,36 @@
                         <button v-if="isAdmin" @click="currentTab = 'history'"
                             :class="currentTab === 'history' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ยอดซื้อขาย</button>
-                        <button v-if="isLoggedIn" @click="currentTab = 'attendance'"
+                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'attendance'"
                             :class="currentTab === 'attendance' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ลงเวลา</button>
                         <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'"
                             :class="currentTab === 'settings' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ตั้งค่า</button>
-                        <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'"
+                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'pre_melt'"
                             :class="currentTab === 'pre_melt' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ประเมินหลอม</button>
-                        <button v-if="isLoggedIn" @click="currentTab = 'drawer'"
+                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'drawer'"
                             :class="currentTab === 'drawer' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ลิ้นชักเงิน</button>
-                        <button v-if="isLoggedIn" @click="currentTab = 'delivery'"
+                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'delivery'"
                             :class="currentTab === 'delivery' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">Delivery & Profit</button>
 
+                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'price_locks'"
+                            :class="currentTab === 'price_locks' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">ประวัติการล็อคราคา</button>
+                        <button v-if="isMerchant" @click="currentTab = 'realtime_price'"
+                            :class="currentTab === 'realtime_price' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
+                            class="hover:text-gold-300 pb-1 transition-all-custom">ราคาทองเรียลไทม์</button>
+
                         <button v-if="isLoggedIn" @click="logout"
                             class="ml-4 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium transition-all-custom">
-                            ออกจากระบบพนักงาน
+                            ออกจากระบบ
                         </button>
                         <button v-else @click="showAuth = true"
                             class="px-5 py-2.5 rounded-lg border border-gold-400 bg-gold-600/20 hover:bg-gold-500/40 text-gold-300 font-medium shadow-lg transition-all-custom hover-glow cursor-pointer">
-                            <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบพนักงาน
+                            <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบ
                         </button>
                     </div>
 
@@ -158,23 +165,27 @@
             <!-- Mobile Menu -->
             <div v-if="mobileMenuOpen" class="md:hidden glass border-t border-gray-800">
                 <div class="px-4 pt-2 pb-5 space-y-3">
-                    <button @click="currentTab = 'calculator'; mobileMenuOpen = false"
+                    <button v-if="!isMerchant" @click="currentTab = 'calculator'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ระบบคำนวณบิล</button>
                     <button v-if="isAdmin" @click="currentTab = 'history'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">สรุปยอดซื้อขาย
                         / ลบ</button>
-                    <button v-if="isLoggedIn" @click="currentTab = 'attendance'; mobileMenuOpen = false"
+                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'attendance'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ลงเวลาเข้างาน</button>
                     <button v-if="isAdmin || isEmployee" @click="currentTab = 'settings'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ตั้งค่าระบบ</button>
-                    <button v-if="isLoggedIn" @click="currentTab = 'pre_melt'; mobileMenuOpen = false"
+                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'pre_melt'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ประเมินหลอม</button>
-                    <button v-if="isLoggedIn" @click="currentTab = 'drawer'; mobileMenuOpen = false"
+                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'drawer'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ลิ้นชักเงิน</button>
-                    <button v-if="isLoggedIn" @click="currentTab = 'delivery'; mobileMenuOpen = false"
+                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'delivery'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">รายการส่งของ</button>
+                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'price_locks'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ประวัติการล็อคราคา</button>
+                    <button v-if="isMerchant" @click="currentTab = 'realtime_price'; mobileMenuOpen = false"
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ราคาทองเรียลไทม์</button>
                     <button v-if="!isLoggedIn" @click="showAuth = true; mobileMenuOpen = false"
-                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gold-400 mt-2 border-t border-gray-800 pt-3">เข้าสู่ระบบพนักงาน</button>
+                        class="block w-full text-left px-3 py-2 rounded-md font-medium text-gold-400 mt-2 border-t border-gray-800 pt-3">เข้าสู่ระบบ</button>
                     <button v-if="isLoggedIn" @click="logout(); mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-red-500 mt-2 border-t border-gray-800 pt-3">ออกจากระบบ</button>
                 </div>
@@ -451,7 +462,7 @@
             </transition>
 
             <transition name="slide-fade" mode="out-in">
-                <!-- Drawer Management -->
+                
                 <div v-if="currentTab === 'pre_melt' && isLoggedIn" key="pre_melt" class="max-w-4xl mx-auto space-y-6">
                     <div class="glass p-6 rounded-2xl border border-gray-800">
                         <h2 class="text-2xl font-bold text-gold-400 mb-6"><i
@@ -567,7 +578,7 @@
                     </div>
                 </div>
 
-                <div v-if="currentTab === 'drawer' && isLoggedIn" key="drawer" class="max-w-4xl mx-auto space-y-6">
+                <div v-else-if="currentTab === 'drawer' && isLoggedIn" key="drawer" class="max-w-4xl mx-auto space-y-6">
                     <div class="glass p-6 rounded-2xl border border-gray-800 relative">
                         <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
                             <h2 class="text-2xl font-bold text-gold-400"><i class="fa-solid fa-cash-register mr-2"></i>
@@ -734,7 +745,6 @@
                             </button>
                         </div>
                     </div>
-
                     <!-- ------------------------------------------------ -->
                     <!-- NEW EXPENSE UI SECTIONS (Moved into Drawer Tab)  -->
                     <!-- ------------------------------------------------ -->
@@ -919,6 +929,147 @@
                 </div>
             </transition>
 
+        <!-- Lock Price Modal -->
+        <div v-if="showLockModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="showLockModal = false"></div>
+            <div class="glass border-t border-gray-700 p-8 rounded-3xl max-w-sm w-full relative transform scale-100 transition-all shadow-2xl">
+                <button @click="showLockModal = false" class="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors bg-gray-800 rounded-full w-8 h-8 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" :class="lockModalData.type === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'">
+                        <i class="fa-solid fa-lock text-3xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-2">
+                        ล็อคราคา<span :class="lockModalData.type === 'buy' ? 'text-green-400' : 'text-red-400'">{{ lockModalData.type === 'buy' ? 'รับซื้อ' : 'ขายออก' }}</span>
+                    </h3>
+                    <p class="text-gray-400 text-sm">กฤต หลอมทอง อุบลราชธานี</p>
+                </div>
+                
+                <div class="bg-gray-900/60 rounded-2xl p-6 text-center mb-8 border border-gray-700/50">
+                    <div class="text-gray-400 text-sm mb-2 font-medium">ราคาที่ใช้ในการล็อค</div>
+                    <div class="text-4xl font-black text-white tracking-tight">{{ Number(lockModalData.price).toLocaleString('th-TH') }}</div>
+                    <div class="text-gray-500 text-xs mt-2">บาท/บาททอง</div>
+                </div>
+
+                <div class="mb-8 relative">
+                    <label class="block text-gray-300 text-sm font-medium mb-4 text-center">ระบุน้ำหนักที่ต้องการ (บาททอง)</label>
+                    <div class="flex items-center justify-between bg-gray-800/80 rounded-2xl p-2 border border-gray-700 mb-6">
+                        <button @click="adjustLockWeight(-1)" class="w-14 h-14 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl flex items-center justify-center transition-colors active:scale-95 shadow-md">
+                            <i class="fa-solid fa-minus"></i>
+                        </button>
+                        <div class="w-24 text-center">
+                            <span class="text-3xl font-black text-gold-400">{{ lockModalData.weight_baht }}</span>
+                        </div>
+                        <button @click="adjustLockWeight(1)" class="w-14 h-14 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl flex items-center justify-center transition-colors active:scale-95 shadow-md">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+
+                    <div class="bg-gold-500/10 border border-gold-500/30 rounded-xl p-4 text-center">
+                        <div class="text-gold-400 text-sm mb-1 font-medium">ยอดรวมทั้งหมด (บาท)</div>
+                        <div class="text-2xl font-black text-gold-400">
+                            {{ Number(lockModalData.price * lockModalData.weight_baht).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="confirmLockPrice" class="w-full py-4 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-400 hover:to-gold-500 text-black font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(250,204,21,0.3)] hover:shadow-[0_0_30px_rgba(250,204,21,0.5)] active:scale-[0.98] text-lg">
+                    ยืนยันรายการ
+                </button>
+            </div>
+        </div>
+
+        <!-- Target Modal -->
+        <div v-if="showTargetModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="showTargetModal = false"></div>
+            <div class="glass border-t border-gray-700 p-8 rounded-3xl max-w-sm w-full relative transform scale-100 transition-all shadow-2xl">
+                <button @click="showTargetModal = false" class="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors bg-gray-800 rounded-full w-8 h-8 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 bg-yellow-500/20 text-yellow-400">
+                        <i class="fa-solid fa-bullseye text-3xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-2">
+                        ตั้งเป้า<span class="text-yellow-400">ออโต้ล็อค</span>
+                    </h3>
+                    <p class="text-gray-400 text-sm">ระบบจะล็อคอัตโนมัติเมื่อถึงราคา</p>
+                </div>
+                
+                <div class="mb-6 relative">
+                    <label class="block text-gray-300 text-sm font-medium mb-2 text-center">ระบุราคาเป้าหมาย (รับซื้อ)</label>
+                    <div class="bg-gray-900/60 rounded-2xl p-4 border border-gray-700/50">
+                        <input type="number" v-model="targetForm.targetPrice" class="w-full bg-transparent text-center text-4xl font-black text-white outline-none tracking-tight" placeholder="0">
+                        <div class="text-center text-gray-500 text-xs mt-2">บาท/บาททอง</div>
+                    </div>
+                </div>
+
+                <div class="mb-8 relative">
+                    <label class="block text-gray-300 text-sm font-medium mb-4 text-center">ระบุน้ำหนักที่ต้องการ (บาททอง)</label>
+                    <div class="flex items-center justify-between bg-gray-800/80 rounded-2xl p-2 border border-gray-700 mb-6">
+                        <button @click="adjustTargetWeight(-1)" class="w-14 h-14 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl flex items-center justify-center transition-colors active:scale-95 shadow-md">
+                            <i class="fa-solid fa-minus"></i>
+                        </button>
+                        <div class="w-24 text-center">
+                            <input type="number" v-model="targetForm.weight" class="w-full bg-transparent text-center text-3xl font-black text-gold-400 outline-none">
+                        </div>
+                        <button @click="adjustTargetWeight(1)" class="w-14 h-14 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl flex items-center justify-center transition-colors active:scale-95 shadow-md">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+
+                    <div class="bg-gold-500/10 border border-gold-500/30 rounded-xl p-4 text-center">
+                        <div class="text-gold-400 text-sm mb-1 font-medium">ยอดรวมทั้งหมด (โดยประมาณ)</div>
+                        <div class="text-2xl font-black text-gold-400">
+                            {{ Number((targetForm.targetPrice || 0) * (targetForm.weight || 0)).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="saveTarget" class="w-full py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] active:scale-[0.98] text-lg">
+                    ยืนยันตั้งเป้า
+                </button>
+            </div>
+        </div>
+
+        <!-- Split Lock Modal -->
+        <div v-if="showSplitLockModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="showSplitLockModal = false"></div>
+            
+            <div class="glass border border-gray-700/50 rounded-[32px] w-full max-w-md p-8 relative z-10 shadow-2xl overflow-hidden">
+                <button @click="showSplitLockModal = false" class="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors bg-gray-800 rounded-full w-8 h-8 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 bg-sky-500/20 text-sky-400">
+                        <i class="fa-solid fa-scissors text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-black text-white">แบ่งรายการล็อคราคา</h2>
+                    <p class="text-gray-400 text-sm mt-1" v-if="splitLockData.originalLock">
+                        น้ำหนักเดิม: <span class="text-gold-400 font-bold">{{ splitLockData.originalLock.weight_baht }}</span> บาททอง
+                    </p>
+                </div>
+
+                <div class="space-y-4 mb-8">
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-2">น้ำหนักรายการที่ 1 (รายการเดิม)</label>
+                        <input type="number" step="any" v-model.number="splitLockData.newWeight1" @input="splitLockData.newWeight2 = Number((splitLockData.originalLock.weight_baht - splitLockData.newWeight1).toFixed(4))"
+                            class="w-full bg-dark-surface border border-gray-700 text-white rounded-xl px-4 py-3 text-xl font-bold text-center focus:border-sky-500 transition-colors outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 text-sm font-medium mb-2">น้ำหนักรายการที่ 2 (รายการใหม่)</label>
+                        <input type="number" step="any" v-model.number="splitLockData.newWeight2" @input="splitLockData.newWeight1 = Number((splitLockData.originalLock.weight_baht - splitLockData.newWeight2).toFixed(4))"
+                            class="w-full bg-dark-surface border border-gray-700 text-white rounded-xl px-4 py-3 text-xl font-bold text-center focus:border-sky-500 transition-colors outline-none">
+                    </div>
+                </div>
+
+                <button @click="confirmSplitLock" class="w-full py-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(14,165,233,0.3)] hover:shadow-[0_0_30px_rgba(14,165,233,0.5)] active:scale-[0.98] text-lg">
+                    ยืนยันการแบ่งรายการ
+                </button>
+            </div>
+        </div>
             <!-- Top Up Modal -->
             <transition name="fade">
                 <div v-if="showTopUpModal"
@@ -1606,8 +1757,12 @@
                                                 class="px-3 py-1 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 rounded-full text-xs font-bold"><i
                                                     class="fa-solid fa-check-circle mr-1"></i> ปิดยอดแล้ว</span>
                                         </div>
-                                        <div class="text-sm text-gray-400 mt-1">วันที่ส่ง: {{ new
-                                            Date(round.created_at).toLocaleString('th-TH') }}</div>
+                                        <div class="text-sm text-gray-400 mt-1 flex items-center gap-3">
+                                            <span>วันที่ส่ง: {{ new Date(round.created_at).toLocaleString('th-TH') }}</span>
+                                            <span v-if="round.sender_name" class="flex items-center gap-1 text-gray-300">
+                                                <i class="fa-solid fa-user text-xs"></i> ผู้ส่ง: {{ round.sender_name }}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div class="flex items-center gap-4">
                                         <div class="text-right">
@@ -2435,7 +2590,7 @@
                                             </div>
                                             <div class="text-xs text-gray-500">
                                                 {{ item.percent }}% | น้ำหนัก: {{ item.weight }} ก.
-                                                <span class="text-gray-400 font-mono ml-1">(@{{ formatPricePerGram(item.netPrice / item.weight, item.type, item.isMerchant ?? isMerchantCustomer) }} ฿/ก.)</span>
+                                                <span class="text-gray-400 font-mono ml-1">(@{{ formatPricePerGram(item.netPrice / item.weight, item.type, item.isMerchant || isMerchantCustomer) }} ฿/ก.)</span>
                                                 <span v-if="item.premium > 0"
                                                     class="text-green-500 ml-1">(+{{item.premium}})</span>
                                             </div>
@@ -3183,6 +3338,514 @@
                 </div>
 
                 <!-- SettingsTab -->
+                <!-- Realtime Price Tab -->
+                <div v-if="currentTab === 'realtime_price' && isMerchant" key="realtime_price"
+                    class="max-w-4xl mx-auto space-y-6">
+                    <div class="glass p-6 md:p-8 rounded-2xl relative overflow-hidden">
+                        <div class="absolute -top-10 -right-10 w-40 h-40 bg-gold-500/10 rounded-full blur-3xl"></div>
+                        <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
+                        
+                        <div class="relative z-10 flex flex-col items-center">
+                            <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gold-300 to-gold-500 mb-2">ราคาทองคำเรียลไทม์</h2>
+                            <p class="text-gray-400 mb-8"><i class="fa-regular fa-clock mr-2"></i>อัปเดตล่าสุด: {{ jkRealtimeGoldTime || '-' }}</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                                <!-- Buy Price -->
+                                <div :class="jkPriceFlashBuy ? 'bg-green-900/40 border-green-500 shadow-[0_0_30px_rgba(74,222,128,0.3)] scale-[1.02]' : 'bg-gray-800/50 border-gray-700/50 shadow-black/20'" class="border rounded-2xl p-6 text-center transform transition-all duration-300 hover:scale-[1.02] shadow-lg flex flex-col justify-center">
+                                    <div>
+                                        <div class="text-gray-400 font-medium mb-3">ราคารับซื้อ (Buy)</div>
+                                        <div class="text-5xl font-black text-green-400 tracking-tight" style="text-shadow: 0 0 20px rgba(74, 222, 128, 0.2)">
+                                            {{ Number(jkRealtimeGoldBuy).toLocaleString('th-TH') }}
+                                        </div>
+                                        <div class="text-sm text-gray-500 mt-2">บาท/บาททอง</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Sell Price -->
+                                <div :class="jkPriceFlashSell ? 'bg-red-900/40 border-red-500 shadow-[0_0_30px_rgba(248,113,113,0.3)] scale-[1.02]' : 'bg-gray-800/50 border-gray-700/50 shadow-black/20'" class="border rounded-2xl p-6 text-center transform transition-all duration-300 hover:scale-[1.02] shadow-lg flex flex-col justify-center">
+                                    <div>
+                                        <div class="text-gray-400 font-medium mb-3">ราคาขายออก (Sell)</div>
+                                        <div class="text-5xl font-black text-red-400 tracking-tight" style="text-shadow: 0 0 20px rgba(248, 113, 113, 0.2)">
+                                            {{ Number(jkRealtimeGoldSell).toLocaleString('th-TH') }}
+                                        </div>
+                                        <div class="text-sm text-gray-500 mt-2">บาท/บาททอง</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons Grid -->
+                            <div class="mt-8 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <button @click="openLockModal('buy')" class="w-full py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(22,163,74,0.3)] hover:shadow-[0_0_30px_rgba(22,163,74,0.5)] active:scale-[0.98] text-lg flex items-center justify-center">
+                                    <i class="fa-solid fa-lock mr-3"></i> สร้างรายการล็อคราคารับซื้อ
+                                </button>
+
+                                <button @click="openTargetModal()" class="w-full py-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] active:scale-[0.98] text-lg flex items-center justify-center">
+                                    <i class="fa-solid fa-bullseye mr-3"></i> ตั้งเป้าออโต้ล็อค (ราคารับซื้อ)
+                                </button>
+                            </div>
+
+                            <div class="mt-6 text-center text-gray-500 text-sm">
+                                <i class="fa-solid fa-bolt text-yellow-500 mr-1"></i> ดึงข้อมูลอัตโนมัติทุก 3 วินาที
+                            </div>
+
+                            <!-- Active Targets -->
+                            <div v-if="merchantTargets.filter(t => t.status === 'active').length > 0" class="mt-6 w-full max-w-4xl mx-auto glass p-6 rounded-2xl border border-gray-700/50 shadow-lg">
+                                <h4 class="text-sm font-medium text-gray-400 mb-4">เป้าหมายที่กำลังทำงาน:</h4>
+                                <div class="space-y-3">
+                                    <div v-for="target in merchantTargets.filter(t => t.status === 'active')" :key="target.id" class="flex justify-between items-center bg-gray-900/80 p-4 rounded-xl border border-gray-700">
+                                        <div class="text-sm">
+                                            <span class="text-gray-400">รอราคารับซื้อที่: </span>
+                                            <span class="text-gold-400 font-bold text-lg">{{ Number(target.target_price).toLocaleString('th-TH') }}</span>
+                                            <span class="text-gray-400 ml-4">น้ำหนัก: </span>
+                                            <span class="text-white font-medium">{{ target.weight_baht }} บาททอง</span>
+                                        </div>
+                                        <button @click="cancelTarget(target.id)" class="text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-4 py-2 rounded-lg text-xs font-medium transition-colors">
+                                            ยกเลิก
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Merchant Active Locks Table -->
+                            <div class="mt-12 w-full text-left bg-gray-800/80 rounded-xl border border-gray-700 shadow-xl overflow-hidden">
+                                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 border-b border-gray-700 bg-gray-800/50">
+                                    <h3 class="text-xl font-bold text-gold-400"><i class="fa-solid fa-clock mr-2"></i>รายการล็อคราคา (กำลังดำเนินการ)</h3>
+                                </div>
+                                <div>
+                                    <!-- Desktop Table View -->
+                                    <div class="hidden md:block overflow-x-auto">
+                                        <table class="w-full text-sm">
+                                            <thead class="bg-gray-900/50 text-gray-400 border-b border-gray-700">
+                                                <tr>
+                                                    <th class="px-4 py-4 text-center font-medium w-12">
+                                                        <input type="checkbox" v-model="selectAllMerchantLocks" class="w-4 h-4 text-gold-500 bg-gray-800 border-gray-600 rounded focus:ring-gold-500 focus:ring-2">
+                                                    </th>
+                                                    <th class="px-4 py-4 text-left font-medium">เวลา</th>
+                                                    <th class="px-4 py-4 text-right font-medium">ราคาที่ล็อค</th>
+                                                    <th class="px-4 py-4 text-right font-medium">น้ำหนัก (บาท)</th>
+                                                    <th class="px-4 py-4 text-right font-medium text-gold-400">ยอดรวม (บาท)</th>
+                                                    <th class="px-4 py-4 text-center font-medium">จัดการ</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-700/50">
+                                                <tr v-if="merchantActiveLocks.length === 0">
+                                                    <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                                                        <div class="flex flex-col items-center">
+                                                            <i class="fa-solid fa-box-open text-4xl mb-3 opacity-20"></i>
+                                                            <p>ไม่มีรายการที่กำลังดำเนินการ</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <template v-for="group in groupedMerchantActiveLocks" :key="group.key">
+                                                    <tr v-for="(lock, index) in group.locks" :key="lock.id" class="hover:bg-gray-700/30 transition-colors" :class="{'bg-gray-800/60': selectedMerchantLocks.includes(lock.id)}">
+                                                        <td class="px-4 py-4 text-center">
+                                                            <input type="checkbox" :value="lock.id" v-model="selectedMerchantLocks" class="w-4 h-4 text-gold-500 bg-gray-800 border-gray-600 rounded focus:ring-gold-500 focus:ring-2">
+                                                        </td>
+                                                        <td class="px-4 py-4 text-gray-300">{{ new Date(lock.created_at).toLocaleString('th-TH') }}</td>
+                                                        <td class="px-4 py-4 text-right font-medium text-white flex flex-col items-end">
+                                                            <div class="flex items-center gap-1">
+                                                                <span v-if="lock.type === 'buy'" class="text-green-400 text-xs"><i class="fa-solid fa-arrow-down"></i></span>
+                                                                <span v-else class="text-red-400 text-xs"><i class="fa-solid fa-arrow-up"></i></span>
+                                                                {{ Number(lock.locked_price).toLocaleString('th-TH') }}
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-4 py-4 text-right text-gold-300 font-bold">{{ lock.weight_baht }}</td>
+                                                        <td class="px-4 py-4 text-right font-bold text-gold-400">{{ Number(lock.locked_price * lock.weight_baht).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}</td>
+                                                        <td v-if="index === 0" :rowspan="group.locks.length" class="px-4 py-4 text-center align-middle" :class="{'border-l border-gray-700/50': group.locks.length > 1}">
+                                                            -
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                            <tfoot class="bg-gray-800/80 border-t border-gray-700" v-if="merchantActiveLocks.length > 0">
+                                                <tr>
+                                                    <td colspan="3" class="px-4 py-4 text-right font-bold text-white">ยอดรวมที่เลือก:</td>
+                                                    <td class="px-4 py-4 text-right font-bold text-gold-300">
+                                                        <div class="text-xs text-gray-400 font-normal">น้ำหนักรวม</div>
+                                                        {{ totalMerchantLockWeight }}
+                                                    </td>
+                                                    <td class="px-4 py-4 text-right font-black text-gold-400 text-lg">
+                                                        <div class="text-xs text-gray-400 font-normal whitespace-nowrap">เฉลี่ย {{ Number(averageMerchantLockPrice).toLocaleString('th-TH', { maximumFractionDigits: 0 }) }} บ./บาท</div>
+                                                        {{ totalMerchantLockAmount.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}
+                                                    </td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+
+                                    <!-- Mobile Card View -->
+                                    <div class="md:hidden flex flex-col p-4 space-y-4">
+                                        <div v-if="merchantActiveLocks.length === 0" class="text-center text-gray-500 py-8">
+                                            <i class="fa-solid fa-box-open text-4xl mb-3 opacity-20"></i>
+                                            <p>ไม่มีรายการที่กำลังดำเนินการ</p>
+                                        </div>
+                                        
+                                        <div v-if="merchantActiveLocks.length > 0" class="flex items-center gap-2 pb-2 border-b border-gray-700/50">
+                                            <input type="checkbox" v-model="selectAllMerchantLocks" class="w-5 h-5 text-gold-500 bg-gray-800 border-gray-600 rounded">
+                                            <label class="text-gray-300 text-sm font-bold" @click="selectAllMerchantLocks = !selectAllMerchantLocks">เลือกทั้งหมด</label>
+                                        </div>
+
+                                        <div v-for="group in groupedMerchantActiveLocks" :key="group.key" class="bg-gray-700/20 rounded-xl p-3 border border-gray-700 space-y-3 shadow-sm">
+                                            <div v-for="(lock, index) in group.locks" :key="lock.id" class="flex justify-between items-center" :class="{'pt-3 border-t border-gray-700/50': index > 0}">
+                                                <div class="flex items-center gap-3">
+                                                    <input type="checkbox" :value="lock.id" v-model="selectedMerchantLocks" class="w-5 h-5 text-gold-500 bg-gray-800 border-gray-600 rounded">
+                                                    <div class="flex flex-col">
+                                                        <span class="text-gray-200 text-sm font-bold flex items-center gap-1">
+                                                            <span v-if="lock.type === 'buy'" class="text-green-400 text-xs"><i class="fa-solid fa-arrow-down"></i></span>
+                                                            <span v-else class="text-red-400 text-xs"><i class="fa-solid fa-arrow-up"></i></span>
+                                                            {{ Number(lock.locked_price).toLocaleString('th-TH') }}
+                                                        </span>
+                                                        <span class="text-gray-500 text-xs">{{ new Date(lock.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) }}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col items-end">
+                                                    <span class="text-gold-300 font-bold text-sm">{{ lock.weight_baht }} บาท</span>
+                                                    <span class="text-gold-500/80 text-[10px] font-medium">รวม {{ Number(lock.locked_price * lock.weight_baht).toLocaleString('th-TH', { maximumFractionDigits: 0 }) }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div v-if="merchantActiveLocks.length > 0" class="mt-4 pt-4 border-t border-gray-700 flex justify-between items-end">
+                                            <div class="flex flex-col">
+                                                <span class="text-gray-400 text-[10px]">น้ำหนักที่เลือก:</span>
+                                                <span class="text-gold-300 font-bold text-base">{{ totalMerchantLockWeight }} บ.</span>
+                                            </div>
+                                            <div class="flex flex-col items-end">
+                                                <span class="text-gray-400 text-[10px]">เฉลี่ย {{ Number(averageMerchantLockPrice).toLocaleString('th-TH', { maximumFractionDigits: 0 }) }} บ./บาท</span>
+                                                <span class="text-gold-400 font-black text-lg">{{ totalMerchantLockAmount.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Merchant History Locks Table -->
+                            <div class="mt-8 w-full text-left bg-gray-800/80 rounded-xl border border-gray-700 shadow-xl overflow-hidden">
+                                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:px-6 border-b border-gray-700 bg-gray-800/50">
+                                    <h3 class="text-xl font-bold text-gray-300"><i class="fa-solid fa-clock-rotate-left mr-2"></i>ประวัติการล็อคราคา (เสร็จสิ้น / ยกเลิก)</h3>
+                                    <div class="flex items-center gap-1 md:gap-3 shrink-0 w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-start">
+                                        <div class="flex items-center gap-1 md:gap-1.5">
+                                            <label class="text-orange-400 text-[10px] md:text-xs font-bold whitespace-nowrap"><i class="fa-solid fa-calendar-day mr-1 hidden md:inline"></i>เริ่ม:</label>
+                                            <input type="datetime-local" v-model="merchantLockStartFilter" class="bg-gray-800 border border-orange-500 text-orange-400 text-[10px] md:text-xs rounded md:rounded-md focus:ring-orange-500 focus:border-orange-500 block py-0.5 px-1 md:py-1 md:px-2 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_8px_rgba(249,115,22,0.2)] tracking-tighter w-[120px] md:w-auto">
+                                        </div>
+                                        <div class="flex items-center gap-1 md:gap-1.5 ml-1 md:ml-0">
+                                            <label class="text-orange-400 text-[10px] md:text-xs font-bold whitespace-nowrap"><i class="fa-solid fa-calendar-day mr-1 hidden md:inline"></i>ถึง:</label>
+                                            <input type="datetime-local" v-model="merchantLockEndFilter" class="bg-gray-800 border border-orange-500 text-orange-400 text-[10px] md:text-xs rounded md:rounded-md focus:ring-orange-500 focus:border-orange-500 block py-0.5 px-1 md:py-1 md:px-2 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_8px_rgba(249,115,22,0.2)] tracking-tighter w-[120px] md:w-auto">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <!-- Desktop Table View -->
+                                    <div class="hidden md:block overflow-x-auto">
+                                        <table class="w-full text-sm">
+                                            <thead class="bg-gray-900/50 text-gray-400 border-b border-gray-700">
+                                                <tr>
+                                                    <th class="px-2 md:px-4 py-4 text-center font-medium w-10 md:w-12">
+                                                        -
+                                                    </th>
+                                                    <th class="px-2 md:px-4 py-4 text-left font-medium">เวลา</th>
+                                                    <th class="px-2 md:px-4 py-4 text-right font-medium">ราคาที่ล็อค</th>
+                                                    <th class="px-2 md:px-4 py-4 text-right font-medium">น้ำหนัก (บาท)</th>
+                                                    <th class="hidden md:table-cell px-4 py-4 text-right font-medium text-gray-300">ยอดรวม (บาท)</th>
+                                                    <th class="px-2 md:px-4 py-4 text-center font-medium">สถานะ</th>
+                                                    <th class="px-2 md:px-4 py-4 text-center font-medium">จัดการ</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-700/50">
+                                                <tr v-if="merchantHistoryLocks.length === 0">
+                                                    <td colspan="7" class="px-4 py-8 text-center text-gray-500">
+                                                        <div class="flex flex-col items-center">
+                                                            <i class="fa-solid fa-box-open text-4xl mb-3 opacity-20"></i>
+                                                            <p>ไม่มีประวัติการล็อคราคา</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                <template v-for="group in groupedMerchantHistoryLocks" :key="group.key">
+                                                    <tr v-for="(lock, index) in group.locks" :key="lock.id" class="hover:bg-gray-700/30 transition-colors">
+                                                        <td class="px-2 md:px-4 py-4 text-center text-gray-500">
+                                                            <i class="fa-solid fa-check"></i>
+                                                        </td>
+                                                        <td class="px-2 md:px-4 py-4 text-gray-400 text-xs md:text-sm">{{ new Date(lock.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) }}</td>
+                                                        <td class="px-2 md:px-4 py-4 text-right font-medium text-gray-300 flex flex-col items-end">
+                                                            <div class="flex items-center gap-1">
+                                                                <span v-if="lock.type === 'buy'" class="text-green-400/70 text-xs"><i class="fa-solid fa-arrow-down"></i></span>
+                                                                <span v-else class="text-red-400/70 text-xs"><i class="fa-solid fa-arrow-up"></i></span>
+                                                                {{ Number(lock.locked_price).toLocaleString('th-TH') }}
+                                                            </div>
+                                                        </td>
+                                                        <td class="px-2 md:px-4 py-4 text-right text-gray-400">{{ lock.weight_baht }}</td>
+                                                        <td class="hidden md:table-cell px-4 py-4 text-right font-medium text-gray-400">{{ Number(lock.locked_price * lock.weight_baht).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}</td>
+                                                        <td class="px-2 md:px-4 py-4 text-center">
+                                                            <span v-if="lock.status === 'completed'" class="text-green-400 bg-green-400/10 border border-green-400/20 px-2 py-1 md:px-3 rounded-full text-[10px] md:text-xs">เสร็จสิ้น</span>
+                                                            <span v-if="lock.status === 'cancelled'" class="text-red-400 bg-red-400/10 border border-red-400/20 px-2 py-1 md:px-3 rounded-full text-[10px] md:text-xs">ยกเลิก</span>
+                                                        </td>
+                                                        <td v-if="index === 0" :rowspan="group.locks.length" class="px-2 md:px-4 py-4 text-center align-middle" :class="{'border-l border-gray-700/50': group.locks.length > 1}">
+                                                            <button v-if="lock.status === 'completed' && lock.transaction_id" 
+                                                                @click="viewLockBill(lock.transaction_id)" 
+                                                                class="text-blue-400 hover:text-blue-300 bg-blue-400/10 px-2 py-1 md:px-3 rounded-lg text-[10px] md:text-xs transition-colors">
+                                                                <i class="fa-solid fa-file-invoice mr-1"></i> ดูบิล
+                                                            </button>
+                                                            <span v-else class="text-gray-500">-</span>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Mobile Card View -->
+                                    <div class="md:hidden flex flex-col p-4 space-y-4">
+                                        <div v-if="merchantHistoryLocks.length === 0" class="text-center text-gray-500 py-8">
+                                            <i class="fa-solid fa-box-open text-4xl mb-3 opacity-20"></i>
+                                            <p>ไม่มีประวัติการล็อคราคา</p>
+                                        </div>
+                                        
+                                        <div v-for="group in groupedMerchantHistoryLocks" :key="group.key" class="bg-gray-700/20 rounded-xl p-3 border border-gray-700 space-y-3 shadow-sm">
+                                            <div v-for="(lock, index) in group.locks" :key="lock.id" class="flex flex-col gap-2" :class="{'pt-3 border-t border-gray-700/50': index > 0}">
+                                                <div class="flex justify-between items-start">
+                                                    <div class="flex flex-col">
+                                                        <span class="text-gray-200 text-sm font-bold flex items-center gap-1">
+                                                            <span v-if="lock.type === 'buy'" class="text-green-400 text-xs"><i class="fa-solid fa-arrow-down"></i></span>
+                                                            <span v-else class="text-red-400 text-xs"><i class="fa-solid fa-arrow-up"></i></span>
+                                                            {{ Number(lock.locked_price).toLocaleString('th-TH') }}
+                                                        </span>
+                                                        <span class="text-gray-500 text-xs">{{ new Date(lock.created_at).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) }}</span>
+                                                    </div>
+                                                    <div class="flex flex-col items-end">
+                                                        <span class="text-gray-300 font-bold text-sm">{{ lock.weight_baht }} บาท</span>
+                                                        <span v-if="lock.status === 'completed'" class="text-green-400 text-[10px] font-semibold bg-green-400/10 px-2 py-0.5 rounded mt-1 border border-green-400/20">เสร็จสิ้น</span>
+                                                        <span v-if="lock.status === 'cancelled'" class="text-red-400 text-[10px] font-semibold bg-red-400/10 px-2 py-0.5 rounded mt-1 border border-red-400/20">ยกเลิก</span>
+                                                    </div>
+                                                </div>
+                                                <div v-if="index === 0 && lock.status === 'completed' && lock.transaction_id" class="mt-2 flex justify-end">
+                                                    <button @click="viewLockBill(lock.transaction_id)" class="text-blue-400 hover:text-blue-300 bg-blue-400/10 px-3 py-1.5 rounded-lg text-xs font-bold w-full transition-colors border border-blue-400/20">
+                                                        <i class="fa-solid fa-file-invoice mr-1"></i> ดูบิล
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Price Locks Tab -->
+                <div v-if="currentTab === 'price_locks' && (isAdmin || isEmployee)" key="price_locks" class="max-w-6xl mx-auto space-y-6">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <h2 class="text-2xl font-bold text-white"><i class="fa-solid fa-lock text-gold-400 mr-2"></i>ประวัติการล็อคราคาจากพ่อค้า</h2>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <label class="text-orange-400 text-sm font-bold"><i class="fa-solid fa-calendar-day mr-1"></i>ตั้งแต่:</label>
+                                <input type="datetime-local" v-model="adminLockStartFilter" class="bg-gray-800 border-2 border-orange-500 text-orange-400 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                                
+                                <label class="text-orange-400 text-sm ml-2 font-bold">ถึง:</label>
+                                <input type="datetime-local" v-model="adminLockEndFilter" class="bg-gray-800 border-2 border-orange-500 text-orange-400 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                                
+                                <button v-if="adminLockStartFilter || adminLockEndFilter" @click="adminLockStartFilter = ''; adminLockEndFilter = ''" class="text-gray-400 hover:text-red-400 transition-colors ml-1" title="ล้างค่าตัวกรอง">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex space-x-4">
+                            <button @click="createBillFromLocks" class="bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-400 hover:to-gold-500 text-black px-4 py-2 rounded-lg font-bold transition-all shadow-[0_0_15px_rgba(250,204,21,0.3)] hover:scale-105 active:scale-95 flex items-center">
+                                <i class="fa-solid fa-file-invoice mr-2"></i> ทำบิลจากรายการที่เลือก
+                            </button>
+                            <button @click="loadLocks" class="text-gray-400 hover:text-white transition-colors flex items-center">
+                                <i class="fa-solid fa-rotate-right mr-2"></i> รีเฟรชข้อมูล
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Card 1: Pending Locks (Active) -->
+                    <div class="glass rounded-xl overflow-hidden border border-gray-700 shadow-xl mb-6">
+                        <div class="bg-gray-800/80 p-4 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-clock-rotate-left mr-2 text-sky-400"></i>รายการรอดำเนินการ</h3>
+                            <div class="relative z-20">
+                                <input type="text" v-model="activeLockFilter" 
+                                    @focus="showActiveLockSuggestions = true"
+                                    @blur="setTimeout(() => showActiveLockSuggestions = false, 200)"
+                                    placeholder="พิมพ์ค้นหาชื่อพ่อค้า..."
+                                    class="bg-gray-900 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block p-2 pl-3 pr-10 text-white outline-none w-64">
+                                <i class="fa-solid fa-search absolute right-3 top-2.5 text-gray-400"></i>
+                                
+                                <ul v-if="showActiveLockSuggestions && activeLockSuggestions.length > 0" class="absolute left-0 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                    <li v-for="name in activeLockSuggestions" :key="name" 
+                                        @click="selectActiveLockFilter(name)" 
+                                        class="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white text-sm">
+                                        {{ name }}
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-900/50 text-gray-400 border-b border-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-4 text-center font-medium w-12">
+                                            <input type="checkbox" v-model="selectAllAdminLocks" class="w-4 h-4 text-gold-500 bg-gray-800 border-gray-600 rounded focus:ring-gold-500 focus:ring-2">
+                                        </th>
+                                        <th class="px-4 py-4 font-medium">เวลา</th>
+                                        <th class="px-4 py-4 font-medium">ชื่อพ่อค้า (Email)</th>
+                                        <th class="px-4 py-4 font-medium">ประเภท</th>
+                                        <th class="px-4 py-4 text-right font-medium">ราคาที่ล็อค</th>
+                                        <th class="px-4 py-4 text-right font-medium">น้ำหนัก (บาท)</th>
+                                        <th class="px-4 py-4 text-right font-medium text-gold-400">ยอดรวม (บาท)</th>
+                                        <th class="px-4 py-4 text-center font-medium">สถานะ</th>
+                                        <th class="px-4 py-4 text-center font-medium">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-700/50">
+                                    <tr v-if="activeAdminLocks.length === 0">
+                                        <td colspan="9" class="px-4 py-12 text-center text-gray-500">
+                                            <div class="flex flex-col items-center">
+                                                <i class="fa-solid fa-folder-open text-4xl mb-3 opacity-20"></i>
+                                                <p>ไม่มีรายการรอดำเนินการ</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr v-for="lock in activeAdminLocks" :key="lock.id" class="hover:bg-gray-700/30 transition-colors" :class="{'bg-gray-800/60': selectedAdminLocks.includes(lock.id)}">
+                                        <td class="px-4 py-4 text-center">
+                                            <input type="checkbox" :value="lock.id" v-model="selectedAdminLocks" class="w-4 h-4 text-gold-500 bg-gray-800 border-gray-600 rounded focus:ring-gold-500 focus:ring-2">
+                                        </td>
+                                        <td class="px-4 py-4 text-gray-300">{{ new Date(lock.created_at).toLocaleString('th-TH') }}</td>
+                                        <td class="px-4 py-4 text-white font-medium">
+                                            <div class="flex flex-col">
+                                                <span>{{ merchantEmailMappings[lock.merchant_email] || lock.merchant_name || lock.merchant_email }}</span>
+                                                <span class="text-xs text-gray-500">{{ lock.merchant_email }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-4">
+                                            <span v-if="lock.type === 'buy'" class="text-green-400 bg-green-400/10 px-2 py-1 rounded text-xs"><i class="fa-solid fa-arrow-down mr-1"></i>รับซื้อ</span>
+                                            <span v-else class="text-red-400 bg-red-400/10 px-2 py-1 rounded text-xs"><i class="fa-solid fa-arrow-up mr-1"></i>ขายออก</span>
+                                        </td>
+                                        <td class="px-4 py-4 text-right font-medium text-white">{{ Number(lock.locked_price).toLocaleString('th-TH') }}</td>
+                                        <td class="px-4 py-4 text-right text-gold-300 font-bold">{{ lock.weight_baht }}</td>
+                                        <td class="px-4 py-4 text-right font-bold text-gold-400">{{ Number(lock.locked_price * lock.weight_baht).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}</td>
+                                        <td class="px-4 py-4 text-center">
+                                            <select :value="lock.status" @change="updateLockStatus(lock.id, $event.target.value)" 
+                                                :disabled="!isAdmin"
+                                                class="bg-gray-800 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block w-full p-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <option value="pending">รอดำเนินการ</option>
+                                                <option value="completed">เสร็จสิ้น</option>
+                                                <option value="cancelled">ยกเลิก</option>
+                                            </select>
+                                        </td>
+                                        <td class="px-4 py-4 text-center">
+                                            <div class="flex justify-center items-center gap-2">
+                                                <button @click="openSplitLockModal(lock)" class="text-sky-400 hover:text-sky-300 p-2 rounded hover:bg-sky-400/10 transition-colors" title="แบ่งรายการ">
+                                                    <i class="fa-solid fa-scissors"></i>
+                                                </button>
+                                                <button v-if="isAdmin" @click="deleteLock(lock.id)" class="text-red-400 hover:text-red-300 p-2 rounded hover:bg-red-400/10 transition-colors" title="ลบรายการ">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot class="bg-gray-800/80 border-t border-gray-700" v-if="activeAdminLocks.length > 0">
+                                    <tr>
+                                        <td colspan="5" class="px-4 py-4 text-right font-bold text-white">ยอดรวมที่เลือก / เฉลี่ย:</td>
+                                        <td class="px-4 py-4 text-right font-bold text-gold-300">
+                                            <div class="text-xs text-gray-400 font-normal">น้ำหนักรวม</div>
+                                            {{ totalAdminLockWeight }}
+                                        </td>
+                                        <td class="px-4 py-4 text-right font-black text-gold-400 text-lg">
+                                            <div class="text-xs text-gray-400 font-normal whitespace-nowrap">เฉลี่ย {{ Number(averageAdminLockPrice).toLocaleString('th-TH', { maximumFractionDigits: 0 }) }} บ./บาท</div>
+                                            {{ totalAdminLockAmount.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}
+                                        </td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: History Locks (Completed/Cancelled) -->
+                    <div class="glass rounded-xl overflow-hidden border border-gray-700 shadow-xl">
+                        <div class="bg-gray-800/80 p-4 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-white"><i class="fa-solid fa-check-double mr-2 text-green-400"></i>ประวัติรายการ (เสร็จสิ้น / ยกเลิก)</h3>
+                            <div class="relative z-20">
+                                <input type="text" v-model="historyLockFilter" 
+                                    @focus="showHistoryLockSuggestions = true"
+                                    @blur="setTimeout(() => showHistoryLockSuggestions = false, 200)"
+                                    placeholder="พิมพ์ค้นหาชื่อพ่อค้า..."
+                                    class="bg-gray-900 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block p-2 pl-3 pr-10 text-white outline-none w-64">
+                                <i class="fa-solid fa-search absolute right-3 top-2.5 text-gray-400"></i>
+                                
+                                <ul v-if="showHistoryLockSuggestions && historyLockSuggestions.length > 0" class="absolute left-0 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                    <li v-for="name in historyLockSuggestions" :key="name" 
+                                        @click="selectHistoryLockFilter(name)" 
+                                        class="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white text-sm">
+                                        {{ name }}
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-900/50 text-gray-400 border-b border-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-4 font-medium">เวลา</th>
+                                        <th class="px-4 py-4 font-medium">ชื่อพ่อค้า (Email)</th>
+                                        <th class="px-4 py-4 font-medium">ประเภท</th>
+                                        <th class="px-4 py-4 text-right font-medium">ราคาที่ล็อค</th>
+                                        <th class="px-4 py-4 text-right font-medium">น้ำหนัก (บาท)</th>
+                                        <th class="px-4 py-4 text-right font-medium text-gold-400">ยอดรวม (บาท)</th>
+                                        <th class="px-4 py-4 text-center font-medium">สถานะ</th>
+                                        <th class="px-4 py-4 text-center font-medium">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-700/50">
+                                    <tr v-if="historyAdminLocks.length === 0">
+                                        <td colspan="8" class="px-4 py-12 text-center text-gray-500">
+                                            <div class="flex flex-col items-center">
+                                                <i class="fa-solid fa-box-archive text-4xl mb-3 opacity-20"></i>
+                                                <p>ไม่มีประวัติรายการ</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr v-for="lock in historyAdminLocks" :key="lock.id" class="hover:bg-gray-700/30 transition-colors opacity-80">
+                                        <td class="px-4 py-4 text-gray-300">{{ new Date(lock.created_at).toLocaleString('th-TH') }}</td>
+                                        <td class="px-4 py-4 text-white font-medium">
+                                            <div class="flex flex-col">
+                                                <span>{{ merchantEmailMappings[lock.merchant_email] || lock.merchant_name || lock.merchant_email }}</span>
+                                                <span class="text-xs text-gray-500">{{ lock.merchant_email }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-4">
+                                            <span v-if="lock.type === 'buy'" class="text-green-400 bg-green-400/10 px-2 py-1 rounded text-xs"><i class="fa-solid fa-arrow-down mr-1"></i>รับซื้อ</span>
+                                            <span v-else class="text-red-400 bg-red-400/10 px-2 py-1 rounded text-xs"><i class="fa-solid fa-arrow-up mr-1"></i>ขายออก</span>
+                                        </td>
+                                        <td class="px-4 py-4 text-right font-medium text-white">{{ Number(lock.locked_price).toLocaleString('th-TH') }}</td>
+                                        <td class="px-4 py-4 text-right text-gold-300 font-bold">{{ lock.weight_baht }}</td>
+                                        <td class="px-4 py-4 text-right font-bold text-gold-400">{{ Number(lock.locked_price * lock.weight_baht).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}</td>
+                                        <td class="px-4 py-4 text-center">
+                                            <select :value="lock.status" @change="updateLockStatus(lock.id, $event.target.value)" 
+                                                :disabled="!isAdmin"
+                                                class="bg-gray-800 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block w-full p-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                :class="{'text-green-400': lock.status === 'completed', 'text-red-400': lock.status === 'cancelled'}">
+                                                <option value="pending">รอดำเนินการ</option>
+                                                <option value="completed">เสร็จสิ้น</option>
+                                                <option value="cancelled">ยกเลิก</option>
+                                            </select>
+                                        </td>
+                                        <td class="px-4 py-4 text-center">
+                                            <div class="flex justify-center items-center gap-2">
+                                                <button v-if="isAdmin" @click="deleteLock(lock.id)" class="text-red-400 hover:text-red-300 p-2 rounded hover:bg-red-400/10 transition-colors" title="ลบรายการ">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <div v-if="currentTab === 'settings' && (isAdmin || isEmployee)" key="settings"
                     class="max-w-3xl mx-auto space-y-6">
                     <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800">
@@ -3499,6 +4162,57 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
+                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+                            <h3 class="font-bold text-xl text-white"><i class="fa-solid fa-users text-gold-400 mr-2"></i> ตั้งค่ารายชื่อพ่อค้า (จับคู่อีเมล)</h3>
+                            <button @click="saveMerchantMappings" :disabled="saving"
+                                class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
+                        </div>
+                        <div class="bg-gray-900/50 p-6 rounded-xl border border-gray-700">
+                            <p class="text-sm text-gray-400 mb-4">ผูกอีเมลของพ่อค้าเข้ากับชื่อในระบบ เพื่อให้ดึงชื่อตอนทำบิลได้ถูกต้อง</p>
+                            
+                            <div class="flex flex-col md:flex-row gap-3 mb-6">
+                                <input type="email" v-model="newMerchantMapping.email" placeholder="อีเมล (เช่น merchant@krittrade.com)" class="flex-1 bg-dark-surface border border-gray-700 text-white rounded px-3 py-2">
+                                <div class="flex-1 relative">
+                                    <input type="text" v-model="newMerchantMapping.name" placeholder="ชื่อพ่อค้า" class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2">
+                                    <div v-if="mappingNameSuggestions.length > 0" class="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-40 overflow-y-auto overflow-x-hidden">
+                                        <div v-for="name in mappingNameSuggestions" :key="name" @click="selectMappingName(name)" class="px-3 py-2 cursor-pointer hover:bg-gray-700 text-gray-200 border-b border-gray-700 last:border-b-0 whitespace-nowrap overflow-hidden text-ellipsis">
+                                            {{ name }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button @click="addMerchantMapping" class="bg-gold-600 hover:bg-gold-500 text-black px-6 py-2 rounded-lg font-bold shadow-md">เพิ่ม</button>
+                            </div>
+
+                            <div class="overflow-x-auto border border-gray-800 rounded-lg">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-gray-800/80 text-gray-400">
+                                        <tr>
+                                            <th class="px-4 py-3 border-b border-gray-700">อีเมล</th>
+                                            <th class="px-4 py-3 border-b border-gray-700">ชื่อพ่อค้าที่แสดงในบิล</th>
+                                            <th class="px-4 py-3 border-b border-gray-700 text-right">จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(name, email) in merchantEmailMappings" :key="email" class="border-b border-gray-800 hover:bg-gray-800/50 last:border-0 transition-colors">
+                                            <td class="px-4 py-3 text-gray-300 font-mono">{{ email }}</td>
+                                            <td class="px-4 py-3 text-gold-400 font-bold">{{ name }}</td>
+                                            <td class="px-4 py-3 text-right">
+                                                <button @click="removeMerchantMapping(email)" class="text-red-400 hover:text-red-300 bg-red-400/10 px-3 py-1 rounded-md text-xs font-bold transition-colors">ลบ</button>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="Object.keys(merchantEmailMappings).length === 0">
+                                            <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                                                <i class="fa-solid fa-link-slash text-2xl mb-2 opacity-50 block"></i>
+                                                ยังไม่มีการผูกชื่อพ่อค้า
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                     <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
                         <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
                             <h3 class="font-bold text-xl text-white"><i
@@ -3595,41 +4309,7 @@
                         </div>
                     </div>
 
-                    <!-- LINE Messaging API Settings -->
-                    <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
-                        <div class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
-                            <h3 class="font-bold text-xl text-white"><i
-                                    class="fa-brands fa-line mr-2 text-green-500"></i> การแจ้งเตือนผ่าน LINE (Messaging
-                                API)</h3>
-                            <button @click="saveLineNotifyToken" :disabled="saving"
-                                class="px-6 py-2 bg-gold-600 hover:bg-gold-500 text-black font-bold rounded-lg transition shadow-md hover-glow">บันทึก</button>
-                        </div>
-                        <div class="bg-dark-base p-6 rounded-xl border border-gray-800 space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">Channel Access Token
-                                    (Long-lived)</label>
-                                <input type="password" v-model="lineNotifyToken"
-                                    placeholder="กรอก Token ของ LINE OA (ทิ้งว่างเพื่อปิดใช้งาน)"
-                                    class="w-full px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none text-md">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-400 mb-1">Target ID (User ID / Group
-                                    ID)</label>
-                                <input type="text" v-model="lineTargetId"
-                                    placeholder="กรอกรหัสของห้องแชทที่จะให้บอทส่งข้อความไป"
-                                    class="w-full px-4 py-3 bg-gray-900 border border-gray-700 text-white rounded-xl focus:border-green-500 outline-none text-md">
-                                <p class="text-xs text-gray-500 mt-1">รหัสนี้ได้จากหน้า Basic Settings (Your user ID)
-                                    หรือรับจาก Webhook ตอนดึงบอทเข้ากลุ่ม</p>
-                            </div>
-                            <div class="pt-4 flex justify-end border-t border-gray-800">
-                                <button @click="testLineNotify"
-                                    :disabled="!lineNotifyToken || !lineTargetId || testingLine"
-                                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold rounded-lg transition disabled:opacity-50">
-                                    <i class="fa-solid fa-bell mr-1"></i> ทดสอบส่งข้อความ
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+
 
                     <!-- Customer Tier Management -->
                     <div v-if="isAdmin" class="glass p-8 rounded-2xl border border-gray-800 mt-6">
@@ -3703,7 +4383,7 @@
                                                             class="fa-solid fa-trash"></i></button>
                                                 </div>
                                             </template>
-                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'vip')"
+                                            <div v-if="!hasVIP"
                                                 class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">
                                                 ไม่มีรายชื่อ VIP</div>
                                         </div>
@@ -3729,7 +4409,7 @@
                                                             class="fa-solid fa-trash"></i></button>
                                                 </div>
                                             </template>
-                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'vvip')"
+                                            <div v-if="!hasVVIP"
                                                 class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">
                                                 ไม่มีรายชื่อ VVIP</div>
                                         </div>
@@ -3755,7 +4435,7 @@
                                                             class="fa-solid fa-trash"></i></button>
                                                 </div>
                                             </template>
-                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'network')"
+                                            <div v-if="!hasNetwork"
                                                 class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">
                                                 ไม่มีรายชื่อพ่อค้าในเครือข่าย</div>
                                         </div>
@@ -3781,7 +4461,7 @@
                                                             class="fa-solid fa-trash"></i></button>
                                                 </div>
                                             </template>
-                                            <div v-if="!premiumCustomersList.some(c => c.tier === 'network_vip')"
+                                            <div v-if="!hasNetworkVIP"
                                                 class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">
                                                 ไม่มีรายชื่อพ่อค้าในเครือข่าย (VIP)</div>
                                         </div>
@@ -3841,7 +4521,7 @@
 
                 <div style="border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 3px;">
-                        <span><b>วันที่:</b> {{ formatDate(new Date()) }}</span>
+                        <span><b>วันที่:</b> {{ formatDate(calcForm.createdAt ? new Date(calcForm.createdAt) : new Date()) }}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 9pt; margin-bottom: 3px;">
                         <span><b>ลูกค้า:</b> {{ calcForm.customerName || 'เงินสด' }}{{ calcForm.phone ? ' (' +
@@ -3875,7 +4555,7 @@
                             <td style="text-align: center; padding: 6px 0; vertical-align: middle;">{{ item.weight }} g
                             </td>
                             <td style="text-align: right; padding: 6px 0; vertical-align: middle;">
-                                <span>{{ formatPricePerGram(item.netPrice / item.weight, item.type, item.isMerchant ?? isMerchantCustomer) }}</span>
+                                <span>{{ formatPricePerGram(item.netPrice / item.weight, item.type, item.isMerchant || isMerchantCustomer) }}</span>
                                 <div v-if="item.type !== 'silver'" style="font-size: 7.5pt; color: #666;">
                                     ({{ Number(item.basePrice).toLocaleString('th-TH', { maximumFractionDigits: 0 })
                                     }}<span v-if="item.premium>0">+{{item.premium}}</span>)

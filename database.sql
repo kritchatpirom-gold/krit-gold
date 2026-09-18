@@ -371,3 +371,50 @@ CREATE POLICY "Allow authenticated full access to customers" ON customers FOR AL
 
 -- From tmp.sql --
 CREATE POLICY "Allow authenticated full access to drawer_balance" ON drawer_balance FOR ALL USING (auth.role() = 'authenticated');
+
+-- From migration_gold_locks.sql --
+CREATE TABLE IF NOT EXISTS gold_locks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merchant_email TEXT NOT NULL,
+  merchant_name TEXT,
+  type TEXT NOT NULL,
+  locked_price NUMERIC NOT NULL,
+  weight_baht NUMERIC NOT NULL,
+  status TEXT DEFAULT 'pending',
+  transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
+);
+
+ALTER TABLE gold_locks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public full access to gold_locks" ON gold_locks FOR ALL USING (true);
+
+-- From migration_gold_targets.sql --
+CREATE TABLE IF NOT EXISTS public.gold_targets (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    merchant_email TEXT NOT NULL,
+    merchant_name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    target_price NUMERIC NOT NULL,
+    weight_baht NUMERIC NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    triggered_at TIMESTAMP WITH TIME ZONE
+);
+
+ALTER TABLE public.gold_targets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Enable all access for targets" ON public.gold_targets
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
+-- From migration_jk_bill.sql --
+ALTER TABLE gold_locks ADD COLUMN IF NOT EXISTS jk_bill_id TEXT;
+ALTER TABLE gold_locks ADD COLUMN IF NOT EXISTS jk_bill_code TEXT;
+ALTER TABLE gold_locks ADD COLUMN IF NOT EXISTS jk_bill_status TEXT;
+ALTER TABLE gold_locks ADD COLUMN IF NOT EXISTS jk_type_id TEXT;
+
+INSERT INTO global_settings (key, value, value_text) VALUES ('jk_gold_token', 0, '') ON CONFLICT (key) DO NOTHING;
+INSERT INTO global_settings (key, value, value_text) VALUES ('jk_gold_daily_seq', 0, '') ON CONFLICT (key) DO NOTHING;
+

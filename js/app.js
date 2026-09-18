@@ -47,8 +47,580 @@ createApp({
 
         // Roles
         const isAdmin = computed(() => user.value && user.value.email === 'admin@kritgold.com');
-        const isEmployee = computed(() => user.value && user.value.email !== 'admin@kritgold.com');
+        const isMerchant = computed(() => user.value && user.value.email.endsWith('@krittrade.com'));
+        const isEmployee = computed(() => user.value && user.value.email !== 'admin@kritgold.com' && !isMerchant.value);
         const isLoggedIn = computed(() => user.value !== null);
+
+        // JK Gold Realtime
+        const jkRealtimeGoldBuy = ref(0);
+        const jkRealtimeGoldSell = ref(0);
+        const jkRealtimeGoldTime = ref('');
+        const jkPriceFlashBuy = ref(false);
+        const jkPriceFlashSell = ref(false);
+        let jkPriceInterval = null;
+
+        const fetchJkRealtimePrices = async () => {
+            if (!isMerchant.value || currentTab.value !== 'realtime_price') return;
+            try {
+                const res = await fetch('https://gold-realtime.kritgold.workers.dev/');
+                const responseJson = await res.json();
+                
+                // The API returns { success: true, data: { bar_buy: 123, bar_sell: 123, updated_at: 123456.78 } }
+                if (responseJson && responseJson.data) {
+                    const priceData = responseJson.data;
+                    
+                    const newBuy = priceData.bar_buy || 0;
+                    const newSell = priceData.bar_sell || 0;
+
+                    if (jkRealtimeGoldBuy.value !== 0 && jkRealtimeGoldBuy.value !== newBuy) {
+                        jkPriceFlashBuy.value = true;
+                        setTimeout(() => jkPriceFlashBuy.value = false, 800);
+                    }
+                    if (jkRealtimeGoldSell.value !== 0 && jkRealtimeGoldSell.value !== newSell) {
+                        jkPriceFlashSell.value = true;
+                        setTimeout(() => jkPriceFlashSell.value = false, 800);
+                    }
+
+                    jkRealtimeGoldBuy.value = newBuy;
+                    jkRealtimeGoldSell.value = newSell;
+                    
+                    if (priceData.updated_at) {
+                        const dt = new Date(priceData.updated_at * 1000);
+                        jkRealtimeGoldTime.value = dt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    }
+                }
+            } catch (e) {
+                console.error("Error fetching realtime gold price from Worker:", e);
+            }
+        };
+
+        // Gold Price Locks
+        const showLockModal = ref(false);
+        const lockModalData = ref({
+            type: 'buy', // 'buy' or 'sell'
+            price: 0,
+            weight_baht: 1,
+        });
+        
+        const showTargetModal = ref(false);
+
+        const showSplitLockModal = ref(false);
+        const splitLockData = ref({ originalLock: null, newWeight1: 0, newWeight2: 0 });
+
+        const openSplitLockModal = (lock) => {
+            splitLockData.value = {
+                originalLock: lock,
+                newWeight1: Number(lock.weight_baht) / 2,
+                newWeight2: Number(lock.weight_baht) / 2
+            };
+            showSplitLockModal.value = true;
+        };
+
+        const confirmSplitLock = async () => {
+            const lock = splitLockData.value.originalLock;
+            const w1 = Number(splitLockData.value.newWeight1);
+            const w2 = Number(splitLockData.value.newWeight2);
+
+            if (!lock || w1 <= 0 || w2 <= 0 || Math.abs((w1 + w2) - Number(lock.weight_baht)) > 0.0001) {
+                await showAppModal('error', 'ข้อผิดพลาด', 'น้ำหนักที่แบ่งไม่ถูกต้อง (ผลรวมต้องเท่ากับน้ำหนักเดิม)');
+                return;
+            }
+
+            saving.value = true;
+            try {
+                // Update original lock weight
+                const { error: err1 } = await supabase.from('gold_locks')
+                    .update({ weight_baht: w1 })
+                    .eq('id', lock.id);
+                if (err1) throw err1;
+
+                // Insert new lock
+                const { error: err2 } = await supabase.from('gold_locks')
+                    .insert({
+                        merchant_email: lock.merchant_email,
+                        merchant_name: lock.merchant_name,
+                        type: lock.type,
+                        locked_price: lock.locked_price,
+                        weight_baht: w2,
+                        status: lock.status,
+                        created_at: lock.created_at
+                    });
+                if (err2) throw err2;
+
+                await loadLocks();
+                showSplitLockModal.value = false;
+                await showAppModal('alert', 'สำเร็จ', 'แบ่งรายการล็อคสำเร็จ');
+            } catch (error) {
+                console.error(error);
+                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถแบ่งรายการได้');
+            } finally {
+                saving.value = false;
+            }
+        };
+
+        const merchantLocks = ref([]);
+        const allLocks = ref([]);
+        
+        const selectedMerchantLocks = ref([]);
+        const selectedAdminLocks = ref([]);
+        const currentBillLocks = ref([]); // Tracks which locks are being turned into a bill
+
+        const showActiveLockSuggestions = ref(false);
+        const activeLockFilter = ref('');
+        const showHistoryLockSuggestions = ref(false);
+        const historyLockFilter = ref('');
+        
+        const getLocalISODate = () => {
+            const d = new Date();
+            const offset = d.getTimezoneOffset() * 60000;
+            return (new Date(d - offset)).toISOString().split('T')[0];
+        };
+        
+        const adminLockStartFilter = ref(`${getLocalISODate()}T00:00`); // YYYY-MM-DDTHH:mm
+        const adminLockEndFilter = ref(`${getLocalISODate()}T23:59`); // YYYY-MM-DDTHH:mm
+        
+        const merchantLockStartFilter = ref(`${getLocalISODate()}T00:00`);
+        const merchantLockEndFilter = ref(`${getLocalISODate()}T23:59`);
+        
+        const merchantActiveLocks = computed(() => {
+            return merchantLocks.value.filter(l => l.status === 'pending');
+        });
+
+        const merchantHistoryLocks = computed(() => {
+            let locks = merchantLocks.value.filter(l => l.status !== 'pending');
+            if (merchantLockStartFilter.value) {
+                const start = new Date(merchantLockStartFilter.value).getTime();
+                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() >= start);
+            }
+            if (merchantLockEndFilter.value) {
+                const end = new Date(merchantLockEndFilter.value).getTime();
+                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() <= end);
+            }
+            return locks;
+        });
+        
+        const groupedMerchantActiveLocks = computed(() => {
+            const groups = [];
+            const tempMap = new Map();
+
+            merchantActiveLocks.value.forEach(lock => {
+                const key = lock.transaction_id || `lock_${lock.id}`;
+                if (!tempMap.has(key)) {
+                    tempMap.set(key, []);
+                }
+                tempMap.get(key).push(lock);
+            });
+
+            tempMap.forEach((locks, key) => {
+                groups.push({ key, locks });
+            });
+            return groups;
+        });
+
+        const groupedMerchantHistoryLocks = computed(() => {
+            const groups = [];
+            const tempMap = new Map();
+
+            merchantHistoryLocks.value.forEach(lock => {
+                const key = lock.transaction_id || `lock_${lock.id}`;
+                if (!tempMap.has(key)) {
+                    tempMap.set(key, []);
+                }
+                tempMap.get(key).push(lock);
+            });
+
+            tempMap.forEach((locks, key) => {
+                groups.push({ key, locks });
+            });
+            return groups;
+        });
+        
+        const activeAdminLocks = computed(() => {
+            let locks = allLocks.value.filter(l => l.status === 'pending');
+            if (adminLockStartFilter.value) {
+                const start = new Date(adminLockStartFilter.value).getTime();
+                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() >= start);
+            }
+            if (adminLockEndFilter.value) {
+                const end = new Date(adminLockEndFilter.value).getTime();
+                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() <= end);
+            }
+            if (activeLockFilter.value) {
+                const filterText = activeLockFilter.value.trim().toLowerCase();
+                locks = locks.filter(l => {
+                    const resolvedName = merchantEmailMappings.value[l.merchant_email] || l.merchant_name || l.merchant_email || '';
+                    return resolvedName.toLowerCase().includes(filterText);
+                });
+            }
+            return locks;
+        });
+
+        const historyAdminLocks = computed(() => {
+            let locks = allLocks.value.filter(l => l.status !== 'pending');
+            if (adminLockStartFilter.value) {
+                const start = new Date(adminLockStartFilter.value).getTime();
+                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() >= start);
+            }
+            if (adminLockEndFilter.value) {
+                const end = new Date(adminLockEndFilter.value).getTime();
+                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() <= end);
+            }
+            if (historyLockFilter.value) {
+                const filterText = historyLockFilter.value.trim().toLowerCase();
+                locks = locks.filter(l => {
+                    const resolvedName = merchantEmailMappings.value[l.merchant_email] || l.merchant_name || l.merchant_email || '';
+                    return resolvedName.toLowerCase().includes(filterText);
+                });
+            }
+            return locks;
+        });
+        
+        const uniqueLockMerchants = computed(() => {
+            const m = new Set();
+            allLocks.value.forEach(l => {
+                const resolvedName = merchantEmailMappings.value[l.merchant_email] || l.merchant_name || l.merchant_email;
+                if (resolvedName) m.add(resolvedName);
+            });
+            return Array.from(m);
+        });
+        
+        const activeLockSuggestions = computed(() => {
+            if (!activeLockFilter.value) return [];
+            const query = activeLockFilter.value.toLowerCase().trim();
+            return uniqueLockMerchants.value.filter(m => 
+                m.toLowerCase().includes(query) && m !== activeLockFilter.value.trim()
+            );
+        });
+
+        const historyLockSuggestions = computed(() => {
+            if (!historyLockFilter.value) return [];
+            const query = historyLockFilter.value.toLowerCase().trim();
+            return uniqueLockMerchants.value.filter(m => 
+                m.toLowerCase().includes(query) && m !== historyLockFilter.value.trim()
+            );
+        });
+
+        const selectActiveLockFilter = (name) => {
+            activeLockFilter.value = name;
+            showActiveLockSuggestions.value = false;
+        };
+
+        const selectHistoryLockFilter = (name) => {
+            historyLockFilter.value = name;
+            showHistoryLockSuggestions.value = false;
+        };
+
+        const totalMerchantLockAmount = computed(() => {
+            const itemsToSum = merchantActiveLocks.value.filter(lock => selectedMerchantLocks.value.includes(lock.id));
+            return itemsToSum.reduce((sum, lock) => sum + (Number(lock.locked_price) * Number(lock.weight_baht)), 0);
+        });
+        const totalMerchantLockWeight = computed(() => {
+            const itemsToSum = merchantActiveLocks.value.filter(lock => selectedMerchantLocks.value.includes(lock.id));
+            return itemsToSum.reduce((sum, lock) => sum + Number(lock.weight_baht), 0);
+        });
+        const averageMerchantLockPrice = computed(() => {
+            return totalMerchantLockWeight.value > 0 ? totalMerchantLockAmount.value / totalMerchantLockWeight.value : 0;
+        });
+
+
+
+        const totalAdminLockAmount = computed(() => {
+            const itemsToSum = allLocks.value.filter(lock => selectedAdminLocks.value.includes(lock.id));
+            return itemsToSum.reduce((sum, lock) => sum + (Number(lock.locked_price) * Number(lock.weight_baht)), 0);
+        });
+        const totalAdminLockWeight = computed(() => {
+            const itemsToSum = allLocks.value.filter(lock => selectedAdminLocks.value.includes(lock.id));
+            return itemsToSum.reduce((sum, lock) => sum + Number(lock.weight_baht), 0);
+        });
+        const averageAdminLockPrice = computed(() => {
+            return totalAdminLockWeight.value > 0 ? totalAdminLockAmount.value / totalAdminLockWeight.value : 0;
+        });
+
+        const selectAllMerchantLocks = computed({
+            get: () => merchantActiveLocks.value.length > 0 && selectedMerchantLocks.value.length === merchantActiveLocks.value.length,
+            set: (value) => {
+                if (value) {
+                    selectedMerchantLocks.value = merchantActiveLocks.value.map(l => l.id);
+                } else {
+                    selectedMerchantLocks.value = [];
+                }
+            }
+        });
+
+        const selectAllAdminLocks = computed({
+            get: () => activeAdminLocks.value.length > 0 && selectedAdminLocks.value.length === activeAdminLocks.value.length,
+            set: (value) => {
+                if (value) {
+                    selectedAdminLocks.value = activeAdminLocks.value.map(l => l.id);
+                } else {
+                    selectedAdminLocks.value = [];
+                }
+            }
+        });
+
+        const openLockModal = (type) => {
+            lockModalData.value = {
+                type: type,
+                price: type === 'buy' ? jkRealtimeGoldBuy.value : jkRealtimeGoldSell.value,
+                weight_baht: 1
+            };
+            showLockModal.value = true;
+        };
+
+        const adjustLockWeight = (amount) => {
+            const newWeight = lockModalData.value.weight_baht + amount;
+            if (newWeight > 0) { 
+                lockModalData.value.weight_baht = newWeight;
+            }
+        };
+        
+        const adjustTargetWeight = (amount) => {
+            const newWeight = Number(targetForm.value.weight) + amount;
+            if (newWeight > 0) { 
+                targetForm.value.weight = newWeight;
+            }
+        };
+
+        const triggerJkGoldBill = async ({ price, weight_baht, type, merchant_name, lock_id }) => {
+            try {
+                const res = await fetch('/api/jk_bill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        price: price,
+                        weight_baht: weight_baht,
+                        type: type || 'buy',
+                        merchant_name: merchant_name,
+                        lock_id: lock_id
+                    })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    console.log('JK-Gold bill sent successfully:', data);
+                } else {
+                    console.warn('JK-Gold bill warning:', data);
+                }
+                return data;
+            } catch (e) {
+                console.error('Error triggering JK-Gold bill:', e);
+                return { ok: false, error: e.message };
+            }
+        };
+
+        const confirmLockPrice = async () => {
+            if (lockModalData.value.weight_baht <= 0) return;
+            
+            const merchantName = user.value.user_metadata?.full_name || merchantEmailMappings.value[user.value.email] || user.value.email;
+            const { data: insertedData, error } = await supabase.from('gold_locks').insert([{
+                merchant_email: user.value.email,
+                merchant_name: merchantName,
+                type: lockModalData.value.type,
+                locked_price: lockModalData.value.price,
+                weight_baht: lockModalData.value.weight_baht,
+                status: 'pending'
+            }]).select();
+
+            if (error) {
+                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถบันทึกรายการล็อคราคาได้: ' + error.message);
+            } else {
+                showLockModal.value = false;
+                const lockId = insertedData?.[0]?.id;
+
+                // ยิงบิลไปยัง JK-Gold ทันที
+                triggerJkGoldBill({
+                    price: lockModalData.value.price,
+                    weight_baht: lockModalData.value.weight_baht,
+                    type: lockModalData.value.type,
+                    merchant_name: merchantName,
+                    lock_id: lockId
+                });
+                
+                const typeLabel = lockModalData.value.type === 'buy' ? 'รับซื้อ' : (lockModalData.value.type === 'sell' ? 'ขายออก' : lockModalData.value.type);
+                const totalAmount = lockModalData.value.price * lockModalData.value.weight_baht;
+                const msg = `🔒 พ่อค้า ${merchantName} ล็อคราคาทอง\nประเภท: ${typeLabel}\nราคา: ฿${lockModalData.value.price.toLocaleString()}\nน้ำหนัก: ${lockModalData.value.weight_baht} บาททอง\nยอดรวม: ฿${totalAmount.toLocaleString()}`;
+                sendTelegramNotify(msg);
+                
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกรายการล็อคราคาเรียบร้อยแล้ว');
+                loadLocks();
+            }
+        };
+
+        const loadLocks = async () => {
+            if (!isLoggedIn.value) return;
+            if (isAdmin.value || isEmployee.value) {
+                const { data } = await supabase.from('gold_locks').select('*').order('created_at', { ascending: false });
+                if (data) {
+                    allLocks.value = data;
+                    selectedAdminLocks.value = data.map(l => l.id);
+                }
+            } 
+            if (isMerchant.value) {
+                const { data } = await supabase.from('gold_locks').select('*').eq('merchant_email', user.value.email).order('created_at', { ascending: false });
+                if (data) {
+                    merchantLocks.value = data;
+                    selectedMerchantLocks.value = data.map(l => l.id);
+                }
+            }
+        };
+
+        const deleteLock = async (id) => {
+            if (!isAdmin.value) {
+                await showAppModal('error', 'ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถลบรายการได้');
+                return;
+            }
+            if (confirm('ต้องการลบรายการนี้ใช่หรือไม่?')) {
+                await supabase.from('gold_locks').delete().eq('id', id);
+                loadLocks();
+            }
+        };
+
+        const updateLockStatus = async (id, status) => {
+            if (!isAdmin.value) {
+                await showAppModal('error', 'ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเปลี่ยนสถานะได้');
+                return;
+            }
+            await supabase.from('gold_locks').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+            loadLocks();
+        };
+
+        const createBillFromLocks = async () => {
+            if (selectedAdminLocks.value.length === 0) {
+                await showAppModal('error', 'ข้อผิดพลาด', 'กรุณาเลือกรายการล็อคราคาอย่างน้อย 1 รายการ');
+                return;
+            }
+
+            // Get selected lock objects
+            const selectedItems = allLocks.value.filter(lock => selectedAdminLocks.value.includes(lock.id));
+            
+            // Check if all selected items belong to the same merchant
+            const firstMerchantEmail = selectedItems[0].merchant_email;
+            const allSameMerchant = selectedItems.every(item => item.merchant_email === firstMerchantEmail);
+            
+            if (!allSameMerchant) {
+                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถทำบิลรวมกันได้ กรุณาเลือกเฉพาะรายการของพ่อค้าคนเดียวกัน');
+                return;
+            }
+            
+            let finalName = selectedItems[0].merchant_name || firstMerchantEmail;
+            if (merchantEmailMappings.value[firstMerchantEmail]) {
+                finalName = merchantEmailMappings.value[firstMerchantEmail];
+            }
+
+            // Populate calculator form
+            calcForm.value.type = 'tong_lom';
+            calcForm.value.customerName = finalName;
+            calcForm.value.weight = '';
+            calcForm.value.manualPrice = Number(averageAdminLockPrice.value).toFixed(2);
+            
+            // Store the locks that we are currently billing
+            currentBillLocks.value = [...selectedAdminLocks.value];
+            selectedAdminLocks.value = []; // Clear selection
+            
+            // Redirect to calculator tab
+            currentTab.value = 'calculator';
+
+            // Auto-fetch customer info (ID card, phone, signature) if name exists
+            if (finalName && finalName.trim().length >= 3) {
+                fetchCustomerByField('customer_name', finalName);
+            }
+        };
+
+        const merchantTargets = ref([]);
+        const allTargets = ref([]);
+        const targetForm = ref({ targetPrice: '', weight: '' });
+
+        const openTargetModal = () => {
+            let defaultPrice = 40000;
+            if (jkRealtimeGoldBuy && jkRealtimeGoldBuy.value) {
+                const buyStr = String(jkRealtimeGoldBuy.value).replace(/,/g, '');
+                defaultPrice = Number(buyStr);
+            }
+            targetForm.value = {
+                targetPrice: defaultPrice,
+                weight: 1
+            };
+            showTargetModal.value = true;
+        };
+        
+        const loadTargets = async () => {
+            if (!isLoggedIn.value) return;
+            if (isAdmin.value || isEmployee.value) {
+                const { data } = await supabase.from('gold_targets').select('*').order('created_at', { ascending: false });
+                if (data) {
+                    allTargets.value = data;
+                }
+            }
+            if (isMerchant.value) {
+                const { data } = await supabase.from('gold_targets').select('*').eq('merchant_email', user.value.email).order('created_at', { ascending: false });
+                if (data) {
+                    merchantTargets.value = data;
+                }
+            }
+        };
+
+        const saveTarget = async () => {
+            if (!targetForm.value.targetPrice || !targetForm.value.weight) {
+                await showAppModal('error', 'ข้อมูลไม่ครบ', 'กรุณากรอกราคาเป้าหมายและน้ำหนักให้ครบถ้วน');
+                return;
+            }
+            if (targetForm.value.weight <= 0) {
+                await showAppModal('error', 'ข้อมูลไม่ถูกต้อง', 'น้ำหนักต้องมากกว่า 0');
+                return;
+            }
+            
+            const merchantName = user.value.user_metadata?.full_name || merchantEmailMappings.value[user.value.email] || user.value.email;
+            
+            const { error } = await supabase.from('gold_targets').insert([{
+                merchant_email: user.value.email,
+                merchant_name: merchantName,
+                target_price: parseFloat(targetForm.value.targetPrice),
+                weight_baht: parseFloat(targetForm.value.weight),
+                type: 'buy',
+                status: 'active'
+            }]);
+            
+            if (error) {
+                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถบันทึกเป้าหมายได้: ' + error.message);
+            } else {
+                const totalAmount = parseFloat(targetForm.value.targetPrice) * parseFloat(targetForm.value.weight);
+                const msg = `🎯 พ่อค้า ${merchantName} ตั้งเป้าราคา\nเป้าหมาย: ฿${parseFloat(targetForm.value.targetPrice).toLocaleString()}\nน้ำหนัก: ${parseFloat(targetForm.value.weight)} บาททอง\nยอดรวม: ฿${totalAmount.toLocaleString()}`;
+                sendTelegramNotify(msg);
+
+                targetForm.value.targetPrice = '';
+                targetForm.value.weight = '';
+                showTargetModal.value = false;
+                await showAppModal('alert', 'สำเร็จ', 'ตั้งเป้าราคาเรียบร้อยแล้ว');
+                loadTargets();
+            }
+        };
+
+        const cancelTarget = async (id) => {
+            if (confirm('ต้องการยกเลิกการตั้งเป้าราคานี้ใช่หรือไม่?')) {
+                const { error } = await supabase.from('gold_targets').update({ status: 'cancelled' }).eq('id', id);
+                if (error) {
+                    await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถยกเลิกเป้าหมายได้');
+                } else {
+                    loadTargets();
+                }
+            }
+        };
+
+        watch(currentTab, (newTab) => {
+            if (jkPriceInterval) {
+                clearInterval(jkPriceInterval);
+                jkPriceInterval = null;
+            }
+            if (newTab === 'realtime_price' && isMerchant.value) {
+                fetchJkRealtimePrices();
+                jkPriceInterval = setInterval(fetchJkRealtimePrices, 3000);
+                loadLocks();
+                loadTargets();
+            }
+            if (newTab === 'price_locks' && (isAdmin.value || isEmployee.value)) {
+                loadLocks();
+                loadTargets();
+            }
+        });
 
         // Prices & Chart
         const goldPriceAsk = ref(0);
@@ -80,6 +652,69 @@ createApp({
         const silverPremiumAmountNetworkVip = ref(0);
         const networkVipGoldPremiumAmount_25_49 = ref(0);
         const networkVipGoldPremiumPercent_25_49 = ref(0);
+        const merchantEmailMappings = ref({});
+        const newMerchantMapping = ref({ email: '', name: '' });
+        const mappingNameSuggestions = ref([]);
+        let mappingSearchTimeout = null;
+
+        watch(() => newMerchantMapping.value.name, (newVal) => {
+            if (!newVal || newVal.trim() === '') {
+                mappingNameSuggestions.value = [];
+                return;
+            }
+            clearTimeout(mappingSearchTimeout);
+            mappingSearchTimeout = setTimeout(async () => {
+                const { data } = await supabase.from('customers')
+                    .select('customer_name')
+                    .ilike('customer_name', `%${newVal}%`)
+                    .limit(10);
+                if (data) {
+                    const uniqueNames = [...new Set(data.map(d => d.customer_name).filter(Boolean))];
+                    if (uniqueNames.length === 1 && uniqueNames[0] === newVal) {
+                        mappingNameSuggestions.value = [];
+                    } else {
+                        mappingNameSuggestions.value = uniqueNames;
+                    }
+                }
+            }, 300);
+        });
+
+        const selectMappingName = (name) => {
+            newMerchantMapping.value.name = name;
+            mappingNameSuggestions.value = [];
+            // Prevent immediate re-trigger if needed, though the exact match check usually handles it.
+        };
+
+        const addMerchantMapping = () => {
+            if (newMerchantMapping.value.email && newMerchantMapping.value.name) {
+                merchantEmailMappings.value[newMerchantMapping.value.email.trim()] = newMerchantMapping.value.name.trim();
+                newMerchantMapping.value = { email: '', name: '' };
+            }
+        };
+
+        const removeMerchantMapping = (email) => {
+            const newMap = { ...merchantEmailMappings.value };
+            delete newMap[email];
+            merchantEmailMappings.value = newMap;
+        };
+
+        const saveMerchantMappings = async () => {
+            saving.value = true;
+            try {
+                const { error } = await supabase.from('global_settings').upsert({
+                    key: 'merchant_email_mappings',
+                    value: 0,
+                    value_text: JSON.stringify(merchantEmailMappings.value)
+                });
+                if (error) throw error;
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกการผูกชื่อพ่อค้าเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error(err);
+                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถบันทึกได้');
+            } finally {
+                saving.value = false;
+            }
+        };
         const networkVipGoldPremiumAmount_50_100 = ref(0);
         const networkVipGoldPremiumPercent_50_100 = ref(0);
         const manualSilverPrice = ref(0);
@@ -89,7 +724,7 @@ createApp({
         // Attendance State
         const lateDeductionRate = ref(1);
 
-        // Notification State (Telegram & LINE)
+        // Notification State (Telegram)
         const telegramBotToken = ref('8915365709:AAGzgbId-uku0yJomcppOSrInA2H_6ct-ao');
         const telegramChatId = ref('');
         const testingTelegram = ref(false);
@@ -141,6 +776,10 @@ createApp({
         const adminCustomerSearchResults = ref([]);
         const customerSearchAttempted = ref(false);
         const premiumCustomersList = ref([]);
+        const hasVIP = computed(() => premiumCustomersList.value.some(c => c.tier === 'vip'));
+        const hasVVIP = computed(() => premiumCustomersList.value.some(c => c.tier === 'vvip'));
+        const hasNetwork = computed(() => premiumCustomersList.value.some(c => c.tier === 'network'));
+        const hasNetworkVIP = computed(() => premiumCustomersList.value.some(c => c.tier === 'network_vip'));
         let priceChart = null;
 
         // Drawer Balance
@@ -898,6 +1537,7 @@ createApp({
         // Calculator Form
         const calcForm = ref({
             type: 'tong_lom',
+            createdAt: null,
             weight: null,
             percent: null,
             customerName: '',
@@ -913,6 +1553,7 @@ createApp({
         const isOldCustomer = ref(false);
 
         const resetForm = () => {
+            calcForm.value.createdAt = null;
             calcForm.value.type = 'tong_lom';
             calcForm.value.weight = null;
             calcForm.value.percent = null;
@@ -1713,7 +2354,11 @@ createApp({
                 }
 
                 showAuth.value = false;
-                currentTab.value = 'calculator';
+                if (isMerchant.value) {
+                    currentTab.value = 'realtime_price';
+                } else {
+                    currentTab.value = 'calculator';
+                }
                 await showAppModal('alert', 'สำเร็จ', 'เข้าสู่ระบบสำเร็จ');
             }
         };
@@ -1762,6 +2407,15 @@ createApp({
                     const tgChatSetting = settingsData.find(s => s.key === 'telegram_chat_id');
                     if (tgChatSetting && tgChatSetting.value_text) {
                         telegramChatId.value = tgChatSetting.value_text;
+                    }
+                    
+                    const mappingSetting = settingsData.find(s => s.key === 'merchant_email_mappings');
+                    if (mappingSetting && mappingSetting.value_text) {
+                        try {
+                            merchantEmailMappings.value = JSON.parse(mappingSetting.value_text);
+                        } catch (e) {
+                            merchantEmailMappings.value = {};
+                        }
                     }
 
                     const silverSetting = settingsData.find(s => s.key === 'silver_deduction');
@@ -2229,6 +2883,25 @@ createApp({
             calcForm.value.phone = g.phone || '';
             calcForm.value.idCard = g.id_card || '';
             calcForm.value.address = g.address || '';
+            calcForm.value.createdAt = g.created_at || null;
+            calcForm.value.customerTier = 'normal';
+
+            if (g.customer_name) {
+                try {
+                    let query = supabase.from('customers').select('tier');
+                    if (g.id_card && g.id_card.trim() !== '') {
+                        query = query.eq('id_card', g.id_card);
+                    } else {
+                        query = query.eq('customer_name', g.customer_name);
+                    }
+                    const { data } = await query.maybeSingle();
+                    if (data && data.tier) {
+                        calcForm.value.customerTier = data.tier;
+                    }
+                } catch (err) {
+                    console.error("Error fetching customer tier for reprint:", err);
+                }
+            }
 
             transferAmount.value = g.items.reduce((sum, t) => sum + (parseFloat(t.transfer_amount) || 0), 0);
             lastSignature.value = g.signature ? fixUrl(g.signature) : null;
@@ -3029,6 +3702,23 @@ createApp({
                 // Deduct drawer balance
                 preDeductBalance = await deductDrawerBalance(cashAmountToPay.value, transactionId);
 
+                // Update lock status if this bill was created from locks
+                if (currentBillLocks.value.length > 0) {
+                    try {
+                        await supabase.from('gold_locks')
+                            .update({ 
+                                status: 'completed', 
+                                updated_at: new Date().toISOString(),
+                                transaction_id: transactionId
+                            })
+                            .in('id', currentBillLocks.value);
+                        currentBillLocks.value = [];
+                        loadLocks();
+                    } catch (err) {
+                        console.error('Error updating lock status:', err);
+                    }
+                }
+
                 saving.value = false;
                 nextTick(() => {
                     triggerPrint();
@@ -3036,6 +3726,48 @@ createApp({
             } catch (error) {
                 saving.value = false;
                 alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
+            }
+        };
+
+        const viewLockBill = async (transactionId) => {
+            if (!transactionId) return;
+            try {
+                // 1. Fetch the transaction to get created_at
+                const { data: tx, error } = await supabase
+                    .from('transactions')
+                    .select('created_at')
+                    .eq('id', transactionId)
+                    .single();
+                if (error || !tx) {
+                    alert('ไม่พบบิลนี้ (อาจถูกลบไปแล้ว)');
+                    return;
+                }
+                
+                // 2. Fetch all transactions with the same created_at
+                const { data: groupItems, error: groupErr } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('created_at', tx.created_at)
+                    .order('created_at');
+                if (groupErr) throw groupErr;
+
+                if (groupItems && groupItems.length > 0) {
+                    const firstItem = groupItems[0];
+                    // Structure the group object required by reprintGroup
+                    const group = {
+                        items: groupItems,
+                        customer_name: firstItem.customer_name,
+                        phone: firstItem.phone,
+                        id_card: firstItem.id_card,
+                        address: firstItem.address,
+                        created_at: firstItem.created_at,
+                        signature: firstItem.signature
+                    };
+                    await reprintGroup(group, false);
+                }
+            } catch (err) {
+                console.error("Error fetching bill for lock:", err);
+                alert("เกิดข้อผิดพลาดในการโหลดบิล");
             }
         };
 
@@ -3370,6 +4102,68 @@ createApp({
             // TradingView widget handles real-time data internally
         };
 
+        let isCheckingTargets = false;
+        const checkAndExecuteTargets = async (currentBuyPrice) => {
+            if (!isAdmin.value && !isEmployee.value) return;
+            if (isCheckingTargets) return;
+            
+            const activeTargets = allTargets.value.filter(t => t.status === 'active');
+            if (activeTargets.length === 0) return;
+
+            isCheckingTargets = true;
+            let triggeredAny = false;
+            
+            for (const target of activeTargets) {
+                if (currentBuyPrice >= target.target_price) {
+                    target.status = 'processing'; // prevent re-entry
+                    try {
+                        const { data: insertedLock, error: lockErr } = await supabase.from('gold_locks').insert([{
+                            merchant_email: target.merchant_email,
+                            merchant_name: target.merchant_name,
+                            type: target.type,
+                            locked_price: target.target_price,
+                            weight_baht: target.weight_baht,
+                            status: 'pending'
+                        }]).select();
+                        
+                        if (!lockErr) {
+                            const lockId = insertedLock?.[0]?.id;
+
+                            // ยิงบิลไปยัง JK-Gold สำหรับออโต้ล็อค
+                            triggerJkGoldBill({
+                                price: target.target_price,
+                                weight_baht: target.weight_baht,
+                                type: target.type,
+                                merchant_name: target.merchant_name,
+                                lock_id: lockId
+                            });
+
+                            await supabase.from('gold_targets').update({ 
+                                status: 'triggered', 
+                                triggered_at: new Date().toISOString() 
+                            }).eq('id', target.id);
+                            
+                            try {
+                                sendAppNotification(`🔔 ออโต้ล็อคสำเร็จ!\nพ่อค้า: ${target.merchant_name || target.merchant_email}\nราคา: ${Number(target.target_price).toLocaleString('th-TH')}\nน้ำหนัก: ${target.weight_baht} บาท`);
+                            } catch(e) {}
+                            triggeredAny = true;
+                        } else {
+                            target.status = 'active';
+                        }
+                    } catch (e) {
+                        console.error('Error executing auto-lock:', e);
+                        target.status = 'active';
+                    }
+                }
+            }
+            
+            if (triggeredAny) {
+                loadLocks();
+                loadTargets();
+            }
+            isCheckingTargets = false;
+        };
+
         const fetchPrices = async () => {
             try {
                 // Fetch Gold API
@@ -3394,6 +4188,9 @@ createApp({
                         if (dataGold.meta) {
                             goldPriceMeta.value = dataGold.meta;
                         }
+
+                        // Run Auto-Lock engine for targets
+                        checkAndExecuteTargets(barBuy);
                     }
                 }
 
@@ -4508,8 +5305,9 @@ createApp({
             }
         };
 
+
         const createDeliveryRound = async () => {
-            if (pendingIngots.value.length === 0) {
+            if (completedIngots.value.length === 0) {
                 await showAppModal('alert', 'แจ้งเตือน', 'ไม่มีก้อนหลอมให้ส่ง');
                 return;
             }
@@ -4569,7 +5367,7 @@ createApp({
                     targetRoundId = roundData[0].id;
                 }
 
-                const ingotIds = pendingIngots.value.map(i => i.id);
+                const ingotIds = completedIngots.value.map(i => i.id);
                 const { error: updateError } = await supabase.from('delivery_ingots').update({ round_id: targetRoundId }).in('id', ingotIds);
                 if (updateError) throw updateError;
 
@@ -4831,6 +5629,13 @@ createApp({
             lateDeductionRate,
             telegramBotToken,
             telegramChatId,
+            merchantEmailMappings,
+            newMerchantMapping,
+            mappingNameSuggestions,
+            selectMappingName,
+            addMerchantMapping,
+            removeMerchantMapping,
+            saveMerchantMappings,
             testingTelegram,
             detectingTelegramChat,
             saveTelegramSettings,
@@ -4860,7 +5665,68 @@ createApp({
             user,
             isLoggedIn,
             isAdmin,
+            isMerchant,
             isEmployee,
+            jkRealtimeGoldBuy,
+            jkRealtimeGoldSell,
+            jkRealtimeGoldTime,
+            jkPriceFlashBuy,
+            jkPriceFlashSell,
+            showLockModal,
+            showTargetModal,
+            openTargetModal,
+            adjustTargetWeight,
+            lockModalData,
+            merchantLocks,
+            groupedMerchantActiveLocks,
+            groupedMerchantHistoryLocks,
+            merchantActiveLocks,
+            merchantHistoryLocks,
+            allLocks,
+            showActiveLockSuggestions,
+            activeLockFilter,
+            showHistoryLockSuggestions,
+            historyLockFilter,
+            adminLockStartFilter,
+            adminLockEndFilter,
+            merchantLockStartFilter,
+            merchantLockEndFilter,
+
+            activeAdminLocks,
+            historyAdminLocks,
+            uniqueLockMerchants,
+            activeLockSuggestions,
+            historyLockSuggestions,
+            selectActiveLockFilter,
+            selectHistoryLockFilter,
+            totalMerchantLockAmount,
+            merchantTargets,
+            allTargets,
+            targetForm,
+            saveTarget,
+            cancelTarget,
+            loadTargets,
+            totalAdminLockAmount,
+            totalMerchantLockWeight,
+            averageMerchantLockPrice,
+            totalAdminLockWeight,
+            averageAdminLockPrice,
+            selectedMerchantLocks,
+            selectedAdminLocks,
+            selectAllMerchantLocks,
+            selectAllAdminLocks,
+            openLockModal,
+            showSplitLockModal,
+            splitLockData,
+            openSplitLockModal,
+            confirmSplitLock,
+            adjustLockWeight,
+            confirmLockPrice,
+            triggerJkGoldBill,
+            loadLocks,
+            deleteLock,
+            updateLockStatus,
+            createBillFromLocks,
             showAuth,
             readCardLoading,
             readIdCard,
@@ -4896,6 +5762,10 @@ createApp({
             adminCustomerSearchResults,
             customerSearchAttempted,
             premiumCustomersList,
+            hasVIP,
+            hasVVIP,
+            hasNetwork,
+            hasNetworkVIP,
             searchOldCustomers,
             addCustomerTier,
             removeCustomerTier,
@@ -5065,7 +5935,8 @@ createApp({
             adminPendingRequests,
             requestPriceEdit,
             approvePriceEdit,
-            rejectPriceEdit
+            rejectPriceEdit,
+            viewLockBill
         };
     }
 }).mount('#app');
