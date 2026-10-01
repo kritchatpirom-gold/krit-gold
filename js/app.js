@@ -3,7 +3,7 @@ const { createApp, ref, onMounted, computed, watch, nextTick } = Vue;
 const supabaseUrl = 'https://cjithgqbtwuxfxrauvax.supabase.co';
 const supabaseKey = 'sb_publishable_lSgOgg-mkQ6cTOxnBe5ZBA_1Jt7nETG';
 
-//const supabaseUrl = 'http://192.168.1.151:54321';
+//const supabaseUrl = 'http://192.168.1.166:54321';
 //const supabaseKey = '850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907';
 //const supabaseUrl = 'http://192.168.1.124:54121';
 //const supabaseKey = 'sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz';
@@ -64,11 +64,11 @@ createApp({
             try {
                 const res = await fetch('https://gold-realtime.kritgold.workers.dev/');
                 const responseJson = await res.json();
-                
+
                 // The API returns { success: true, data: { bar_buy: 123, bar_sell: 123, updated_at: 123456.78 } }
                 if (responseJson && responseJson.data) {
                     const priceData = responseJson.data;
-                    
+
                     const newBuy = priceData.bar_buy || 0;
                     const newSell = priceData.bar_sell || 0;
 
@@ -83,7 +83,7 @@ createApp({
 
                     jkRealtimeGoldBuy.value = newBuy;
                     jkRealtimeGoldSell.value = newSell;
-                    
+
                     if (priceData.updated_at) {
                         const dt = new Date(priceData.updated_at * 1000);
                         jkRealtimeGoldTime.value = dt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -101,7 +101,7 @@ createApp({
             price: 0,
             weight_baht: 1,
         });
-        
+
         const showTargetModal = ref(false);
 
         const showSplitLockModal = ref(false);
@@ -160,7 +160,7 @@ createApp({
 
         const merchantLocks = ref([]);
         const allLocks = ref([]);
-        
+
         const selectedMerchantLocks = ref([]);
         const selectedAdminLocks = ref([]);
         const currentBillLocks = ref([]); // Tracks which locks are being turned into a bill
@@ -169,19 +169,19 @@ createApp({
         const activeLockFilter = ref('');
         const showHistoryLockSuggestions = ref(false);
         const historyLockFilter = ref('');
-        
+
         const getLocalISODate = () => {
             const d = new Date();
             const offset = d.getTimezoneOffset() * 60000;
             return (new Date(d - offset)).toISOString().split('T')[0];
         };
-        
+
         const adminLockStartFilter = ref(`${getLocalISODate()}T00:00`); // YYYY-MM-DDTHH:mm
         const adminLockEndFilter = ref(`${getLocalISODate()}T23:59`); // YYYY-MM-DDTHH:mm
-        
+
         const merchantLockStartFilter = ref(`${getLocalISODate()}T00:00`);
         const merchantLockEndFilter = ref(`${getLocalISODate()}T23:59`);
-        
+
         const merchantActiveLocks = computed(() => {
             return merchantLocks.value.filter(l => l.status === 'pending');
         });
@@ -198,7 +198,7 @@ createApp({
             }
             return locks;
         });
-        
+
         const groupedMerchantActiveLocks = computed(() => {
             const groups = [];
             const tempMap = new Map();
@@ -234,7 +234,7 @@ createApp({
             });
             return groups;
         });
-        
+
         const activeAdminLocks = computed(() => {
             let locks = allLocks.value.filter(l => l.status === 'pending');
             if (adminLockStartFilter.value) {
@@ -274,7 +274,7 @@ createApp({
             }
             return locks;
         });
-        
+
         const uniqueLockMerchants = computed(() => {
             const m = new Set();
             allLocks.value.forEach(l => {
@@ -283,11 +283,11 @@ createApp({
             });
             return Array.from(m);
         });
-        
+
         const activeLockSuggestions = computed(() => {
             if (!activeLockFilter.value) return [];
             const query = activeLockFilter.value.toLowerCase().trim();
-            return uniqueLockMerchants.value.filter(m => 
+            return uniqueLockMerchants.value.filter(m =>
                 m.toLowerCase().includes(query) && m !== activeLockFilter.value.trim()
             );
         });
@@ -295,7 +295,7 @@ createApp({
         const historyLockSuggestions = computed(() => {
             if (!historyLockFilter.value) return [];
             const query = historyLockFilter.value.toLowerCase().trim();
-            return uniqueLockMerchants.value.filter(m => 
+            return uniqueLockMerchants.value.filter(m =>
                 m.toLowerCase().includes(query) && m !== historyLockFilter.value.trim()
             );
         });
@@ -369,14 +369,14 @@ createApp({
 
         const adjustLockWeight = (amount) => {
             const newWeight = lockModalData.value.weight_baht + amount;
-            if (newWeight > 0) { 
+            if (newWeight > 0) {
                 lockModalData.value.weight_baht = newWeight;
             }
         };
-        
+
         const adjustTargetWeight = (amount) => {
             const newWeight = Number(targetForm.value.weight) + amount;
-            if (newWeight > 0) { 
+            if (newWeight > 0) {
                 targetForm.value.weight = newWeight;
             }
         };
@@ -409,7 +409,7 @@ createApp({
 
         const confirmLockPrice = async () => {
             if (lockModalData.value.weight_baht <= 0) return;
-            
+
             const merchantName = user.value.user_metadata?.full_name || merchantEmailMappings.value[user.value.email] || user.value.email;
             const { data: insertedData, error } = await supabase.from('gold_locks').insert([{
                 merchant_email: user.value.email,
@@ -434,12 +434,12 @@ createApp({
                     merchant_name: merchantName,
                     lock_id: lockId
                 });
-                
+
                 const typeLabel = lockModalData.value.type === 'buy' ? 'รับซื้อ' : (lockModalData.value.type === 'sell' ? 'ขายออก' : lockModalData.value.type);
                 const totalAmount = lockModalData.value.price * lockModalData.value.weight_baht;
                 const msg = `🔒 พ่อค้า ${merchantName} ล็อคราคาทอง\nประเภท: ${typeLabel}\nราคา: ฿${lockModalData.value.price.toLocaleString()}\nน้ำหนัก: ${lockModalData.value.weight_baht} บาททอง\nยอดรวม: ฿${totalAmount.toLocaleString()}`;
                 sendTelegramNotify(msg);
-                
+
                 await showAppModal('alert', 'สำเร็จ', 'บันทึกรายการล็อคราคาเรียบร้อยแล้ว');
                 loadLocks();
             }
@@ -453,7 +453,7 @@ createApp({
                     allLocks.value = data;
                     selectedAdminLocks.value = data.map(l => l.id);
                 }
-            } 
+            }
             if (isMerchant.value) {
                 const { data } = await supabase.from('gold_locks').select('*').eq('merchant_email', user.value.email).order('created_at', { ascending: false });
                 if (data) {
@@ -491,16 +491,16 @@ createApp({
 
             // Get selected lock objects
             const selectedItems = allLocks.value.filter(lock => selectedAdminLocks.value.includes(lock.id));
-            
+
             // Check if all selected items belong to the same merchant
             const firstMerchantEmail = selectedItems[0].merchant_email;
             const allSameMerchant = selectedItems.every(item => item.merchant_email === firstMerchantEmail);
-            
+
             if (!allSameMerchant) {
                 await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถทำบิลรวมกันได้ กรุณาเลือกเฉพาะรายการของพ่อค้าคนเดียวกัน');
                 return;
             }
-            
+
             let finalName = selectedItems[0].merchant_name || firstMerchantEmail;
             if (merchantEmailMappings.value[firstMerchantEmail]) {
                 finalName = merchantEmailMappings.value[firstMerchantEmail];
@@ -511,11 +511,11 @@ createApp({
             calcForm.value.customerName = finalName;
             calcForm.value.weight = '';
             calcForm.value.manualPrice = Number(averageAdminLockPrice.value).toFixed(2);
-            
+
             // Store the locks that we are currently billing
             currentBillLocks.value = [...selectedAdminLocks.value];
             selectedAdminLocks.value = []; // Clear selection
-            
+
             // Redirect to calculator tab
             currentTab.value = 'calculator';
 
@@ -541,7 +541,7 @@ createApp({
             };
             showTargetModal.value = true;
         };
-        
+
         const loadTargets = async () => {
             if (!isLoggedIn.value) return;
             if (isAdmin.value || isEmployee.value) {
@@ -567,9 +567,9 @@ createApp({
                 await showAppModal('error', 'ข้อมูลไม่ถูกต้อง', 'น้ำหนักต้องมากกว่า 0');
                 return;
             }
-            
+
             const merchantName = user.value.user_metadata?.full_name || merchantEmailMappings.value[user.value.email] || user.value.email;
-            
+
             const { error } = await supabase.from('gold_targets').insert([{
                 merchant_email: user.value.email,
                 merchant_name: merchantName,
@@ -578,7 +578,7 @@ createApp({
                 type: 'buy',
                 status: 'active'
             }]);
-            
+
             if (error) {
                 await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถบันทึกเป้าหมายได้: ' + error.message);
             } else {
@@ -1140,15 +1140,15 @@ createApp({
                     status: 'pending'
                 }]);
                 if (error) throw error;
-                
+
                 await fetchExpenseRequests();
-                
+
                 let notifyMsg = `🔔 ขออนุมัติเบิกค่าใช้จ่าย\n`;
                 notifyMsg += `👤 ผู้เบิก: ${reqName}\n`;
                 notifyMsg += `💸 จำนวนเงิน: ${formatCurrency(expenseAmount.value)} บาท\n`;
                 notifyMsg += `📝 เหตุผล: ${expenseReason.value}`;
                 sendAppNotification(notifyMsg);
-                
+
                 await showAppModal('alert', 'สำเร็จ', 'ส่งคำขอเบิกเงินเรียบร้อยแล้ว รอผู้ดูแลระบบอนุมัติ');
                 expenseReason.value = '';
                 expenseBreakdownForm.value = { b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' };
@@ -1217,7 +1217,7 @@ createApp({
                 drawerBalance.value = newBalance;
 
                 await logDrawerAction('WITHDRAW', -expenseApproveTotal.value, oldBalance, newBalance, `อนุมัติเบิกเงิน: ${selectedExpense.value.reason}`);
-                
+
                 showApproveExpenseModal.value = false;
                 await fetchExpenseRequests();
                 await showAppModal('alert', 'สำเร็จ', `อนุมัติเบิกค่าใช้จ่ายและตัดลิ้นชักเรียบร้อยแล้ว`);
@@ -1238,7 +1238,7 @@ createApp({
                         approved_by: adminName,
                         updated_at: new Date().toISOString()
                     }).eq('id', expense.id);
-                    
+
                     if (error) throw error;
                     await fetchExpenseRequests();
                 } catch (err) {
@@ -1485,6 +1485,31 @@ createApp({
             return transactions.value.length > 0 && selectedTransactions.value.length === transactions.value.length;
         });
 
+        const selectedHistoryStats = computed(() => {
+            const selected = transactions.value.filter(t => selectedTransactions.value.includes(t.id));
+            let totalWeight = 0;
+            let totalNetPrice = 0;
+            let basePriceWeightSum = 0;
+            let basePriceSum = 0;
+
+            selected.forEach(t => {
+                const w = Number(t.weight) || 0;
+                const net = Number(t.net_price) || 0;
+                const bp = Number(t.base_price) || 0;
+
+                totalWeight += w;
+                totalNetPrice += net;
+                basePriceWeightSum += w;
+                basePriceSum += (bp * w);
+            });
+
+            return {
+                weight: totalWeight,
+                netPrice: totalNetPrice,
+                avgBasePrice: basePriceWeightSum > 0 ? (basePriceSum / basePriceWeightSum) : 0
+            };
+        });
+
         const togglePurity = (range) => {
             const idx = filter.value.purityRange.indexOf(range);
             if (idx > -1) {
@@ -1622,12 +1647,32 @@ createApp({
             }
         });
 
+        const checkIsMerchant = (name, idCard, tier) => {
+            if (tier && ['vip', 'vvip', 'network', 'network_vip'].includes(tier)) return true;
+            if (name) {
+                const trimmed = String(name).trim();
+                if (trimmed.includes('พ่อค้า')) return true;
+                if (merchantEmailMappings.value && Object.values(merchantEmailMappings.value).some(mName => mName && String(mName).trim() === trimmed)) return true;
+                if (premiumCustomersList.value && premiumCustomersList.value.some(c => c.customer_name && String(c.customer_name).trim() === trimmed)) return true;
+            }
+            if (idCard && String(idCard).trim() !== '') {
+                const trimmedId = String(idCard).trim();
+                if (premiumCustomersList.value && premiumCustomersList.value.some(c => c.id_card && String(c.id_card).trim() === trimmedId)) return true;
+            }
+            return false;
+        };
+
         const isMerchantCustomer = computed(() => {
-            const tier = calcForm.value.customerTier;
-            const isTierMerchant = tier === 'vip' || tier === 'vvip' || tier === 'network' || tier === 'network_vip';
-            const isNameMerchant = Boolean(calcForm.value.customerName && calcForm.value.customerName.includes('พ่อค้า'));
-            return isTierMerchant || isNameMerchant;
+            return checkIsMerchant(calcForm.value.customerName, calcForm.value.idCard, calcForm.value.customerTier);
         });
+
+        const isItemOrBillMerchant = (item) => {
+            if (item && item.isMerchant) return true;
+            const name = (item && item.customerName) || calcForm.value.customerName;
+            const idCard = (item && item.idCard) || calcForm.value.idCard;
+            const tier = (item && item.customerTier) || calcForm.value.customerTier;
+            return checkIsMerchant(name, idCard, tier);
+        };
 
         const isPercentValid = computed(() => {
             const type = calcForm.value.type;
@@ -1854,7 +1899,7 @@ createApp({
 
             if (tForm.type === 'tong_lom') {
                 base = gp;
-                let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
+                let activePremium = premiums.value.find(pr => Math.floor(p) >= pr.range_min && Math.floor(p) <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักรวม >= 5 กรัม หรือเป็นลูกค้าเก่า ให้บวกพรีเมียม
                 const totalWeightForPremium = accumulatedGoldWeight.value + w;
                 const isVipOrVvip = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip');
@@ -1963,6 +2008,14 @@ createApp({
             }
             const isEditing = false; // We can add edit logic later if needed
 
+            let perGram = 0;
+            if (calcForm.value.type === 'silver' && isMerchantCustomer.value) {
+                const rawPerGram = ((calculatedResult.value.basePrice + calculatedResult.value.premium) / 1000) * (Number(calcForm.value.percent) / 100);
+                perGram = floor2(rawPerGram);
+            } else if (Number(calcForm.value.weight) > 0) {
+                perGram = calculatedResult.value.netPrice / Number(calcForm.value.weight);
+            }
+
             billItems.value.push({
                 id: Date.now() + Math.random(),
                 type: calcForm.value.type,
@@ -1976,7 +2029,8 @@ createApp({
                 idCard: calcForm.value.idCard,
                 address: calcForm.value.address,
                 isMerchant: isMerchantCustomer.value,
-                customerTier: calcForm.value.customerTier
+                customerTier: calcForm.value.customerTier,
+                per_gram: perGram
             });
             calcForm.value.weight = null;
             calcForm.value.percent = null;
@@ -2026,7 +2080,7 @@ createApp({
         const formatPricePerGram = (val, type, isMerchant = false) => {
             let digits = 2;
             if (type === 'silver') {
-                digits = isMerchant ? 2 : 0;
+                digits = (isMerchant || (Number(val) % 1 !== 0)) ? 2 : 0;
             }
             if (val === null || val === undefined || val === '') return digits === 0 ? '0' : '0.00';
             const num = Number(val);
@@ -2327,39 +2381,47 @@ createApp({
         const login = async () => {
             authLoading.value = true;
             authError.value = '';
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: authForm.value.email,
-                password: authForm.value.password,
-            });
-            authLoading.value = false;
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: authForm.value.email,
+                    password: authForm.value.password,
+                });
 
-            if (error) {
-                authError.value = error.message;
-            } else {
-                user.value = data.user;
-                if (isAdmin.value && currentTab.value === 'history') loadTransactions();
-
-                try {
-                    setupRealtimeRequests();
-                } catch (e) {
-                    console.error('Error setting up realtime:', e);
-                }
-
-                if (isAdmin.value) {
-                    try {
-                        loadPendingRequests();
-                    } catch (e) {
-                        console.error('Error loading pending requests:', e);
-                    }
-                }
-
-                showAuth.value = false;
-                if (isMerchant.value) {
-                    currentTab.value = 'realtime_price';
+                if (error) {
+                    authError.value = error.message;
+                    authLoading.value = false;
                 } else {
-                    currentTab.value = 'calculator';
+                    user.value = data.user;
+                    if (isAdmin.value && currentTab.value === 'history') loadTransactions();
+
+                    try {
+                        setupRealtimeRequests();
+                    } catch (e) {
+                        console.error('Error setting up realtime:', e);
+                    }
+
+                    if (isAdmin.value) {
+                        try {
+                            loadPendingRequests();
+                        } catch (e) {
+                            console.error('Error loading pending requests:', e);
+                        }
+                    }
+
+                    showAuth.value = false;
+                    authLoading.value = false;
+
+                    if (isMerchant.value) {
+                        currentTab.value = 'realtime_price';
+                    } else {
+                        currentTab.value = 'calculator';
+                    }
+                    await showAppModal('alert', 'สำเร็จ', 'เข้าสู่ระบบสำเร็จ');
                 }
-                await showAppModal('alert', 'สำเร็จ', 'เข้าสู่ระบบสำเร็จ');
+            } catch (err) {
+                authLoading.value = false;
+                authError.value = "เกิดข้อผิดพลาดในการเชื่อมต่อเครือข่าย: " + (err.message || err);
+                console.error("Login Exception:", err);
             }
         };
 
@@ -2408,7 +2470,7 @@ createApp({
                     if (tgChatSetting && tgChatSetting.value_text) {
                         telegramChatId.value = tgChatSetting.value_text;
                     }
-                    
+
                     const mappingSetting = settingsData.find(s => s.key === 'merchant_email_mappings');
                     if (mappingSetting && mappingSetting.value_text) {
                         try {
@@ -2867,41 +2929,71 @@ createApp({
             const backupTransferAmount = transferAmount.value;
             const backupSignature = lastSignature.value;
 
-            billItems.value = g.items.map(t => ({
-                id: t.id,
-                type: t.type,
-                weight: parseFloat(t.weight) || 0,
-                percent: parseFloat(t.percent) || 0,
-                basePrice: parseFloat(t.base_price) || 0,
-                premium: parseFloat(t.premium_amount) || 0,
-                netPrice: parseFloat(t.net_price) || 0
-            }));
-
             pauseCustomerWatch = true;
 
-            calcForm.value.customerName = g.customer_name || '';
-            calcForm.value.phone = g.phone || '';
-            calcForm.value.idCard = g.id_card || '';
-            calcForm.value.address = g.address || '';
-            calcForm.value.createdAt = g.created_at || null;
-            calcForm.value.customerTier = 'normal';
+            const effectiveIdCard = g.id_card || (g.items && g.items[0] && g.items[0].id_card) || '';
+            let customerTier = 'normal';
 
-            if (g.customer_name) {
+            if (checkIsMerchant(g.customer_name, effectiveIdCard, null)) {
+                customerTier = 'vip';
+            }
+
+            if (g.customer_name || effectiveIdCard) {
                 try {
                     let query = supabase.from('customers').select('tier');
-                    if (g.id_card && g.id_card.trim() !== '') {
-                        query = query.eq('id_card', g.id_card);
-                    } else {
-                        query = query.eq('customer_name', g.customer_name);
+                    if (effectiveIdCard && effectiveIdCard.trim() !== '' && !effectiveIdCard.startsWith('NO_ID_')) {
+                        query = query.eq('id_card', effectiveIdCard.trim());
+                    } else if (g.customer_name) {
+                        query = query.eq('customer_name', g.customer_name.trim());
                     }
-                    const { data } = await query.maybeSingle();
-                    if (data && data.tier) {
-                        calcForm.value.customerTier = data.tier;
+                    const { data } = await query;
+                    if (data && data.length > 0) {
+                        const vip = data.find(c => ['vip', 'vvip', 'network', 'network_vip'].includes(c.tier));
+                        if (vip) {
+                            customerTier = vip.tier;
+                        }
                     }
                 } catch (err) {
                     console.error("Error fetching customer tier for reprint:", err);
                 }
             }
+
+            billItems.value = g.items.map(t => {
+                const itemIsMerchant = checkIsMerchant(t.customer_name || g.customer_name, t.id_card || effectiveIdCard, customerTier);
+                const weight = parseFloat(t.weight) || 0;
+                const netPrice = parseFloat(t.net_price) || 0;
+                const basePrice = parseFloat(t.base_price) || 0;
+                const premium = parseFloat(t.premium_amount) || 0;
+                const percent = parseFloat(t.percent) || 0;
+                let perGram = weight > 0 ? (netPrice / weight) : 0;
+                if (t.type === 'silver' && itemIsMerchant) {
+                    const rawPerGram = ((basePrice + premium) / 1000) * (percent / 100);
+                    if (rawPerGram > 0) {
+                        perGram = floor2(rawPerGram);
+                    }
+                }
+                return {
+                    id: t.id,
+                    type: t.type,
+                    weight: weight,
+                    percent: percent,
+                    basePrice: basePrice,
+                    premium: premium,
+                    netPrice: netPrice,
+                    isMerchant: itemIsMerchant,
+                    customerTier: customerTier,
+                    customerName: t.customer_name || g.customer_name,
+                    idCard: t.id_card || effectiveIdCard,
+                    per_gram: perGram
+                };
+            });
+
+            calcForm.value.customerName = g.customer_name || '';
+            calcForm.value.phone = g.phone || '';
+            calcForm.value.idCard = effectiveIdCard;
+            calcForm.value.address = g.address || '';
+            calcForm.value.createdAt = g.created_at || null;
+            calcForm.value.customerTier = customerTier;
 
             transferAmount.value = g.items.reduce((sum, t) => sum + (parseFloat(t.transfer_amount) || 0), 0);
             lastSignature.value = g.signature ? fixUrl(g.signature) : null;
@@ -2990,6 +3082,7 @@ createApp({
                             created_at: t.created_at,
                             customer_name: t.customer_name,
                             phone: t.phone,
+                            id_card: t.id_card || '',
                             address: t.address,
                             signature: t.signature,
                             photo: t.photo,
@@ -2998,6 +3091,7 @@ createApp({
                             net_price: 0
                         };
                     } else {
+                        if (t.id_card && !groups[key].id_card) groups[key].id_card = t.id_card;
                         if (t.signature) groups[key].signature = t.signature;
                         if (t.photo) groups[key].photo = t.photo;
                         if (t.id_card_photo) groups[key].id_card_photo = t.id_card_photo;
@@ -3023,13 +3117,17 @@ createApp({
             id: null,
             customer_name: '',
             phone: '',
+            id_card: '',
+            customerTier: 'normal',
+            isMerchant: false,
             type: 'tong_lom',
             base_price: 0,
             premium_amount: 0,
             percent: 0,
             weight: 0,
             net_price: 0,
-            original_net_price: 0
+            original_net_price: 0,
+            per_gram: 0
         });
 
         const calculateEditTrxNetPrice = () => {
@@ -3042,39 +3140,60 @@ createApp({
             const base = Number(tForm.base_price) || 0;
             const premium = Number(tForm.premium_amount) || 0;
             let net = 0;
+            let perGram = 0;
 
             const gp = Math.floor(base);
 
             if (tForm.type === 'tong_lom') {
-                const perGram = floor2((gp + premium) * 0.0656);
-                const withPurity = floor2(perGram * (p / 100));
-                net = floor2(withPurity * w);
+                const perGramBase = floor2((gp + premium) * 0.0656);
+                perGram = floor2(perGramBase * (p / 100));
+                net = floor2(perGram * w);
             } else if (tForm.type === 'tong_roop') {
                 const baseAfterPercent = floor2(gp * (p / 100));
-                const perGram = floor2(baseAfterPercent * 0.0656);
+                perGram = floor2(baseAfterPercent * 0.0656);
                 net = floor2(perGram * w);
             } else if (tForm.type === 'redeem') {
                 const baseAfterPercent = floor2(gp * 0.95);
-                const perGram = floor2(baseAfterPercent * 0.0656);
+                perGram = floor2(baseAfterPercent * 0.0656);
                 net = floor2(perGram * w);
             } else if (tForm.type === 'tong_tang') {
-                const perGram = floor2((gp - 300) * 0.0656);
+                perGram = floor2((gp - 300) * 0.0656);
                 net = floor2(perGram * w);
             } else if (tForm.type === 'silver') {
-                const sp = gp;
-                const isMerchant = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip' || (tForm.customer_name && tForm.customer_name.includes('พ่อค้า')));
+                const sp = Number(base) || 0;
+                const isMerchant = tForm.isMerchant || checkIsMerchant(tForm.customer_name, tForm.id_card, tForm.customerTier);
                 if (isMerchant) {
                     const rawPerGram = ((sp + premium) / 1000) * (p / 100);
-                    const perGram = floor2(rawPerGram);
+                    perGram = floor2(rawPerGram);
                     net = floor2(perGram * w);
                 } else {
-                    const perGram = Math.floor((sp + premium) / 1000);
-                    const withPercent = Math.floor(perGram * (p / 100));
-                    net = Math.floor(withPercent * w);
+                    const basePerGram = Math.floor((sp + premium) / 1000);
+                    perGram = Math.floor(basePerGram * (p / 100));
+                    net = Math.floor(perGram * w);
                 }
             }
 
+            tForm.per_gram = perGram;
             tForm.net_price = floor2(Math.max(0, net));
+        };
+
+        const onEditCustomerName = () => {
+            const tForm = editTrxModal.value;
+            tForm.isMerchant = checkIsMerchant(tForm.customer_name, tForm.id_card, tForm.customerTier);
+            calculateEditTrxNetPrice();
+        };
+
+        const onEditTrxNetPrice = () => {
+            const tForm = editTrxModal.value;
+            const w = Number(tForm.weight) || 0;
+            if (w > 0) {
+                const isMerchant = tForm.isMerchant || checkIsMerchant(tForm.customer_name, tForm.id_card, tForm.customerTier);
+                if (isMerchant || tForm.type !== 'silver') {
+                    tForm.per_gram = floor2(Number(tForm.net_price) / w);
+                } else {
+                    tForm.per_gram = Math.floor(Number(tForm.net_price) / w);
+                }
+            }
         };
 
         const onEditBasePrice = () => {
@@ -3083,7 +3202,7 @@ createApp({
             const base = Number(tForm.base_price) || 0;
 
             if (tForm.type === 'tong_lom') {
-                let activePremium = premiums.value.find(pr => p >= pr.range_min && p <= pr.range_max);
+                let activePremium = premiums.value.find(pr => Math.floor(p) >= pr.range_min && Math.floor(p) <= pr.range_max);
                 if (activePremium) {
                     if (activePremium.premium_type === 'percent') {
                         tForm.premium_amount = Math.floor(Math.floor(base) * (Number(activePremium.premium_percent) / 100));
@@ -3093,21 +3212,51 @@ createApp({
             calculateEditTrxNetPrice();
         };
 
-        const editTransaction = (t) => {
+        const editTransaction = async (t) => {
             const parsedPercent = parseFloat(t.percent);
+            let customerTier = t.customer_tier || t.tier || 'normal';
+            let isMerchant = checkIsMerchant(t.customer_name, t.id_card, customerTier);
+
+            if (!isMerchant && (t.id_card || t.customer_name)) {
+                try {
+                    let query = supabase.from('customers').select('tier');
+                    if (t.id_card && t.id_card.trim() !== '' && !t.id_card.startsWith('NO_ID_')) {
+                        query = query.eq('id_card', t.id_card.trim());
+                    } else if (t.customer_name) {
+                        query = query.eq('customer_name', t.customer_name.trim());
+                    }
+                    const { data } = await query;
+                    if (data && data.length > 0) {
+                        const vip = data.find(c => ['vip', 'vvip', 'network', 'network_vip'].includes(c.tier));
+                        if (vip) {
+                            customerTier = vip.tier;
+                            isMerchant = true;
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error looking up customer tier for edit:", err);
+                }
+            }
+
             editTrxModal.value = {
                 show: true,
                 id: t.id,
                 customer_name: t.customer_name || '',
                 phone: t.phone || '',
+                id_card: t.id_card || '',
+                customerTier: customerTier,
+                isMerchant: isMerchant,
                 type: t.type || 'tong_lom',
                 base_price: parseFloat(t.base_price) || 0,
                 premium_amount: parseFloat(t.premium_amount) || 0,
                 percent: (parsedPercent > 0) ? parsedPercent : (t.type === 'tong_roop' ? 96.00 : 0),
                 weight: parseFloat(t.weight) || 0,
                 net_price: parseFloat(t.net_price) || 0,
-                original_net_price: parseFloat(t.net_price) || 0
+                original_net_price: parseFloat(t.net_price) || 0,
+                per_gram: 0
             };
+
+            calculateEditTrxNetPrice();
         };
 
         const saveEditTransaction = async () => {
@@ -3294,6 +3443,7 @@ createApp({
                         created_at: t.created_at,
                         customer_name: t.customer_name,
                         phone: t.phone,
+                        id_card: t.id_card || '',
                         address: t.address,
                         signature: t.signature,
                         photo: t.photo,
@@ -3302,6 +3452,7 @@ createApp({
                         net_price: 0
                     };
                 } else {
+                    if (t.id_card && !groups[key].id_card) groups[key].id_card = t.id_card;
                     if (t.signature) groups[key].signature = t.signature;
                     if (t.photo) groups[key].photo = t.photo;
                     if (t.id_card_photo) groups[key].id_card_photo = t.id_card_photo;
@@ -3706,8 +3857,8 @@ createApp({
                 if (currentBillLocks.value.length > 0) {
                     try {
                         await supabase.from('gold_locks')
-                            .update({ 
-                                status: 'completed', 
+                            .update({
+                                status: 'completed',
                                 updated_at: new Date().toISOString(),
                                 transaction_id: transactionId
                             })
@@ -3742,7 +3893,7 @@ createApp({
                     alert('ไม่พบบิลนี้ (อาจถูกลบไปแล้ว)');
                     return;
                 }
-                
+
                 // 2. Fetch all transactions with the same created_at
                 const { data: groupItems, error: groupErr } = await supabase
                     .from('transactions')
@@ -4106,13 +4257,13 @@ createApp({
         const checkAndExecuteTargets = async (currentBuyPrice) => {
             if (!isAdmin.value && !isEmployee.value) return;
             if (isCheckingTargets) return;
-            
+
             const activeTargets = allTargets.value.filter(t => t.status === 'active');
             if (activeTargets.length === 0) return;
 
             isCheckingTargets = true;
             let triggeredAny = false;
-            
+
             for (const target of activeTargets) {
                 if (currentBuyPrice >= target.target_price) {
                     target.status = 'processing'; // prevent re-entry
@@ -4125,7 +4276,7 @@ createApp({
                             weight_baht: target.weight_baht,
                             status: 'pending'
                         }]).select();
-                        
+
                         if (!lockErr) {
                             const lockId = insertedLock?.[0]?.id;
 
@@ -4138,14 +4289,14 @@ createApp({
                                 lock_id: lockId
                             });
 
-                            await supabase.from('gold_targets').update({ 
-                                status: 'triggered', 
-                                triggered_at: new Date().toISOString() 
+                            await supabase.from('gold_targets').update({
+                                status: 'triggered',
+                                triggered_at: new Date().toISOString()
                             }).eq('id', target.id);
-                            
+
                             try {
                                 sendAppNotification(`🔔 ออโต้ล็อคสำเร็จ!\nพ่อค้า: ${target.merchant_name || target.merchant_email}\nราคา: ${Number(target.target_price).toLocaleString('th-TH')}\nน้ำหนัก: ${target.weight_baht} บาท`);
-                            } catch(e) {}
+                            } catch (e) { }
                             triggeredAny = true;
                         } else {
                             target.status = 'active';
@@ -4156,7 +4307,7 @@ createApp({
                     }
                 }
             }
-            
+
             if (triggeredAny) {
                 loadLocks();
                 loadTargets();
@@ -4833,19 +4984,22 @@ createApp({
                 groupedUnsent.value = groups;
 
                 // 2. Fetch pending ingots
-                const { data: pending } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight, percent)').is('round_id', null).order('created_at', { ascending: true });
+                const { data: pending } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight, percent, base_price)').is('round_id', null).order('created_at', { ascending: true });
                 if (pending) {
                     pending.forEach(ing => {
                         ing.total_cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
                         ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
-                        let sumW = 0, sumWP = 0;
+                        let sumW = 0, sumWP = 0, sumWBP = 0;
                         ing.transactions.forEach(t => {
                             const w = Number(t.weight) || 0;
                             const p = Number(t.percent) || 0;
+                            const bp = Number(t.base_price) || 0;
                             sumW += w;
                             sumWP += (w * p);
+                            sumWBP += (w * bp);
                         });
                         ing.avg_percent = sumW > 0 ? (sumWP / sumW) : 0;
+                        ing.avg_base_price = sumW > 0 ? (sumWBP / sumW) : 0;
                     });
                     pending.sort((a, b) => {
                         const isASilver = a.category === 'silver';
@@ -4859,7 +5013,7 @@ createApp({
 
                 // 3. Fetch rounds history (Admin ONLY)
                 if (isAdmin.value) {
-                    let roundsQuery = supabase.from('delivery_rounds').select('*, delivery_ingots(*, transactions(net_price, weight, percent))').order('created_at', { ascending: false });
+                    let roundsQuery = supabase.from('delivery_rounds').select('*, delivery_ingots(*, transactions(net_price, weight, percent, base_price))').order('created_at', { ascending: false });
 
                     if (historyStatusFilter.value !== 'all') {
                         roundsQuery = roundsQuery.eq('status', historyStatusFilter.value);
@@ -4907,20 +5061,45 @@ createApp({
                             let totalCost = 0;
                             let goldCost = 0;
                             let silverCost = 0;
+                            let goldWeightGrams = 0; // melted weight
+                            let silverWeightGrams = 0; // melted weight
+                            let goldBaseSum = 0;
+                            let silverBaseSum = 0;
+                            let goldRawWeightSum = 0;
+                            let silverRawWeightSum = 0;
                             r.delivery_ingots.forEach(ing => {
                                 const cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
+                                ing.cost = cost;
                                 ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
                                 let sumW = 0, sumWP = 0;
+                                let ingBaseSum = 0;
+                                let ingRawWeightSum = 0;
                                 ing.transactions.forEach(t => {
                                     const w = Number(t.weight) || 0;
                                     const p = Number(t.percent) || 0;
+                                    const bp = Number(t.base_price) || 0;
                                     sumW += w;
                                     sumWP += (w * p);
+                                    ingBaseSum += (bp * w);
+                                    ingRawWeightSum += w;
+                                    if (ing.category === 'silver') {
+                                        silverBaseSum += (bp * w);
+                                        silverRawWeightSum += w;
+                                    } else {
+                                        goldBaseSum += (bp * w);
+                                        goldRawWeightSum += w;
+                                    }
                                 });
                                 ing.avg_percent = sumW > 0 ? (sumWP / sumW) : 0;
+                                ing.avg_base_price = ingRawWeightSum > 0 ? (ingBaseSum / ingRawWeightSum) : 0;
                                 totalCost += cost;
-                                if (ing.category === 'silver') silverCost += cost;
-                                else goldCost += cost;
+                                if (ing.category === 'silver') {
+                                    silverCost += cost;
+                                    silverWeightGrams += Number(ing.melted_weight) || 0;
+                                } else {
+                                    goldCost += cost;
+                                    goldWeightGrams += Number(ing.melted_weight) || 0;
+                                }
                             });
                             r.delivery_ingots.sort((a, b) => {
                                 const isASilver = a.category === 'silver';
@@ -4932,9 +5111,15 @@ createApp({
                             r.total_cost = totalCost;
                             r.gold_cost = goldCost;
                             r.silver_cost = silverCost;
+                            r.gold_weight_grams = goldWeightGrams;
+                            r.silver_weight_grams = silverWeightGrams;
                             r.net_profit = (Number(r.gold_payment || 0) + Number(r.silver_payment || 0)) - totalCost;
                             r.inputGold = r.gold_payment > 0 ? r.gold_payment : '';
                             r.inputSilver = r.silver_payment > 0 ? r.silver_payment : '';
+
+                            r.avg_gold_cost_per_baht = goldRawWeightSum > 0 ? (goldBaseSum / goldRawWeightSum) : 0;
+
+                            r.avg_silver_cost_per_kg = silverRawWeightSum > 0 ? (silverBaseSum / silverRawWeightSum) : 0;
                         });
                     }
                     deliveryRoundsHistory.value = rounds || [];
@@ -5069,20 +5254,27 @@ createApp({
             let totalWeight = 0;
             let weightedPercentSum = 0;
             let totalCost = 0;
+            let basePriceWeightSum = 0;
+            let basePriceSum = 0;
 
             selected.forEach(i => {
                 const w = Number(i.weight) || 0;
                 const p = Number(i.percent) || 0;
+                const bp = Number(i.base_price) || 0;
                 totalWeight += w;
                 weightedPercentSum += (w * p);
                 totalCost += Number(i.net_price) || 0;
+
+                basePriceWeightSum += w;
+                basePriceSum += (bp * w);
             });
 
             return {
                 count: selected.length,
                 weight: totalWeight,
                 cost: totalCost,
-                avgPercent: totalWeight > 0 ? (weightedPercentSum / totalWeight) : 0
+                avgPercent: totalWeight > 0 ? (weightedPercentSum / totalWeight) : 0,
+                avgBasePrice: basePriceWeightSum > 0 ? (basePriceSum / basePriceWeightSum) : 0
             };
         });
 
@@ -5266,6 +5458,89 @@ createApp({
                 await loadDeliveryData();
             } catch (err) {
                 console.error("Error setting other purpose:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const markAsSoldFromShowcase = async () => {
+            if (selectedTransactionIds.value.length === 0) {
+                await showAppModal('alert', 'แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการขายออก');
+                return;
+            }
+
+            const sellingPriceInput = await showAppModal('prompt', 'ขายออก', 'โปรดระบุยอดเงินสุทธิที่ขายได้ทั้งหมด (บาท):', [
+                { label: 'ยอดเงินที่ขายได้', type: 'number', defaultValue: '' }
+            ]);
+
+            if (sellingPriceInput === null || sellingPriceInput === '') return;
+            const sellingPrice = Number(sellingPriceInput);
+            if (isNaN(sellingPrice) || sellingPrice < 0) {
+                await showAppModal('alert', 'ผิดพลาด', 'ยอดเงินไม่ถูกต้อง');
+                return;
+            }
+
+            loadingDeliveryData.value = true;
+            try {
+                const selectedItems = unsentTransactions.value.filter(i => selectedTransactionIds.value.includes(i.id));
+                const totalWeight = selectedItems.reduce((sum, i) => sum + Number(i.weight), 0);
+                const isSilver = selectedItems[0]?.type === 'silver';
+
+                // Find existing round for today's showcase sales
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const todayEnd = new Date();
+                todayEnd.setHours(23, 59, 59, 999);
+
+                const { data: todayRounds } = await supabase.from('delivery_rounds')
+                    .select('*, delivery_ingots(*)')
+                    .gte('created_at', todayStart.toISOString())
+                    .lte('created_at', todayEnd.toISOString())
+                    .eq('status', 'completed');
+
+                let targetRound = null;
+                if (todayRounds && todayRounds.length > 0) {
+                    targetRound = todayRounds.find(r =>
+                        r.delivery_ingots.length > 0 &&
+                        r.delivery_ingots.every(ing => ing.category.startsWith('ขายออก'))
+                    );
+                }
+
+                let roundId;
+                if (targetRound) {
+                    roundId = targetRound.id;
+                    const { error: updateError } = await supabase.from('delivery_rounds').update({
+                        gold_payment: Number(targetRound.gold_payment || 0) + (isSilver ? 0 : sellingPrice),
+                        silver_payment: Number(targetRound.silver_payment || 0) + (isSilver ? sellingPrice : 0)
+                    }).eq('id', roundId);
+                    if (updateError) throw updateError;
+                } else {
+                    const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
+                        status: 'completed',
+                        gold_payment: isSilver ? 0 : sellingPrice,
+                        silver_payment: isSilver ? sellingPrice : 0,
+                        created_at: new Date().toISOString()
+                    }]).select();
+                    if (roundError) throw roundError;
+                    roundId = roundData[0].id;
+                }
+
+                const { data: ingotData, error: ingotError } = await supabase.from('delivery_ingots').insert([{
+                    category: isSilver ? `ขายออก (ตู้โชว์) [เงิน]` : `ขายออก (ตู้โชว์)`,
+                    melted_weight: totalWeight,
+                    melted_percent: 0,
+                    round_id: roundId
+                }]).select();
+
+                if (ingotError) throw ingotError;
+                const ingotId = ingotData[0].id;
+
+                const { error: txError } = await supabase.from('transactions').update({ ingot_id: ingotId, in_showcase: false }).in('id', selectedTransactionIds.value);
+                if (txError) throw txError;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error selling from showcase:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
                 loadingDeliveryData.value = false;
             }
@@ -5479,7 +5754,7 @@ createApp({
             if (isGold) {
                 let base = gp;
                 let premium = 0;
-                let activePremium = premiums.value.find(pr => avgPercent >= pr.range_min && avgPercent <= pr.range_max);
+                let activePremium = premiums.value.find(pr => Math.floor(avgPercent) >= pr.range_min && Math.floor(avgPercent) <= pr.range_max);
                 const meetsWeightReq = totalWeight >= 5 || isOldCustomer.value;
                 if (activePremium && meetsWeightReq) {
                     if (activePremium.premium_type === 'percent') {
@@ -5833,14 +6108,19 @@ createApp({
             editTransaction,
             editTrxModal,
             calculateEditTrxNetPrice,
+            onEditCustomerName,
+            onEditTrxNetPrice,
             onEditBasePrice,
             saveEditTransaction,
+            checkIsMerchant,
+            isItemOrBillMerchant,
             reprintGroup,
             reprintLatestReceipt,
             loadTransactions,
             deleteSelected,
             exportCSV,
             selectedTransactions,
+            selectedHistoryStats,
             isAllSelected,
             togglePurity,
             setDatePreset,
@@ -5916,6 +6196,7 @@ createApp({
             markAsShowcase,
             markAsOther,
             removeFromShowcase,
+            markAsSoldFromShowcase,
             deleteIngot,
             createDeliveryRound,
             savePayment,
