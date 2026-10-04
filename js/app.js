@@ -2331,10 +2331,12 @@ createApp({
 
         const approvePriceEdit = async (id) => {
             await supabase.from('price_edit_requests').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', id);
+            adminPendingRequests.value = adminPendingRequests.value.filter(r => r.id !== id);
         };
 
         const rejectPriceEdit = async (id) => {
             await supabase.from('price_edit_requests').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', id);
+            adminPendingRequests.value = adminPendingRequests.value.filter(r => r.id !== id);
         };
 
         // Realtime mechanism was removed to save disk I/O.
