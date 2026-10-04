@@ -2283,6 +2283,8 @@ createApp({
         const currentPriceEditRequestId = ref(null);
         const adminPendingRequests = ref([]);
 
+        let priceEditPollInterval = null;
+
         const requestPriceEdit = async () => {
             if (!user.value || isAdmin.value) return;
             priceEditStatus.value = 'pending';
@@ -2300,6 +2302,27 @@ createApp({
                     notifyMsg += `📱 กรุณาตรวจสอบและอนุมัติในระบบ`;
                     sendAppNotification(notifyMsg);
                 }
+
+                // เริ่ม Polling เช็คสถานะทุก 3 วินาที แทนการใช้ Realtime (ลดโหลด DB)
+                if (priceEditPollInterval) clearInterval(priceEditPollInterval);
+                priceEditPollInterval = setInterval(async () => {
+                    if (!currentPriceEditRequestId.value) {
+                        clearInterval(priceEditPollInterval);
+                        return;
+                    }
+                    const { data: checkData } = await supabase.from('price_edit_requests').select('status').eq('id', currentPriceEditRequestId.value).single();
+                    if (checkData) {
+                        priceEditStatus.value = checkData.status;
+                        if (checkData.status === 'approved') {
+                            clearInterval(priceEditPollInterval);
+                        } else if (checkData.status === 'rejected') {
+                            clearInterval(priceEditPollInterval);
+                            currentPriceEditRequestId.value = null;
+                            priceEditStatus.value = null;
+                        }
+                    }
+                }, 3000);
+
             } else if (error) {
                 console.error("Error requesting price edit:", error);
                 priceEditStatus.value = null;
@@ -2314,38 +2337,8 @@ createApp({
             await supabase.from('price_edit_requests').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', id);
         };
 
-        const setupRealtimeRequests = () => {
-            supabase.channel('price_edit_requests')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'price_edit_requests' }, payload => {
-                    const req = payload.new;
-
-                    if (isAdmin.value) {
-                        if (payload.eventType === 'INSERT' && req.status === 'pending') {
-                            adminPendingRequests.value.push(req);
-                        } else if (payload.eventType === 'UPDATE') {
-                            const index = adminPendingRequests.value.findIndex(r => r.id === req.id);
-                            if (req.status !== 'pending') {
-                                if (index !== -1) adminPendingRequests.value.splice(index, 1);
-                            } else if (index === -1) {
-                                adminPendingRequests.value.push(req);
-                            }
-                        } else if (payload.eventType === 'DELETE') {
-                            adminPendingRequests.value = adminPendingRequests.value.filter(r => r.id !== payload.old.id);
-                        }
-                    }
-
-                    if (!isAdmin.value && currentPriceEditRequestId.value === req.id && payload.eventType === 'UPDATE') {
-                        priceEditStatus.value = req.status;
-                        if (req.status === 'approved') {
-                            // Don't show modal, just change UI state to avoid interrupting flow
-                        } else if (req.status === 'rejected') {
-                            currentPriceEditRequestId.value = null;
-                            priceEditStatus.value = null;
-                        }
-                    }
-                })
-                .subscribe();
-        };
+        // Realtime mechanism was removed to save disk I/O.
+        // Admin refreshes page to see requests. Employee polls actively when waiting.
 
         const loadPendingRequests = async () => {
             if (!isAdmin.value) return;
@@ -2362,11 +2355,7 @@ createApp({
             if (user.value) {
                 if (isAdmin.value && currentTab.value === 'history') loadTransactions();
 
-                try {
-                    setupRealtimeRequests();
-                } catch (e) {
-                    console.error('Error setting up realtime (checkAuth):', e);
-                }
+                // setupRealtimeRequests removed
 
                 if (isAdmin.value) {
                     try {
@@ -2394,11 +2383,7 @@ createApp({
                     user.value = data.user;
                     if (isAdmin.value && currentTab.value === 'history') loadTransactions();
 
-                    try {
-                        setupRealtimeRequests();
-                    } catch (e) {
-                        console.error('Error setting up realtime:', e);
-                    }
+                    // setupRealtimeRequests removed
 
                     if (isAdmin.value) {
                         try {
@@ -2966,12 +2951,7 @@ createApp({
                 const premium = parseFloat(t.premium_amount) || 0;
                 const percent = parseFloat(t.percent) || 0;
                 let perGram = weight > 0 ? (netPrice / weight) : 0;
-                if (t.type === 'silver' && itemIsMerchant) {
-                    const rawPerGram = ((basePrice + premium) / 1000) * (percent / 100);
-                    if (rawPerGram > 0) {
-                        perGram = floor2(rawPerGram);
-                    }
-                }
+                // Removed misleading recalculation so it correctly reflects the saved net price
                 return {
                     id: t.id,
                     type: t.type,
@@ -3223,7 +3203,7 @@ createApp({
                     if (t.id_card && t.id_card.trim() !== '' && !t.id_card.startsWith('NO_ID_')) {
                         query = query.eq('id_card', t.id_card.trim());
                     } else if (t.customer_name) {
-                        query = query.eq('customer_name', t.customer_name.trim());
+                        query = query.ilike('customer_name', t.customer_name.trim());
                     }
                     const { data } = await query;
                     if (data && data.length > 0) {
@@ -4884,17 +4864,115 @@ createApp({
         const groupedUnsent = ref({
             'tong_tang': { label: 'ทองคำแท่ง', items: [], selectedIds: [] },
             'tong_roop': { label: 'ทองรูปพรรณ/ไถ่ถอน', items: [], selectedIds: [] },
-            'gold_50_99': { label: 'ทอง (50-99%)', items: [], selectedIds: [] },
-            'gold_25_49': { label: 'ทอง (25-49%)', items: [], selectedIds: [] },
-            'gold_1_24': { label: 'ทอง (1-24%)', items: [], selectedIds: [] },
-            'silver': { label: 'เงิน', items: [], selectedIds: [] }
+            'gold_99': { label: 'ทอง (99-100%)', items: [], selectedIds: [] },
+            'gold_1_98': { label: 'ทอง (1-98%)', items: [], selectedIds: [] },
+            'silver_99': { label: 'เงิน (99-100%)', items: [], selectedIds: [] },
+            'silver_1_98': { label: 'เงิน (1-98%)', items: [], selectedIds: [] }
         });
 
         const pendingIngots = ref([]);
         const meltingIngots = computed(() => pendingIngots.value.filter(ing => ing.status === 'melting'));
         const completedIngots = computed(() => pendingIngots.value.filter(ing => !ing.status || ing.status === 'completed'));
+        
+        const selectedCompletedIngotIds = ref([]);
+        const selectedCompletedIngotsStats = computed(() => {
+            const selected = completedIngots.value.filter(ing => selectedCompletedIngotIds.value.includes(ing.id));
+            if (selected.length === 0) return null;
+            
+            let totalWeight = 0;
+            let totalCost = 0;
+            let totalWBP = 0;
+            let totalWP = 0;
+            let rawWeight = 0;
+
+            selected.forEach(ing => {
+                totalCost += Number(ing.total_cost) || 0;
+                if (ing.transactions) {
+                    ing.transactions.forEach(t => {
+                        const w = Number(t.weight) || 0;
+                        const p = Number(t.percent) || 0;
+                        const bp = Number(t.base_price) || 0;
+                        rawWeight += w;
+                        totalWP += (w * p);
+                        totalWBP += (w * bp);
+                    });
+                }
+                totalWeight += Number(ing.melted_weight) || 0;
+            });
+
+            return {
+                count: selected.length,
+                totalWeight: totalWeight,
+                rawWeight: rawWeight,
+                avgPercent: rawWeight > 0 ? (totalWP / rawWeight) : 0,
+                avgBasePrice: rawWeight > 0 ? (totalWBP / rawWeight) : 0,
+                totalCost: totalCost
+            };
+        });
+
+        const toggleSelectAllCompletedIngots = () => {
+            if (selectedCompletedIngotIds.value.length === completedIngots.value.length) {
+                selectedCompletedIngotIds.value = [];
+            } else {
+                selectedCompletedIngotIds.value = completedIngots.value.map(ing => ing.id);
+            }
+        };
         const deliveryRoundsHistory = ref([]);
         const historyViewTab = ref('normal');
+
+        const selectedHistoryIngotIds = ref([]);
+        const selectedHistoryIngotsStats = computed(() => {
+            if (selectedHistoryIngotIds.value.length === 0) return null;
+            
+            const allHistoryIngots = [];
+            deliveryRoundsHistory.value.forEach(round => {
+                if (round.delivery_ingots) {
+                    allHistoryIngots.push(...round.delivery_ingots);
+                }
+            });
+            
+            const selected = allHistoryIngots.filter(ing => selectedHistoryIngotIds.value.includes(ing.id));
+            if (selected.length === 0) return null;
+            
+            let totalWeight = 0;
+            let totalCost = 0;
+            let totalWBP = 0;
+            let totalWP = 0;
+            let rawWeight = 0;
+
+            selected.forEach(ing => {
+                totalCost += Number(ing.total_cost) || 0;
+                
+                if (ing.transactions) {
+                    ing.transactions.forEach(t => {
+                        const w = Number(t.weight) || 0;
+                        const p = Number(t.percent) || 0;
+                        const bp = Number(t.base_price) || 0;
+                        rawWeight += w;
+                        totalWP += (w * p);
+                        totalWBP += (w * bp);
+                    });
+                } else if (ing.raw_weight) {
+                    const rw = Number(ing.raw_weight) || 0;
+                    const ap = Number(ing.avg_percent) || 0;
+                    const abp = Number(ing.avg_base_price) || 0;
+                    rawWeight += rw;
+                    totalWP += (rw * ap);
+                    totalWBP += (rw * abp);
+                }
+                
+                totalWeight += Number(ing.melted_weight) || 0;
+            });
+
+            return {
+                count: selected.length,
+                totalWeight: totalWeight,
+                rawWeight: rawWeight,
+                avgPercent: rawWeight > 0 ? (totalWP / rawWeight) : 0,
+                avgBasePrice: rawWeight > 0 ? (totalWBP / rawWeight) : 0,
+                totalCost: totalCost
+            };
+        });
 
         const normalDeliveryRounds = computed(() => {
             return deliveryRoundsHistory.value.filter(r => !r.delivery_ingots.every(ing => ing.category && String(ing.category).startsWith('อื่นๆ:')));
@@ -4957,25 +5035,25 @@ createApp({
                 const groups = {
                     'tong_tang': { label: 'ทองคำแท่ง', items: [] },
                     'tong_roop': { label: 'ทองรูปพรรณ/ไถ่ถอน', items: [] },
-                    'gold_50_99': { label: 'ทอง (50-99%)', items: [] },
-                    'gold_25_49': { label: 'ทอง (25-49%)', items: [] },
-                    'gold_1_24': { label: 'ทอง (1-24%)', items: [] },
-                    'silver': { label: 'เงิน', items: [] }
+                    'gold_99': { label: 'ทอง (99-100%)', items: [] },
+                    'gold_1_98': { label: 'ทอง (1-98%)', items: [] },
+                    'silver_99': { label: 'เงิน (99-100%)', items: [] },
+                    'silver_1_98': { label: 'เงิน (1-98%)', items: [] }
                 };
 
                 unsentTransactions.value.forEach(t => {
                     let key = '';
+                    const p = parseFloat(t.percent || 0);
                     if (t.type === 'silver') {
-                        key = 'silver';
+                        if (p >= 99) key = 'silver_99';
+                        else key = 'silver_1_98';
                     } else if (t.type === 'tong_tang') {
                         key = 'tong_tang';
                     } else if (t.type === 'tong_roop' || t.type === 'redeem') {
                         key = 'tong_roop';
                     } else {
-                        const p = parseFloat(t.percent || 0);
-                        if (p >= 50) key = 'gold_50_99';
-                        else if (p >= 25 && p < 50) key = 'gold_25_49';
-                        else if (p >= 0 && p < 25) key = 'gold_1_24';
+                        if (p >= 99) key = 'gold_99';
+                        else key = 'gold_1_98';
                     }
                     if (key) {
                         groups[key].items.push(t);
@@ -5642,8 +5720,15 @@ createApp({
                     targetRoundId = roundData[0].id;
                 }
 
-                const ingotIds = completedIngots.value.map(i => i.id);
+                const ingotsToSend = selectedCompletedIngotIds.value.length > 0 ? 
+                    completedIngots.value.filter(i => selectedCompletedIngotIds.value.includes(i.id)) : 
+                    completedIngots.value;
+                    
+                const ingotIds = ingotsToSend.map(i => i.id);
                 const { error: updateError } = await supabase.from('delivery_ingots').update({ round_id: targetRoundId }).in('id', ingotIds);
+                
+                // Clear selection after sending
+                selectedCompletedIngotIds.value = [];
                 if (updateError) throw updateError;
 
                 await loadDeliveryData();
@@ -6172,6 +6257,11 @@ createApp({
             pendingIngots,
             meltingIngots,
             completedIngots,
+            selectedCompletedIngotIds,
+            selectedCompletedIngotsStats,
+            toggleSelectAllCompletedIngots,
+            selectedHistoryIngotIds,
+            selectedHistoryIngotsStats,
             completeMelting,
             deliveryRoundsHistory,
             historyViewTab,
