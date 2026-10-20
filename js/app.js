@@ -108,6 +108,10 @@ createApp({
         const splitLockData = ref({ originalLock: null, newWeight1: 0, newWeight2: 0 });
 
         const openSplitLockModal = (lock) => {
+            if (!lock || Number(lock.weight_baht) <= 1) {
+                showAppModal('alert', 'ไม่สามารถแบ่งรายการได้', 'น้ำหนักทอง 1 บาทหรือน้อยกว่า ไม่สามารถแบ่งรายการได้');
+                return;
+            }
             splitLockData.value = {
                 originalLock: lock,
                 newWeight1: Number(lock.weight_baht) / 2,
@@ -121,7 +125,12 @@ createApp({
             const w1 = Number(splitLockData.value.newWeight1);
             const w2 = Number(splitLockData.value.newWeight2);
 
-            if (!lock || w1 <= 0 || w2 <= 0 || Math.abs((w1 + w2) - Number(lock.weight_baht)) > 0.0001) {
+            if (!lock || Number(lock.weight_baht) <= 1) {
+                await showAppModal('error', 'ข้อผิดพลาด', 'น้ำหนักทอง 1 บาทหรือน้อยกว่า ไม่สามารถแบ่งรายการได้');
+                return;
+            }
+
+            if (w1 <= 0 || w2 <= 0 || Math.abs((w1 + w2) - Number(lock.weight_baht)) > 0.0001) {
                 await showAppModal('error', 'ข้อผิดพลาด', 'น้ำหนักที่แบ่งไม่ถูกต้อง (ผลรวมต้องเท่ากับน้ำหนักเดิม)');
                 return;
             }
@@ -237,23 +246,122 @@ createApp({
 
         const activeAdminLocks = computed(() => {
             let locks = allLocks.value.filter(l => l.status === 'pending');
-            if (adminLockStartFilter.value) {
-                const start = new Date(adminLockStartFilter.value).getTime();
-                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() >= start);
-            }
-            if (adminLockEndFilter.value) {
-                const end = new Date(adminLockEndFilter.value).getTime();
-                locks = locks.filter(l => l.created_at && new Date(l.created_at).getTime() <= end);
-            }
             if (activeLockFilter.value) {
                 const filterText = activeLockFilter.value.trim().toLowerCase();
                 locks = locks.filter(l => {
-                    const resolvedName = merchantEmailMappings.value[l.merchant_email] || l.merchant_name || l.merchant_email || '';
+                    const resolvedName = (merchantEmailMappings.value && (merchantEmailMappings.value[l.merchant_email] || (l.merchant_email && merchantEmailMappings.value[l.merchant_email.toLowerCase()]))) || l.merchant_name || l.merchant_email || '';
                     return resolvedName.toLowerCase().includes(filterText);
                 });
             }
             return locks;
         });
+
+        const expandedLockGroups = ref({});
+        const toggleExpandLockGroup = (key) => {
+            expandedLockGroups.value[key] = !expandedLockGroups.value[key];
+        };
+
+        const groupedActiveAdminLocks = computed(() => {
+            // Group active pending locks by merchant_email and type
+            const groupsMap = new Map();
+            activeAdminLocks.value.forEach(lock => {
+                const email = (lock.merchant_email || lock.merchant_name || 'unknown').trim().toLowerCase();
+                const type = lock.type || 'buy';
+                const groupKey = `${email}_${type}`;
+
+                if (!groupsMap.has(groupKey)) {
+                    const resolvedName = (merchantEmailMappings.value && (merchantEmailMappings.value[lock.merchant_email] || (lock.merchant_email && merchantEmailMappings.value[lock.merchant_email.toLowerCase()]))) || lock.merchant_name || lock.merchant_email || '';
+                    groupsMap.set(groupKey, {
+                        key: groupKey,
+                        merchant_email: lock.merchant_email,
+                        merchant_name: resolvedName,
+                        type: type,
+                        locks: [],
+                        total_weight: 0,
+                        total_amount: 0,
+                        average_price: 0,
+                        latest_created_at: lock.created_at,
+                        ids: [],
+                        status: 'pending'
+                    });
+                }
+
+                const group = groupsMap.get(groupKey);
+                group.locks.push(lock);
+                group.ids.push(lock.id);
+
+                const w = Number(lock.weight_baht) || 0;
+                const p = Number(lock.locked_price) || 0;
+                group.total_weight += w;
+                group.total_amount += (w * p);
+
+                if (new Date(lock.created_at) > new Date(group.latest_created_at)) {
+                    group.latest_created_at = lock.created_at;
+                }
+            });
+
+            const result = [];
+            groupsMap.forEach(group => {
+                group.total_weight = Math.round(group.total_weight * 1000) / 1000;
+                group.average_price = group.total_weight > 0 ? (group.total_amount / group.total_weight) : 0;
+                group.locks.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                result.push(group);
+            });
+
+            // Sort groups by latest_created_at desc
+            result.sort((a, b) => new Date(b.latest_created_at) - new Date(a.latest_created_at));
+            return result;
+        });
+
+        const isLockGroupSelected = (group) => {
+            return group.ids.length > 0 && group.ids.every(id => selectedAdminLocks.value.includes(id));
+        };
+
+        const isLockGroupIndeterminate = (group) => {
+            const selectedCount = group.ids.filter(id => selectedAdminLocks.value.includes(id)).length;
+            return selectedCount > 0 && selectedCount < group.ids.length;
+        };
+
+        const toggleLockGroupSelection = (group) => {
+            if (isLockGroupSelected(group)) {
+                selectedAdminLocks.value = selectedAdminLocks.value.filter(id => !group.ids.includes(id));
+            } else {
+                const toAdd = group.ids.filter(id => !selectedAdminLocks.value.includes(id));
+                selectedAdminLocks.value = [...selectedAdminLocks.value, ...toAdd];
+            }
+        };
+
+        const updateGroupLockStatus = async (group, status) => {
+            if (!isAdmin.value) {
+                await showAppModal('error', 'ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเปลี่ยนสถานะได้');
+                return;
+            }
+            const { error } = await supabase.from('gold_locks').update({
+                status,
+                updated_at: new Date().toISOString()
+            }).in('id', group.ids);
+            if (error) {
+                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถเปลี่ยนสถานะได้: ' + error.message);
+            } else {
+                await loadLocks();
+            }
+        };
+
+        const deleteGroupLocks = async (group) => {
+            if (!isAdmin.value) {
+                await showAppModal('error', 'ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถลบรายการได้');
+                return;
+            }
+            const countText = group.locks.length > 1 ? `ทั้งหมด ${group.locks.length} รายการ` : 'รายการนี้';
+            if (await showAppModal('confirm', 'ยืนยันการลบ', `คุณแน่ใจหรือไม่ว่าต้องการลบรายการล็อคราคาของ "${group.merchant_name || group.merchant_email}" (${countText})?`)) {
+                const { error } = await supabase.from('gold_locks').delete().in('id', group.ids);
+                if (error) {
+                    await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถลบรายการได้');
+                } else {
+                    await loadLocks();
+                }
+            }
+        };
 
         const historyAdminLocks = computed(() => {
             let locks = allLocks.value.filter(l => l.status !== 'pending');
@@ -268,7 +376,7 @@ createApp({
             if (historyLockFilter.value) {
                 const filterText = historyLockFilter.value.trim().toLowerCase();
                 locks = locks.filter(l => {
-                    const resolvedName = merchantEmailMappings.value[l.merchant_email] || l.merchant_name || l.merchant_email || '';
+                    const resolvedName = (merchantEmailMappings.value && (merchantEmailMappings.value[l.merchant_email] || (l.merchant_email && merchantEmailMappings.value[l.merchant_email.toLowerCase()]))) || l.merchant_name || l.merchant_email || '';
                     return resolvedName.toLowerCase().includes(filterText);
                 });
             }
@@ -451,14 +559,15 @@ createApp({
                 const { data } = await supabase.from('gold_locks').select('*').order('created_at', { ascending: false });
                 if (data) {
                     allLocks.value = data;
-                    selectedAdminLocks.value = data.map(l => l.id);
+                    // Do not auto-select all; retain only existing pending selections
+                    selectedAdminLocks.value = selectedAdminLocks.value.filter(id => data.some(l => l.id === id && l.status === 'pending'));
                 }
             }
             if (isMerchant.value) {
                 const { data } = await supabase.from('gold_locks').select('*').eq('merchant_email', user.value.email).order('created_at', { ascending: false });
                 if (data) {
                     merchantLocks.value = data;
-                    selectedMerchantLocks.value = data.map(l => l.id);
+                    selectedMerchantLocks.value = selectedMerchantLocks.value.filter(id => data.some(l => l.id === id));
                 }
             }
         };
@@ -611,12 +720,14 @@ createApp({
                 jkPriceInterval = null;
             }
             if (newTab === 'realtime_price' && isMerchant.value) {
+                selectedMerchantLocks.value = [];
                 fetchJkRealtimePrices();
                 jkPriceInterval = setInterval(fetchJkRealtimePrices, 3000);
                 loadLocks();
                 loadTargets();
             }
             if (newTab === 'price_locks' && (isAdmin.value || isEmployee.value)) {
+                selectedAdminLocks.value = [];
                 loadLocks();
                 loadTargets();
             }
@@ -685,35 +796,59 @@ createApp({
             // Prevent immediate re-trigger if needed, though the exact match check usually handles it.
         };
 
-        const addMerchantMapping = () => {
-            if (newMerchantMapping.value.email && newMerchantMapping.value.name) {
-                merchantEmailMappings.value[newMerchantMapping.value.email.trim()] = newMerchantMapping.value.name.trim();
-                newMerchantMapping.value = { email: '', name: '' };
-            }
-        };
-
-        const removeMerchantMapping = (email) => {
-            const newMap = { ...merchantEmailMappings.value };
-            delete newMap[email];
-            merchantEmailMappings.value = newMap;
-        };
-
-        const saveMerchantMappings = async () => {
+        const saveMerchantMappings = async (silent = false) => {
             saving.value = true;
             try {
                 const { error } = await supabase.from('global_settings').upsert({
                     key: 'merchant_email_mappings',
                     value: 0,
-                    value_text: JSON.stringify(merchantEmailMappings.value)
-                });
+                    value_text: JSON.stringify(merchantEmailMappings.value || {})
+                }, { onConflict: 'key' });
                 if (error) throw error;
-                await showAppModal('alert', 'สำเร็จ', 'บันทึกการผูกชื่อพ่อค้าเรียบร้อยแล้ว');
+                if (!silent) {
+                    await showAppModal('alert', 'สำเร็จ', 'บันทึกการผูกชื่อพ่อค้าเรียบร้อยแล้ว');
+                }
             } catch (err) {
-                console.error(err);
-                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถบันทึกได้');
+                console.error('Error saving merchant mappings:', err);
+                await showAppModal('error', 'ข้อผิดพลาด', 'ไม่สามารถบันทึกได้: ' + (err.message || ''));
             } finally {
                 saving.value = false;
             }
+        };
+
+        const addMerchantMapping = async () => {
+            const email = (newMerchantMapping.value.email || '').trim().toLowerCase();
+            const name = (newMerchantMapping.value.name || '').trim();
+
+            if (!email || !name) {
+                await showAppModal('alert', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกทั้งอีเมลและชื่อพ่อค้า');
+                return;
+            }
+
+            if (!email.includes('@') || !email.includes('.')) {
+                await showAppModal('alert', 'อีเมลไม่ถูกต้อง', 'กรุณาระบุรูปแบบอีเมลให้ถูกต้อง (เช่น merchant@krittrade.com)');
+                return;
+            }
+
+            merchantEmailMappings.value = {
+                ...merchantEmailMappings.value,
+                [email]: name
+            };
+            newMerchantMapping.value = { email: '', name: '' };
+            mappingNameSuggestions.value = [];
+
+            await saveMerchantMappings(false);
+        };
+
+        const removeMerchantMapping = async (email) => {
+            const confirmed = await showAppModal('confirm', 'ยืนยันการลบ', `คุณต้องการยกเลิกการผูกอีเมล "${email}" ใช่หรือไม่?`);
+            if (!confirmed) return;
+
+            const newMap = { ...merchantEmailMappings.value };
+            delete newMap[email];
+            merchantEmailMappings.value = newMap;
+
+            await saveMerchantMappings(false);
         };
         const networkVipGoldPremiumAmount_50_100 = ref(0);
         const networkVipGoldPremiumPercent_50_100 = ref(0);
@@ -2461,10 +2596,13 @@ createApp({
                     const mappingSetting = settingsData.find(s => s.key === 'merchant_email_mappings');
                     if (mappingSetting && mappingSetting.value_text) {
                         try {
-                            merchantEmailMappings.value = JSON.parse(mappingSetting.value_text);
+                            merchantEmailMappings.value = JSON.parse(mappingSetting.value_text) || {};
                         } catch (e) {
+                            console.error("Error parsing merchant_email_mappings:", e);
                             merchantEmailMappings.value = {};
                         }
+                    } else {
+                        merchantEmailMappings.value = {};
                     }
 
                     const silverSetting = settingsData.find(s => s.key === 'silver_deduction');
@@ -2550,8 +2688,9 @@ createApp({
                 { key: 'network_vip_gold_amount_25_49', value: Number(networkVipGoldPremiumAmount_25_49.value) || 0 },
                 { key: 'network_vip_gold_percent_25_49', value: Number(networkVipGoldPremiumPercent_25_49.value) || 0 },
                 { key: 'network_vip_gold_amount_50_100', value: Number(networkVipGoldPremiumAmount_50_100.value) || 0 },
-                { key: 'network_vip_gold_percent_50_100', value: Number(networkVipGoldPremiumPercent_50_100.value) || 0 }
-            ]);
+                { key: 'network_vip_gold_percent_50_100', value: Number(networkVipGoldPremiumPercent_50_100.value) || 0 },
+                { key: 'merchant_email_mappings', value: 0, value_text: JSON.stringify(merchantEmailMappings.value || {}) }
+            ], { onConflict: 'key' });
 
             saving.value = false;
             await showAppModal('alert', 'สำเร็จ', 'บันทึกการตั้งค่าสำเร็จ');
@@ -6055,6 +6194,14 @@ createApp({
             merchantLockEndFilter,
 
             activeAdminLocks,
+            groupedActiveAdminLocks,
+            expandedLockGroups,
+            toggleExpandLockGroup,
+            isLockGroupSelected,
+            isLockGroupIndeterminate,
+            toggleLockGroupSelection,
+            updateGroupLockStatus,
+            deleteGroupLocks,
             historyAdminLocks,
             uniqueLockMerchants,
             activeLockSuggestions,

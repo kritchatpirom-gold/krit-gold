@@ -4011,26 +4011,9 @@
                 <div v-if="currentTab === 'price_locks' && (isAdmin || isEmployee)" key="price_locks"
                     class="max-w-6xl mx-auto space-y-6">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                        <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex items-center gap-4">
                             <h2 class="text-2xl font-bold text-white"><i
                                     class="fa-solid fa-lock text-gold-400 mr-2"></i>ประวัติการล็อคราคาจากพ่อค้า</h2>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <label class="text-orange-400 text-sm font-bold"><i
-                                        class="fa-solid fa-calendar-day mr-1"></i>ตั้งแต่:</label>
-                                <input type="datetime-local" v-model="adminLockStartFilter"
-                                    class="bg-gray-800 border-2 border-orange-500 text-orange-400 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_10px_rgba(249,115,22,0.2)]">
-
-                                <label class="text-orange-400 text-sm ml-2 font-bold">ถึง:</label>
-                                <input type="datetime-local" v-model="adminLockEndFilter"
-                                    class="bg-gray-800 border-2 border-orange-500 text-orange-400 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-2 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_10px_rgba(249,115,22,0.2)]">
-
-                                <button v-if="adminLockStartFilter || adminLockEndFilter"
-                                    @click="adminLockStartFilter = ''; adminLockEndFilter = ''"
-                                    class="text-gray-400 hover:text-red-400 transition-colors ml-1"
-                                    title="ล้างค่าตัวกรอง">
-                                    <i class="fa-solid fa-times"></i>
-                                </button>
-                            </div>
                         </div>
                         <div class="flex space-x-4">
                             <button @click="createBillFromLocks"
@@ -4085,7 +4068,7 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-700/50">
-                                    <tr v-if="activeAdminLocks.length === 0">
+                                    <tr v-if="groupedActiveAdminLocks.length === 0">
                                         <td colspan="9" class="px-4 py-12 text-center text-gray-500">
                                             <div class="flex flex-col items-center">
                                                 <i class="fa-solid fa-folder-open text-4xl mb-3 opacity-20"></i>
@@ -4093,64 +4076,155 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr v-for="lock in activeAdminLocks" :key="lock.id"
-                                        class="hover:bg-gray-700/30 transition-colors"
-                                        :class="{'bg-gray-800/60': selectedAdminLocks.includes(lock.id)}">
-                                        <td class="px-4 py-4 text-center">
-                                            <input type="checkbox" :value="lock.id" v-model="selectedAdminLocks"
-                                                class="w-4 h-4 text-gold-500 bg-gray-800 border-gray-600 rounded focus:ring-gold-500 focus:ring-2">
-                                        </td>
-                                        <td class="px-4 py-4 text-gray-300">{{ new
-                                            Date(lock.created_at).toLocaleString('th-TH') }}</td>
-                                        <td class="px-4 py-4 text-white font-medium">
-                                            <div class="flex flex-col">
-                                                <span>{{ merchantEmailMappings[lock.merchant_email] ||
-                                                    lock.merchant_name || lock.merchant_email }}</span>
-                                                <span class="text-xs text-gray-500">{{ lock.merchant_email }}</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-4">
-                                            <span v-if="lock.type === 'buy'"
-                                                class="text-green-400 bg-green-400/10 px-2 py-1 rounded text-xs"><i
-                                                    class="fa-solid fa-arrow-down mr-1"></i>รับซื้อ</span>
-                                            <span v-else class="text-red-400 bg-red-400/10 px-2 py-1 rounded text-xs"><i
-                                                    class="fa-solid fa-arrow-up mr-1"></i>ขายออก</span>
-                                        </td>
-                                        <td class="px-4 py-4 text-right font-medium text-white">{{
-                                            Number(lock.locked_price).toLocaleString('th-TH') }}</td>
-                                        <td class="px-4 py-4 text-right text-gold-300 font-bold">{{ lock.weight_baht }}
-                                        </td>
-                                        <td class="px-4 py-4 text-right font-bold text-gold-400">{{
-                                            Number(lock.locked_price * lock.weight_baht).toLocaleString('th-TH', {
-                                            minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}</td>
-                                        <td class="px-4 py-4 text-center">
-                                            <select :value="lock.status"
-                                                @change="updateLockStatus(lock.id, $event.target.value)"
-                                                :disabled="!isAdmin"
-                                                class="bg-gray-800 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block w-full p-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
-                                                <option value="pending">รอดำเนินการ</option>
-                                                <option value="completed">เสร็จสิ้น</option>
-                                                <option value="cancelled">ยกเลิก</option>
-                                            </select>
-                                        </td>
-                                        <td class="px-4 py-4 text-center">
-                                            <div class="flex justify-center items-center gap-2">
-                                                <button @click="openSplitLockModal(lock)"
-                                                    class="text-sky-400 hover:text-sky-300 p-2 rounded hover:bg-sky-400/10 transition-colors"
-                                                    title="แบ่งรายการ">
-                                                    <i class="fa-solid fa-scissors"></i>
-                                                </button>
-                                                <button v-if="isAdmin" @click="deleteLock(lock.id)"
-                                                    class="text-red-400 hover:text-red-300 p-2 rounded hover:bg-red-400/10 transition-colors"
-                                                    title="ลบรายการ">
-                                                    <i class="fa-solid fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <template v-for="group in groupedActiveAdminLocks" :key="group.key">
+                                        <!-- Main Group Row (Combined rounds with average price) -->
+                                        <tr class="hover:bg-gray-700/30 transition-colors"
+                                            :class="{'bg-gray-800/60': isLockGroupSelected(group)}">
+                                            <td class="px-4 py-4 text-center">
+                                                <input type="checkbox"
+                                                    :checked="isLockGroupSelected(group)"
+                                                    :indeterminate.prop="isLockGroupIndeterminate(group)"
+                                                    @change="toggleLockGroupSelection(group)"
+                                                    class="w-4 h-4 text-gold-500 bg-gray-800 border-gray-600 rounded focus:ring-gold-500 focus:ring-2 cursor-pointer">
+                                            </td>
+                                            <td class="px-4 py-4 text-gray-300">
+                                                <div class="flex flex-col gap-1">
+                                                    <span>{{ new Date(group.latest_created_at).toLocaleString('th-TH') }}</span>
+                                                    <span v-if="group.locks.length > 1"
+                                                        class="inline-flex items-center w-fit px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                        <i class="fa-solid fa-layer-group mr-1 text-[10px]"></i>รวม {{ group.locks.length }} รอบ
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 text-white font-medium">
+                                                <div class="flex flex-col">
+                                                    <span>{{ merchantEmailMappings[group.merchant_email] || group.merchant_name || group.merchant_email }}</span>
+                                                    <span class="text-xs text-gray-500">{{ group.merchant_email }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4">
+                                                <span v-if="group.type === 'buy'"
+                                                    class="text-green-400 bg-green-400/10 px-2 py-1 rounded text-xs"><i
+                                                        class="fa-solid fa-arrow-down mr-1"></i>รับซื้อ</span>
+                                                <span v-else class="text-red-400 bg-red-400/10 px-2 py-1 rounded text-xs"><i
+                                                        class="fa-solid fa-arrow-up mr-1"></i>ขายออก</span>
+                                            </td>
+                                            <td class="px-4 py-4 text-right">
+                                                <div v-if="group.locks.length > 1">
+                                                    <span class="font-bold text-amber-300 text-base">
+                                                        {{ Number(group.average_price).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}
+                                                    </span>
+                                                    <div class="text-[10px] text-amber-400 font-semibold flex items-center justify-end gap-1">
+                                                        <i class="fa-solid fa-calculator text-[9px]"></i>ราคาเฉลี่ย
+                                                    </div>
+                                                </div>
+                                                <div v-else class="font-medium text-white">
+                                                    {{ Number(group.average_price).toLocaleString('th-TH') }}
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-4 text-right text-gold-300 font-bold">
+                                                {{ group.total_weight }}
+                                            </td>
+                                            <td class="px-4 py-4 text-right font-bold text-gold-400">
+                                                {{ Number(group.total_amount).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}
+                                            </td>
+                                            <td class="px-4 py-4 text-center">
+                                                <select :value="group.status"
+                                                    @change="updateGroupLockStatus(group, $event.target.value)"
+                                                    :disabled="!isAdmin"
+                                                    class="bg-gray-800 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block w-full p-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    <option value="pending">รอดำเนินการ</option>
+                                                    <option value="completed">เสร็จสิ้น</option>
+                                                    <option value="cancelled">ยกเลิก</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-4 text-center">
+                                                <div v-if="group.locks.length === 1" class="flex justify-center items-center gap-2">
+                                                    <button @click="openSplitLockModal(group.locks[0])"
+                                                        :disabled="Number(group.locks[0].weight_baht) <= 1"
+                                                        :class="Number(group.locks[0].weight_baht) <= 1 ? 'text-gray-600 opacity-30 cursor-not-allowed' : 'text-sky-400 hover:text-sky-300 hover:bg-sky-400/10'"
+                                                        class="p-2 rounded transition-colors"
+                                                        :title="Number(group.locks[0].weight_baht) <= 1 ? 'น้ำหนักทอง 1 บาทหรือน้อยกว่า ไม่สามารถแบ่งรายการได้' : 'แบ่งรายการ'">
+                                                        <i class="fa-solid fa-scissors"></i>
+                                                    </button>
+                                                    <button v-if="isAdmin" @click="deleteLock(group.locks[0].id)"
+                                                        class="text-red-400 hover:text-red-300 p-2 rounded hover:bg-red-400/10 transition-colors"
+                                                        title="ลบรายการ">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                                <div v-else class="flex justify-center items-center gap-2">
+                                                    <button @click="toggleExpandLockGroup(group.key)"
+                                                        class="text-amber-400 hover:text-amber-300 px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 transition-colors text-xs flex items-center gap-1 border border-amber-500/30"
+                                                        :title="expandedLockGroups[group.key] ? 'ซ่อนรายละเอียดแต่ละรอบ' : 'ดูรายละเอียดแต่ละรอบ'">
+                                                        <i :class="expandedLockGroups[group.key] ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'"></i>
+                                                        <span>{{ expandedLockGroups[group.key] ? 'ซ่อนรอบ' : 'ดูรอบ' }}</span>
+                                                    </button>
+                                                    <button v-if="isAdmin" @click="deleteGroupLocks(group)"
+                                                        class="text-red-400 hover:text-red-300 p-2 rounded hover:bg-red-400/10 transition-colors"
+                                                        :title="'ลบทั้ง ' + group.locks.length + ' รายการ'">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Expandable Sub-Rows for each individual round -->
+                                        <template v-if="group.locks.length > 1 && expandedLockGroups[group.key]">
+                                            <tr v-for="(subLock, subIndex) in group.locks" :key="'sub_' + subLock.id"
+                                                class="bg-gray-950/70 hover:bg-gray-900/70 border-l-4 border-amber-500 text-xs transition-colors"
+                                                :class="{'bg-amber-950/20': selectedAdminLocks.includes(subLock.id)}">
+                                                <td class="px-4 py-2.5 text-center">
+                                                    <input type="checkbox" :value="subLock.id" v-model="selectedAdminLocks"
+                                                        class="w-3.5 h-3.5 text-gold-500 bg-gray-800 border-gray-600 rounded focus:ring-gold-500 cursor-pointer">
+                                                </td>
+                                                <td class="px-4 py-2.5 text-gray-400 pl-6">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <i class="fa-solid fa-turn-up rotate-90 text-amber-400/70 text-[10px]"></i>
+                                                        <span>รอบที่ {{ group.locks.length - subIndex }}: {{ new Date(subLock.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</span>
+                                                    </div>
+                                                </td>
+                                                <td class="px-4 py-2.5 text-gray-500">
+                                                    <span>(รายการย่อย #{{ subLock.id }})</span>
+                                                </td>
+                                                <td class="px-4 py-2.5">
+                                                    <span v-if="subLock.type === 'buy'" class="text-green-400/90 text-xs">รับซื้อ</span>
+                                                    <span v-else class="text-red-400/90 text-xs">ขายออก</span>
+                                                </td>
+                                                <td class="px-4 py-2.5 text-right font-medium text-white">
+                                                    {{ Number(subLock.locked_price).toLocaleString('th-TH') }}
+                                                </td>
+                                                <td class="px-4 py-2.5 text-right text-gold-300/90 font-medium">
+                                                    {{ subLock.weight_baht }}
+                                                </td>
+                                                <td class="px-4 py-2.5 text-right font-medium text-gold-400/90">
+                                                    {{ Number(subLock.locked_price * subLock.weight_baht).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) }}
+                                                </td>
+                                                <td class="px-4 py-2.5 text-center text-gray-500 text-[11px]">
+                                                    <span class="px-2 py-0.5 rounded bg-gray-800/80 text-gray-400">รอดำเนินการ</span>
+                                                </td>
+                                                <td class="px-4 py-2.5 text-center">
+                                                    <div class="flex justify-center items-center gap-2">
+                                                        <button @click="openSplitLockModal(subLock)"
+                                                            :disabled="Number(subLock.weight_baht) <= 1"
+                                                            :class="Number(subLock.weight_baht) <= 1 ? 'text-gray-600 opacity-30 cursor-not-allowed' : 'text-sky-400 hover:text-sky-300 hover:bg-sky-400/10'"
+                                                            class="p-1 rounded text-xs transition-colors"
+                                                            :title="Number(subLock.weight_baht) <= 1 ? 'น้ำหนักทอง 1 บาทหรือน้อยกว่า ไม่สามารถแบ่งรายการได้' : 'แบ่งรายการรอบนี้'">
+                                                            <i class="fa-solid fa-scissors"></i>
+                                                        </button>
+                                                        <button v-if="isAdmin" @click="deleteLock(subLock.id)"
+                                                            class="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-400/10 text-xs"
+                                                            title="ลบเฉพาะรอบนี้">
+                                                            <i class="fa-solid fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </template>
                                 </tbody>
                                 <tfoot class="bg-gray-800/80 border-t border-gray-700"
-                                    v-if="activeAdminLocks.length > 0">
+                                    v-if="groupedActiveAdminLocks.length > 0">
                                     <tr>
                                         <td colspan="5" class="px-4 py-4 text-right font-bold text-white">ยอดรวมที่เลือก
                                             / เฉลี่ย:</td>
@@ -4163,7 +4237,7 @@
                                                 Number(averageAdminLockPrice).toLocaleString('th-TH', {
                                                 maximumFractionDigits: 0 }) }} บ./บาท</div>
                                             {{ totalAdminLockAmount.toLocaleString('th-TH', { minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2 }) }}
+                                             maximumFractionDigits: 2 }) }}
                                         </td>
                                         <td colspan="2"></td>
                                     </tr>
@@ -4174,26 +4248,45 @@
 
                     <!-- Card 2: History Locks (Completed/Cancelled) -->
                     <div class="glass rounded-xl overflow-hidden border border-gray-700 shadow-xl">
-                        <div class="bg-gray-800/80 p-4 border-b border-gray-700 flex justify-between items-center">
+                        <div class="bg-gray-800/80 p-4 border-b border-gray-700 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                             <h3 class="font-bold text-lg text-white"><i
                                     class="fa-solid fa-check-double mr-2 text-green-400"></i>ประวัติรายการ (เสร็จสิ้น /
                                 ยกเลิก)</h3>
-                            <div class="relative z-20">
-                                <input type="text" v-model="historyLockFilter"
-                                    @focus="showHistoryLockSuggestions = true"
-                                    @blur="setTimeout(() => showHistoryLockSuggestions = false, 200)"
-                                    placeholder="พิมพ์ค้นหาชื่อพ่อค้า..."
-                                    class="bg-gray-900 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block p-2 pl-3 pr-10 text-white outline-none w-64">
-                                <i class="fa-solid fa-search absolute right-3 top-2.5 text-gray-400"></i>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <label class="text-orange-400 text-xs font-bold"><i
+                                            class="fa-solid fa-calendar-day mr-1"></i>ตั้งแต่:</label>
+                                    <input type="datetime-local" v-model="adminLockStartFilter"
+                                        class="bg-gray-900 border border-orange-500/80 text-orange-400 text-xs rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-1.5 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_10px_rgba(249,115,22,0.15)]">
 
-                                <ul v-if="showHistoryLockSuggestions && historyLockSuggestions.length > 0"
-                                    class="absolute left-0 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
-                                    <li v-for="name in historyLockSuggestions" :key="name"
-                                        @click="selectHistoryLockFilter(name)"
-                                        class="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white text-sm">
-                                        {{ name }}
-                                    </li>
-                                </ul>
+                                    <label class="text-orange-400 text-xs font-bold">ถึง:</label>
+                                    <input type="datetime-local" v-model="adminLockEndFilter"
+                                        class="bg-gray-900 border border-orange-500/80 text-orange-400 text-xs rounded-lg focus:ring-orange-500 focus:border-orange-500 block p-1.5 outline-none cursor-pointer orange-calendar-icon shadow-[0_0_10px_rgba(249,115,22,0.15)]">
+
+                                    <button v-if="adminLockStartFilter || adminLockEndFilter"
+                                        @click="adminLockStartFilter = ''; adminLockEndFilter = ''"
+                                        class="text-gray-400 hover:text-red-400 transition-colors"
+                                        title="ล้างค่าตัวกรองช่วงเวลา">
+                                        <i class="fa-solid fa-times text-xs"></i>
+                                    </button>
+                                </div>
+                                <div class="relative z-20">
+                                    <input type="text" v-model="historyLockFilter"
+                                        @focus="showHistoryLockSuggestions = true"
+                                        @blur="setTimeout(() => showHistoryLockSuggestions = false, 200)"
+                                        placeholder="พิมพ์ค้นหาชื่อพ่อค้า..."
+                                        class="bg-gray-900 border border-gray-600 text-sm rounded-lg focus:ring-gold-500 focus:border-gold-500 block p-1.5 pl-3 pr-8 text-white outline-none w-56">
+                                    <i class="fa-solid fa-search absolute right-2.5 top-2.5 text-gray-400 text-xs"></i>
+
+                                    <ul v-if="showHistoryLockSuggestions && historyLockSuggestions.length > 0"
+                                        class="absolute left-0 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                                        <li v-for="name in historyLockSuggestions" :key="name"
+                                            @click="selectHistoryLockFilter(name)"
+                                            class="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white text-sm">
+                                            {{ name }}
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
