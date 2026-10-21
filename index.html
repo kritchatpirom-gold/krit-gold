@@ -1536,32 +1536,72 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div v-for="(group, key) in groupedUnsent" :key="key"
                                 class="bg-dark-surface/50 rounded-xl border border-gray-800 p-4">
-                                <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                                <div class="flex justify-between items-center mb-3 border-b border-gray-700 pb-2">
                                     <h3 class="font-bold text-lg text-white">{{ group.label }} <span
                                             class="text-xs text-gray-500 font-normal">({{ group.items.length }}
                                             ชิ้น)</span></h3>
                                     <button @click="toggleSelectAllCategory(key)"
                                         class="text-sm px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors">
-                                        {{ group.items.length > 0 && group.items.every(i =>
-                                        selectedTransactionIds.includes(i.id)) ? 'เอาออกทั้งหมด' : 'เลือกทั้งหมด' }}
+                                        {{ typeof getCategorySelectAllLabel === 'function' ? getCategorySelectAllLabel(key) : (group.items.length > 0 && group.items.every(i => selectedTransactionIds.includes(i.id)) ? 'เอาออกทั้งหมด' : 'เลือกทั้งหมด') }}
                                     </button>
                                 </div>
+
+                                <!-- Search bar for weight & details (especially for silver_1_98 and categories with items) -->
+                                <div v-if="(key === 'silver_1_98' || group.items.length > 0) && unsentCategorySearch" class="mb-3">
+                                    <div class="flex items-center gap-2">
+                                        <div class="relative flex-1">
+                                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-xs">
+                                                <i class="fa-solid fa-magnifying-glass"></i>
+                                            </span>
+                                            <input type="text"
+                                                v-model="unsentCategorySearch[key]"
+                                                @keydown.enter.prevent="typeof quickTickCategorySearch === 'function' && quickTickCategorySearch(key, $event)"
+                                                :placeholder="key === 'silver_1_98' ? 'พิมพ์ค้นหาน้ำหนัก (กรัม) เช่น 15.2 ... กด Enter เพื่อติ๊ก' : 'ค้นหาน้ำหนัก / รายละเอียด...'"
+                                                class="w-full pl-8 pr-7 py-1.5 bg-dark-base border border-gray-700 focus:border-gold-500 rounded-lg text-xs text-white placeholder-gray-500 outline-none transition-colors">
+                                            <button v-if="unsentCategorySearch[key]"
+                                                type="button"
+                                                @click="unsentCategorySearch[key] = ''"
+                                                class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-white text-xs"
+                                                title="ล้างคำค้นหา">
+                                                <i class="fa-solid fa-circle-xmark"></i>
+                                            </button>
+                                        </div>
+                                        <button v-if="unsentCategorySearch[key]"
+                                            type="button"
+                                            @click="typeof quickTickCategorySearch === 'function' && quickTickCategorySearch(key, $event)"
+                                            class="px-2.5 py-1.5 bg-gold-500/20 hover:bg-gold-500/30 text-gold-400 border border-gold-500/40 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1"
+                                            title="ติ๊กรายการที่ค้นพบ (หรือกด Enter)">
+                                            <i class="fa-solid fa-check"></i> ติ๊ก
+                                        </button>
+                                    </div>
+                                    <div v-if="unsentCategorySearch[key]" class="mt-1.5 flex items-center justify-between text-[11px] px-1 text-gray-400">
+                                        <span>พบ <strong class="text-gold-400 font-mono">{{ (typeof getFilteredCategoryItems === 'function' ? getFilteredCategoryItems(key) : group.items).length }}</strong> รายการ</span>
+                                        <span v-if="(typeof getFilteredCategoryItems === 'function' ? getFilteredCategoryItems(key) : group.items).length > 0" class="text-gray-400">
+                                            ติ๊กแล้ว <strong class="text-green-400 font-mono">{{ (typeof getFilteredCategoryItems === 'function' ? getFilteredCategoryItems(key) : group.items).filter(i => selectedTransactionIds.includes(i.id)).length }}</strong>/{{ (typeof getFilteredCategoryItems === 'function' ? getFilteredCategoryItems(key) : group.items).length }}
+                                        </span>
+                                    </div>
+                                </div>
+
                                 <div class="max-h-48 overflow-y-auto custom-scrollbar space-y-2 mb-4 pr-2">
                                     <div v-if="group.items.length === 0" class="text-center text-gray-500 py-4 text-sm">
                                         ไม่มีของในสต็อก</div>
-                                    <label v-for="item in group.items" :key="item.id"
-                                        class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800/50 cursor-pointer border border-transparent hover:border-gray-700 transition-colors">
+                                    <div v-else-if="(typeof getFilteredCategoryItems === 'function' ? getFilteredCategoryItems(key) : group.items).length === 0" class="text-center text-gray-500 py-4 text-xs">
+                                        ไม่พบรายการที่ตรงกับ "{{ unsentCategorySearch ? unsentCategorySearch[key] : '' }}"
+                                    </div>
+                                    <label v-for="item in (typeof getFilteredCategoryItems === 'function' ? getFilteredCategoryItems(key) : group.items)" :key="item.id"
+                                        class="flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors"
+                                        :class="selectedTransactionIds.includes(item.id) ? 'bg-gold-500/10 border-gold-500/40' : 'hover:bg-gray-800/50 border-transparent hover:border-gray-700'">
                                         <input type="checkbox" :value="item.id" v-model="selectedTransactionIds"
                                             class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-gold-500 focus:ring-gold-500 focus:ring-offset-gray-800">
                                         <div class="flex-1 min-w-0">
-                                            <div class="text-sm text-gray-300 truncate">
+                                            <div class="text-sm truncate" :class="selectedTransactionIds.includes(item.id) ? 'text-gold-200 font-medium' : 'text-gray-300'">
                                                 {{ item.details || (item.type === 'silver' ? 'เงิน' : 'ทอง') }}
                                                 <span v-if="item.percent" class="text-gold-400 text-xs ml-1">[{{
                                                     item.percent }}%]</span>
                                                 <span class="text-xs text-gray-500 ml-1">({{ new
                                                     Date(item.created_at).toLocaleDateString('th-TH') }})</span>
                                             </div>
-                                            <div class="text-xs text-gold-400 font-mono">{{ item.weight }}g / {{
+                                            <div class="text-xs font-mono" :class="selectedTransactionIds.includes(item.id) ? 'text-gold-300 font-bold' : 'text-gold-400'">{{ item.weight }}g / {{
                                                 formatCurrency(item.net_price) }}฿</div>
                                         </div>
                                     </label>
@@ -1580,6 +1620,13 @@
                                     <span class="text-gray-400">เลือกแล้ว:</span> <span
                                         class="text-white font-bold ml-2 text-base">{{ selectedStats.count }}</span>
                                     <span class="text-gray-500 ml-1">ชิ้น</span>
+                                    <button v-if="selectedStats.count > 0"
+                                        type="button"
+                                        @click="selectedTransactionIds = []"
+                                        class="ml-2 text-xs text-red-400 hover:text-red-300 underline cursor-pointer"
+                                        title="ยกเลิกการเลือกทั้งหมด">
+                                        (ล้าง)
+                                    </button>
                                 </div>
                                 <div
                                     class="bg-dark-base/80 px-3 py-1.5 rounded-lg border border-gray-800 flex items-center">
@@ -2581,6 +2628,20 @@
                                         </div>
                                     </div>
 
+                                     <!-- Locked Price Notice Banner -->
+                                    <div v-if="lockedBillPrice"
+                                        class="mb-3 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between animate-fade-in">
+                                        <div class="flex items-center gap-2 text-xs text-amber-300 font-medium">
+                                            <i class="fa-solid fa-lock text-gold-400"></i>
+                                            <span>กำลังทำบิลจากรายการล็อคราคา (ราคาเฉลี่ย: <strong class="text-white">{{ Number(lockedBillPrice).toLocaleString('th-TH') }}</strong> บาท)</span>
+                                        </div>
+                                        <button type="button" @click="cancelLockBill"
+                                            class="text-xs text-red-400 hover:text-red-300 underline font-medium cursor-pointer ml-2"
+                                            title="ยกเลิกการใช้ราคาล็อค">
+                                            ยกเลิก
+                                        </button>
+                                    </div>
+
                                     <div>
                                         <label
                                             class="block text-sm font-medium text-gray-400 mb-2">ประเภทสินทรัพย์</label>
@@ -2625,7 +2686,12 @@
                                                     class="ml-1 text-green-500 text-xs px-2" title="อนุมัติแล้ว">
                                                     <i class="fa-solid fa-unlock"></i>
                                                 </div>
-                                                <div v-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice"
+                                                <div v-if="lockedBillPrice" class="flex items-center gap-1.5">
+                                                    <span class="text-xs font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 flex items-center gap-1">
+                                                        <i class="fa-solid fa-lock text-[10px]"></i> (ราคาล็อค)
+                                                    </span>
+                                                </div>
+                                                <div v-else-if="!calcForm.manualPrice || calcForm.manualPrice === currentAssetPrice"
                                                     class="flex items-center gap-1.5">
                                                     <span class="text-xs text-gray-500">(อิงสมาคม)</span>
                                                     <template v-if="calcForm.type !== 'silver'">
@@ -5589,7 +5655,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.36" type="module"></script>
+    <script src="/js/app.js?v=1.0.37" type="module"></script>
 </body>
 
 </html>

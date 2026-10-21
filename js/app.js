@@ -173,6 +173,7 @@ createApp({
         const selectedMerchantLocks = ref([]);
         const selectedAdminLocks = ref([]);
         const currentBillLocks = ref([]); // Tracks which locks are being turned into a bill
+        const lockedBillPrice = ref(null); // Preserves locked price until bill is printed
 
         const showActiveLockSuggestions = ref(false);
         const activeLockFilter = ref('');
@@ -619,7 +620,9 @@ createApp({
             calcForm.value.type = 'tong_lom';
             calcForm.value.customerName = finalName;
             calcForm.value.weight = '';
-            calcForm.value.manualPrice = Number(averageAdminLockPrice.value).toFixed(2);
+            const avgPrice = Number(averageAdminLockPrice.value).toFixed(2);
+            calcForm.value.manualPrice = avgPrice;
+            lockedBillPrice.value = avgPrice;
 
             // Store the locks that we are currently billing
             currentBillLocks.value = [...selectedAdminLocks.value];
@@ -1728,6 +1731,14 @@ createApp({
             transferAmount.value = 0;
             clearSignature();
             isOldCustomer.value = false;
+            lockedBillPrice.value = null;
+            currentBillLocks.value = [];
+        };
+
+        const cancelLockBill = () => {
+            currentBillLocks.value = [];
+            lockedBillPrice.value = null;
+            resetForm();
         };
 
         const formatThaiDate = (dateStr) => {
@@ -1895,11 +1906,23 @@ createApp({
         });
 
         watch(() => calcForm.value.type, (newType) => {
-            calcForm.value.manualPrice = null;
+            if (lockedBillPrice.value) {
+                calcForm.value.manualPrice = lockedBillPrice.value;
+            } else if (priceEditStatus.value === 'approved' || isAdmin.value || calcForm.value.manualPrice) {
+                // คงราคาที่ขอแก้ไข / ปรับเองไว้ ไม่ล้างออกเมื่อเปลี่ยนประเภทสินทรัพย์ (จนกว่าจะพิมพ์บิล)
+            } else {
+                calcForm.value.manualPrice = null;
+            }
             if (newType === 'tong_roop') {
                 calcForm.value.percent = isMerchantCustomer.value ? '96.50' : '96';
             } else if (newType === 'redeem' || newType === 'tong_tang') {
                 calcForm.value.percent = null;
+            }
+        });
+
+        watch(() => calcForm.value.manualPrice, (newPrice) => {
+            if (lockedBillPrice.value && newPrice) {
+                lockedBillPrice.value = newPrice;
             }
         });
 
@@ -5497,15 +5520,80 @@ createApp({
             };
         });
 
+        const unsentCategorySearch = ref({
+            'tong_tang': '',
+            'tong_roop': '',
+            'gold_99': '',
+            'gold_1_98': '',
+            'silver_99': '',
+            'silver_1_98': ''
+        });
+
+        const getFilteredCategoryItems = (key) => {
+            const group = groupedUnsent.value ? groupedUnsent.value[key] : null;
+            if (!group || !group.items) return [];
+            const query = (unsentCategorySearch.value && unsentCategorySearch.value[key]) ? unsentCategorySearch.value[key].trim().toLowerCase() : '';
+            if (!query) return group.items;
+
+            const queryNum = parseFloat(query);
+            const isNum = !isNaN(queryNum);
+
+            return group.items.filter(item => {
+                if (!item) return false;
+                const wNum = parseFloat(item.weight || 0);
+                const wStr = String(item.weight || '');
+                const wFixed = !isNaN(wNum) ? wNum.toFixed(2) : '';
+                const details = (item.details || '').toLowerCase();
+                const percent = String(item.percent || '');
+
+                if (isNum && Math.abs(wNum - queryNum) < 0.001) return true;
+                if (wStr.includes(query) || (wFixed && wFixed.includes(query))) return true;
+                if (details.includes(query)) return true;
+                if (percent.includes(query)) return true;
+
+                return false;
+            });
+        };
+
+        const quickTickCategorySearch = (key, event) => {
+            const items = getFilteredCategoryItems(key);
+            if (!items || items.length === 0) return;
+
+            const firstUnticked = items.find(item => selectedTransactionIds.value && !selectedTransactionIds.value.includes(item.id));
+            if (firstUnticked) {
+                selectedTransactionIds.value.push(firstUnticked.id);
+            }
+            if (event && event.target && typeof event.target.select === 'function') {
+                event.target.select();
+            }
+        };
+
+        const getCategorySelectAllLabel = (key) => {
+            const group = groupedUnsent.value ? groupedUnsent.value[key] : null;
+            if (!group) return 'เลือกทั้งหมด';
+            const query = (unsentCategorySearch.value && unsentCategorySearch.value[key]) ? unsentCategorySearch.value[key].trim() : '';
+            const items = getFilteredCategoryItems(key);
+            if (!items || items.length === 0) return query ? 'ไม่พบรายการ' : 'เลือกทั้งหมด';
+
+            const allSelected = items.every(i => selectedTransactionIds.value && selectedTransactionIds.value.includes(i.id));
+            if (query) {
+                return allSelected ? 'เอาออกที่ค้นพบ' : `เลือกที่ค้นพบ (${items.length})`;
+            }
+            return allSelected ? 'เอาออกทั้งหมด' : 'เลือกทั้งหมด';
+        };
+
         const toggleSelectAllCategory = (category) => {
-            const group = groupedUnsent.value[category];
-            const groupIds = group.items.map(i => i.id);
-            const allSelected = groupIds.length > 0 && groupIds.every(id => selectedTransactionIds.value.includes(id));
+            const group = groupedUnsent.value ? groupedUnsent.value[category] : null;
+            if (!group) return;
+            const items = getFilteredCategoryItems(category);
+            if (!items) return;
+            const itemIds = items.map(i => i.id);
+            const allSelected = itemIds.length > 0 && itemIds.every(id => selectedTransactionIds.value && selectedTransactionIds.value.includes(id));
 
             if (allSelected) {
-                selectedTransactionIds.value = selectedTransactionIds.value.filter(id => !groupIds.includes(id));
+                selectedTransactionIds.value = selectedTransactionIds.value.filter(id => !itemIds.includes(id));
             } else {
-                groupIds.forEach(id => {
+                itemIds.forEach(id => {
                     if (!selectedTransactionIds.value.includes(id)) {
                         selectedTransactionIds.value.push(id);
                     }
@@ -6236,6 +6324,9 @@ createApp({
             deleteLock,
             updateLockStatus,
             createBillFromLocks,
+            lockedBillPrice,
+            currentBillLocks,
+            cancelLockBill,
             showAuth,
             readCardLoading,
             readIdCard,
@@ -6431,6 +6522,10 @@ createApp({
             selectedStats,
             loadDeliveryData,
             toggleSelectAllCategory,
+            unsentCategorySearch,
+            getFilteredCategoryItems,
+            quickTickCategorySearch,
+            getCategorySelectAllLabel,
             createIngot,
             markAsShowcase,
             markAsOther,
