@@ -5050,7 +5050,8 @@ createApp({
             let rawWeight = 0;
 
             selected.forEach(ing => {
-                totalCost += Number(ing.total_cost) || 0;
+                const ingotCost = ing.total_cost != null ? Number(ing.total_cost) : (ing.cost != null ? Number(ing.cost) : (ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0));
+                totalCost += ingotCost;
                 if (ing.transactions) {
                     ing.transactions.forEach(t => {
                         const w = Number(t.weight) || 0;
@@ -5081,6 +5082,95 @@ createApp({
                 selectedCompletedIngotIds.value = completedIngots.value.map(ing => ing.id);
             }
         };
+
+        // --- Silver Storage State & Computed ---
+        const ingotViewTab = ref('delivery'); // 'delivery' | 'storage'
+        const storedSilverIngots = computed(() => pendingIngots.value.filter(ing => ing.status === 'stored'));
+        const selectedStoredIngotIds = ref([]);
+
+        const totalStoredSilverWeight = computed(() => {
+            return storedSilverIngots.value.reduce((sum, ing) => sum + (Number(ing.melted_weight) || 0), 0);
+        });
+
+        const totalStoredSilverCost = computed(() => {
+            return storedSilverIngots.value.reduce((sum, ing) => sum + (Number(ing.total_cost != null ? ing.total_cost : (ing.cost || 0))), 0);
+        });
+
+        const avgStoredSilverPercent = computed(() => {
+            const list = storedSilverIngots.value;
+            if (list.length === 0) return 0;
+            let sumWP = 0;
+            let sumW = 0;
+            list.forEach(ing => {
+                const w = Number(ing.melted_weight) || 0;
+                const p = Number(ing.melted_percent) || 0;
+                sumW += w;
+                sumWP += (w * p);
+            });
+            return sumW > 0 ? (sumWP / sumW) : 0;
+        });
+
+        const avgStoredSilverBasePrice = computed(() => {
+            const list = storedSilverIngots.value;
+            if (list.length === 0) return 0;
+            let sumWBP = 0;
+            let sumW = 0;
+            list.forEach(ing => {
+                if (ing.transactions) {
+                    ing.transactions.forEach(t => {
+                        const w = Number(t.weight) || 0;
+                        const bp = Number(t.base_price) || 0;
+                        sumW += w;
+                        sumWBP += (w * bp);
+                    });
+                }
+            });
+            return sumW > 0 ? (sumWBP / sumW) : 0;
+        });
+
+        const selectedStoredIngotsStats = computed(() => {
+            const selected = storedSilverIngots.value.filter(ing => selectedStoredIngotIds.value.includes(ing.id));
+            if (selected.length === 0) return null;
+            
+            let totalWeight = 0;
+            let totalCost = 0;
+            let totalWBP = 0;
+            let totalWP = 0;
+            let rawWeight = 0;
+
+            selected.forEach(ing => {
+                const ingotCost = ing.total_cost != null ? Number(ing.total_cost) : (ing.cost != null ? Number(ing.cost) : (ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0));
+                totalCost += ingotCost;
+                if (ing.transactions) {
+                    ing.transactions.forEach(t => {
+                        const w = Number(t.weight) || 0;
+                        const p = Number(t.percent) || 0;
+                        const bp = Number(t.base_price) || 0;
+                        rawWeight += w;
+                        totalWP += (w * p);
+                        totalWBP += (w * bp);
+                    });
+                }
+                totalWeight += Number(ing.melted_weight) || 0;
+            });
+
+            return {
+                count: selected.length,
+                totalWeight: totalWeight,
+                rawWeight: rawWeight,
+                avgPercent: rawWeight > 0 ? (totalWP / rawWeight) : 0,
+                avgBasePrice: rawWeight > 0 ? (totalWBP / rawWeight) : 0,
+                totalCost: totalCost
+            };
+        });
+
+        const toggleSelectAllStoredIngots = () => {
+            if (selectedStoredIngotIds.value.length === storedSilverIngots.value.length) {
+                selectedStoredIngotIds.value = [];
+            } else {
+                selectedStoredIngotIds.value = storedSilverIngots.value.map(ing => ing.id);
+            }
+        };
         const deliveryRoundsHistory = ref([]);
         const historyViewTab = ref('normal');
 
@@ -5105,7 +5195,8 @@ createApp({
             let rawWeight = 0;
 
             selected.forEach(ing => {
-                totalCost += Number(ing.total_cost) || 0;
+                const ingotCost = ing.total_cost != null ? Number(ing.total_cost) : (ing.cost != null ? Number(ing.cost) : (ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0));
+                totalCost += ingotCost;
                 
                 if (ing.transactions) {
                     ing.transactions.forEach(t => {
@@ -5229,8 +5320,10 @@ createApp({
                 const { data: pending } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight, percent, base_price)').is('round_id', null).order('created_at', { ascending: true });
                 if (pending) {
                     pending.forEach(ing => {
-                        ing.total_cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
-                        ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
+                        const cost = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0;
+                        ing.total_cost = cost;
+                        ing.cost = cost;
+                        ing.raw_weight = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0) : 0;
                         let sumW = 0, sumWP = 0, sumWBP = 0;
                         ing.transactions.forEach(t => {
                             const w = Number(t.weight) || 0;
@@ -5257,8 +5350,10 @@ createApp({
                 if (isAdmin.value) {
                     let roundsQuery = supabase.from('delivery_rounds').select('*, delivery_ingots(*, transactions(net_price, weight, percent, base_price))').order('created_at', { ascending: false });
 
-                    if (historyStatusFilter.value !== 'all') {
-                        roundsQuery = roundsQuery.eq('status', historyStatusFilter.value);
+                    if (historyStatusFilter.value === 'completed') {
+                        roundsQuery = roundsQuery.eq('status', 'completed');
+                    } else if (historyStatusFilter.value === 'pending' || historyStatusFilter.value === 'waiting_transfer' || historyStatusFilter.value === 'no_payment') {
+                        roundsQuery = roundsQuery.in('status', ['pending', 'gold_completed', 'silver_completed']);
                     }
 
                     let epQuery = supabase.from('extra_profits').select('amount');
@@ -5297,8 +5392,13 @@ createApp({
 
                     const [roundsRes, epRes] = await Promise.all([roundsQuery, epQuery]);
 
-                    const rounds = roundsRes.data;
+                    let rounds = roundsRes.data;
                     if (rounds) {
+                        if (historyStatusFilter.value === 'waiting_transfer') {
+                            rounds = rounds.filter(r => r.status !== 'completed' && (Number(r.gold_payment || 0) > 0 || Number(r.silver_payment || 0) > 0));
+                        } else if (historyStatusFilter.value === 'no_payment') {
+                            rounds = rounds.filter(r => r.status === 'pending' && Number(r.gold_payment || 0) === 0 && Number(r.silver_payment || 0) === 0);
+                        }
                         rounds.forEach(r => {
                             let totalCost = 0;
                             let goldCost = 0;
@@ -5310,9 +5410,10 @@ createApp({
                             let goldRawWeightSum = 0;
                             let silverRawWeightSum = 0;
                             r.delivery_ingots.forEach(ing => {
-                                const cost = ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0);
+                                const cost = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0;
                                 ing.cost = cost;
-                                ing.raw_weight = ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0);
+                                ing.total_cost = cost;
+                                ing.raw_weight = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0) : 0;
                                 let sumW = 0, sumWP = 0;
                                 let ingBaseSum = 0;
                                 let ingRawWeightSum = 0;
@@ -5471,7 +5572,7 @@ createApp({
 
         const historyGoldProfit = computed(() => {
             return deliveryRoundsHistory.value.reduce((sum, r) => {
-                if (r.status === 'completed') {
+                if (r.status === 'completed' || r.status === 'gold_completed') {
                     return sum + (Number(r.gold_payment || 0) - Number(r.gold_cost || 0));
                 }
                 return sum;
@@ -5480,7 +5581,7 @@ createApp({
 
         const historySilverProfit = computed(() => {
             return deliveryRoundsHistory.value.reduce((sum, r) => {
-                if (r.status === 'completed') {
+                if (r.status === 'completed' || r.status === 'silver_completed') {
                     return sum + (Number(r.silver_payment || 0) - Number(r.silver_cost || 0));
                 }
                 return sum;
@@ -5666,7 +5767,7 @@ createApp({
 
             if (!weight || !percent) return;
 
-            const isSilver = ingot.category && ingot.category.includes('เงิน');
+            const isSilver = ingot.category && (ingot.category.includes('เงิน') || ingot.category === 'silver' || (ingot.transactions && ingot.transactions.some(t => t.type === 'silver')));
             let newCategory = 'silver';
             if (!isSilver) {
                 const p = parseFloat(percent);
@@ -5677,9 +5778,10 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
+                const newStatus = isSilver ? 'stored' : 'completed';
                 const { error: updateError } = await supabase.from('delivery_ingots').update({
                     category: newCategory,
-                    status: 'completed',
+                    status: newStatus,
                     melted_weight: parseFloat(weight),
                     melted_percent: parseFloat(percent)
                 }).eq('id', ingot.id);
@@ -5687,6 +5789,10 @@ createApp({
                 if (updateError) throw updateError;
 
                 await loadDeliveryData();
+                if (isSilver) {
+                    ingotViewTab.value = 'storage';
+                    await showAppModal('alert', 'หลอมก้อนเงินสำเร็จ', 'บันทึกก้อนเงินเข้า "คลังก้อนเงินจัดเก็บ" เรียบร้อยแล้ว\n\nสามารถเลือกจัดส่งสมาคมได้ในภายหลัง');
+                }
             } catch (err) {
                 console.error("Error completing melting:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
@@ -5887,6 +5993,198 @@ createApp({
             }
         };
 
+        const revertIngotToMelting = async (ingot) => {
+            const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ต้องการนำก้อนหลอมนี้กลับไปเป็นก้อนกำลังหลอมใช่หรือไม่?');
+            if (!confirmed) return;
+            loadingDeliveryData.value = true;
+            try {
+                const ingotId = typeof ingot === 'object' ? ingot.id : ingot;
+                let isSilver = false;
+                if (typeof ingot === 'object') {
+                    isSilver = ingot.category === 'silver' || (ingot.category && ingot.category.includes('เงิน')) || (ingot.transactions && ingot.transactions.some(t => t.type === 'silver'));
+                } else {
+                    const found = pendingIngots.value.find(i => i.id === ingotId);
+                    if (found) {
+                        isSilver = found.category === 'silver' || (found.category && found.category.includes('เงิน')) || (found.transactions && found.transactions.some(t => t.type === 'silver'));
+                    }
+                }
+
+                const revertCategory = isSilver ? 'กำลังหลอม (เงิน)' : 'กำลังหลอม (ทอง)';
+
+                const { error } = await supabase
+                    .from('delivery_ingots')
+                    .update({
+                        status: 'melting',
+                        category: revertCategory,
+                        melted_weight: null,
+                        melted_percent: null
+                    })
+                    .eq('id', ingotId);
+
+                if (error) throw error;
+
+                const idx = selectedCompletedIngotIds.value.indexOf(ingotId);
+                if (idx !== -1) {
+                    selectedCompletedIngotIds.value.splice(idx, 1);
+                }
+                const sIdx = selectedStoredIngotIds.value.indexOf(ingotId);
+                if (sIdx !== -1) {
+                    selectedStoredIngotIds.value.splice(sIdx, 1);
+                }
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error reverting ingot to melting:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        // --- Silver Storage Actions ---
+        const moveToStorage = async (ingot) => {
+            const confirmed = await showAppModal('confirm', 'ย้ายไปคลังจัดเก็บ', 'ต้องการย้ายก้อนเงินนี้เข้า "คลังก้อนเงินจัดเก็บ" เพื่อส่งสมาคมในภายหลังใช่หรือไม่?');
+            if (!confirmed) return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const ingotId = typeof ingot === 'object' ? ingot.id : ingot;
+                const { error } = await supabase.from('delivery_ingots').update({
+                    status: 'stored'
+                }).eq('id', ingotId);
+
+                if (error) throw error;
+
+                const idx = selectedCompletedIngotIds.value.indexOf(ingotId);
+                if (idx !== -1) selectedCompletedIngotIds.value.splice(idx, 1);
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'สำเร็จ', 'ย้ายก้อนเงินเข้าคลังจัดเก็บเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error("Error moving to storage:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const moveToDelivery = async (ingot) => {
+            let ids = [];
+            if (ingot && ingot.id) {
+                ids = [ingot.id];
+            } else if (Array.isArray(ingot)) {
+                ids = ingot;
+            } else if (selectedStoredIngotIds.value.length > 0) {
+                ids = [...selectedStoredIngotIds.value];
+            } else if (storedSilverIngots.value.length > 0) {
+                ids = storedSilverIngots.value.map(i => i.id);
+            }
+
+            if (ids.length === 0) {
+                await showAppModal('alert', 'แจ้งเตือน', 'กรุณาเลือกก้อนเงินที่ต้องการย้ายไปส่งสมาคม');
+                return;
+            }
+
+            const confirmed = await showAppModal('confirm', 'ย้ายไปรอส่งสมาคม', `ต้องการย้ายก้อนเงินจำนวน ${ids.length} ก้อน ไปยัง "ก้อนรอส่งสมาคม" ใช่หรือไม่?`);
+            if (!confirmed) return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_ingots').update({
+                    status: 'completed'
+                }).in('id', ids);
+
+                if (error) throw error;
+
+                selectedStoredIngotIds.value = selectedStoredIngotIds.value.filter(id => !ids.includes(id));
+
+                await loadDeliveryData();
+                ingotViewTab.value = 'delivery';
+                await showAppModal('alert', 'สำเร็จ', `ย้ายก้อนเงินจำนวน ${ids.length} ก้อน ไปยัง "ก้อนรอส่งสมาคม" เรียบร้อยแล้ว`);
+            } catch (err) {
+                console.error("Error moving to delivery:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const deliverSelectedStoredSilver = async () => {
+            const ingotsToSend = selectedStoredIngotIds.value.length > 0 ? 
+                storedSilverIngots.value.filter(i => selectedStoredIngotIds.value.includes(i.id)) : 
+                storedSilverIngots.value;
+
+            if (ingotsToSend.length === 0) {
+                await showAppModal('alert', 'แจ้งเตือน', 'ไม่มีก้อนเงินในคลังสำหรับจัดส่ง');
+                return;
+            }
+
+            const inputs = await showAppModal('prompt', 'จัดส่งก้อนเงินรอบนี้', `ต้องการส่งก้อนเงินจำนวน ${ingotsToSend.length} ก้อนไปยังสมาคม\n\nกรุณาเลือกวันที่จัดส่ง และชื่อผู้ส่ง:`, [
+                { label: 'วันที่จัดส่ง', type: 'date', defaultValue: new Date().toLocaleDateString('en-CA') },
+                { label: 'ชื่อผู้ส่ง', type: 'text', defaultValue: '' }
+            ]);
+
+            if (!inputs || inputs.length < 2) return;
+            const dateInput = inputs[0];
+            const senderName = inputs[1] || '';
+            if (!dateInput) return;
+
+            let createdAtIso = new Date().toISOString();
+            if (dateInput) {
+                const dateObj = new Date(dateInput);
+                const now = new Date();
+                dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+                createdAtIso = dateObj.toISOString();
+            }
+
+            loadingDeliveryData.value = true;
+            try {
+                const startOfDay = new Date(dateInput);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(dateInput);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const { data: existingRounds, error: existingError } = await supabase
+                    .from('delivery_rounds')
+                    .select('id')
+                    .gte('created_at', startOfDay.toISOString())
+                    .lte('created_at', endOfDay.toISOString())
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (existingError) throw existingError;
+
+                let targetRoundId;
+                if (existingRounds && existingRounds.length > 0) {
+                    targetRoundId = existingRounds[0].id;
+                    if (senderName) {
+                        await supabase.from('delivery_rounds').update({ sender_name: senderName }).eq('id', targetRoundId);
+                    }
+                } else {
+                    const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
+                        status: 'pending',
+                        created_at: createdAtIso,
+                        sender_name: senderName || null
+                    }]).select();
+                    if (roundError) throw roundError;
+                    targetRoundId = roundData[0].id;
+                }
+
+                const ingotIds = ingotsToSend.map(i => i.id);
+                const { error: updateError } = await supabase.from('delivery_ingots').update({
+                    round_id: targetRoundId,
+                    status: 'completed'
+                }).in('id', ingotIds);
+
+                if (updateError) throw updateError;
+
+                selectedStoredIngotIds.value = [];
+                await loadDeliveryData();
+                await showAppModal('alert', 'สำเร็จ', `สร้างรอบส่งสมาคมสำหรับก้อนเงินจำนวน ${ingotIds.length} ก้อน เรียบร้อยแล้ว`);
+            } catch (err) {
+                console.error("Error delivering stored silver:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
 
         const createDeliveryRound = async () => {
             if (completedIngots.value.length === 0) {
@@ -5968,12 +6266,245 @@ createApp({
             }
         };
 
-        const savePayment = async (roundId, goldAmount, silverAmount) => {
-            const gold = parseFloat(goldAmount) || 0;
-            const silver = parseFloat(silverAmount) || 0;
-            if (gold === 0 && silver === 0) {
-                if (!confirm('ยอดเงินเป็น 0 ยืนยันการบันทึกใช่หรือไม่?')) return;
+        const getRoundCurrentGold = (round) => {
+            if (round.inputGold !== '' && round.inputGold != null) return Number(round.inputGold) || 0;
+            return Number(round.gold_payment) || 0;
+        };
+
+        const getRoundCurrentSilver = (round) => {
+            if (round.inputSilver !== '' && round.inputSilver != null) return Number(round.inputSilver) || 0;
+            return Number(round.silver_payment) || 0;
+        };
+
+        const roundHasGold = (round) => {
+            return Number(round.gold_weight_grams || 0) > 0 || Number(round.gold_cost || 0) > 0 || (round.delivery_ingots && round.delivery_ingots.some(i => i.category !== 'silver'));
+        };
+
+        const roundHasSilver = (round) => {
+            return Number(round.silver_weight_grams || 0) > 0 || Number(round.silver_cost || 0) > 0 || (round.delivery_ingots && round.delivery_ingots.some(i => i.category === 'silver'));
+        };
+
+        const isGoldCompleted = (round) => {
+            return round.status === 'completed' || round.status === 'gold_completed';
+        };
+
+        const isSilverCompleted = (round) => {
+            return round.status === 'completed' || round.status === 'silver_completed';
+        };
+
+        const isRoundFullyCompleted = (round) => {
+            const hasGld = roundHasGold(round);
+            const hasSilv = roundHasSilver(round);
+            if (hasGld && hasSilv) return isGoldCompleted(round) && isSilverCompleted(round);
+            if (hasGld) return isGoldCompleted(round);
+            if (hasSilv) return isSilverCompleted(round);
+            return round.status === 'completed';
+        };
+
+        // --- Gold Actions ---
+        const saveDraftGold = async (round) => {
+            const gold = round.inputGold !== '' && round.inputGold != null ? (parseFloat(round.inputGold) || 0) : 0;
+            if (gold === 0) {
+                const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ยอดทองเป็น 0 ยืนยันการบันทึกใช่หรือไม่?');
+                if (!confirmed) return;
             }
+
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_rounds').update({
+                    gold_payment: gold
+                }).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกยอดทองเรียบร้อยแล้ว (สถานะ: รอเงินโอน)');
+            } catch (err) {
+                console.error("Error saving draft gold:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const confirmGoldReceived = async (round) => {
+            const gold = round.inputGold !== '' && round.inputGold != null ? (parseFloat(round.inputGold) || 0) : (Number(round.gold_payment) || 0);
+
+            const confirmed = await showAppModal('confirm', 'ยืนยันรับเงินโอนค่าทอง', `ยืนยันว่าสมาคมโอนเงินค่าทองเข้าบัญชีเรียบร้อยแล้วใช่หรือไม่?\n\nยอดเงินทอง: ${formatCurrency(gold)} ฿`);
+            if (!confirmed) return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const hasSilv = roundHasSilver(round);
+                const silvDone = isSilverCompleted(round);
+                const newStatus = (!hasSilv || silvDone) ? 'completed' : 'gold_completed';
+
+                const updatePayload = {
+                    gold_payment: gold,
+                    status: newStatus
+                };
+                if (newStatus === 'completed') {
+                    updatePayload.completed_at = new Date().toISOString();
+                }
+
+                const { error } = await supabase.from('delivery_rounds').update(updatePayload).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'ปิดยอดทองสำเร็จ', 'ปิดยอดทองและบันทึกกำไรทองเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error("Error confirming gold payment:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const updateCompletedGold = async (round) => {
+            const gold = round.inputGold !== '' && round.inputGold != null ? (parseFloat(round.inputGold) || 0) : (Number(round.gold_payment) || 0);
+
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_rounds').update({
+                    gold_payment: gold
+                }).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'สำเร็จ', 'อัปเดตยอดเงินทองเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error("Error updating gold payment:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const revertGoldToPending = async (round) => {
+            const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ต้องการเปลี่ยนสถานะยอดทองกลับไปเป็น "รอเงินโอน" ใช่หรือไม่?');
+            if (!confirmed) return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const silvDone = isSilverCompleted(round);
+                const newStatus = silvDone ? 'silver_completed' : 'pending';
+
+                const { error } = await supabase.from('delivery_rounds').update({
+                    status: newStatus,
+                    completed_at: null
+                }).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error reverting gold status:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        // --- Silver Actions ---
+        const saveDraftSilver = async (round) => {
+            const silver = round.inputSilver !== '' && round.inputSilver != null ? (parseFloat(round.inputSilver) || 0) : 0;
+            if (silver === 0) {
+                const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ยอดเงินเป็น 0 ยืนยันการบันทึกใช่หรือไม่?');
+                if (!confirmed) return;
+            }
+
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_rounds').update({
+                    silver_payment: silver
+                }).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'สำเร็จ', 'บันทึกยอดเงินเรียบร้อยแล้ว (สถานะ: รอเงินโอน)');
+            } catch (err) {
+                console.error("Error saving draft silver:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const confirmSilverReceived = async (round) => {
+            const silver = round.inputSilver !== '' && round.inputSilver != null ? (parseFloat(round.inputSilver) || 0) : (Number(round.silver_payment) || 0);
+
+            const confirmed = await showAppModal('confirm', 'ยืนยันรับเงินโอนค่าเงิน', `ยืนยันว่าสมาคมโอนเงินค่าเงินเข้าบัญชีเรียบร้อยแล้วใช่หรือไม่?\n\nยอดเงินเงิน: ${formatCurrency(silver)} ฿`);
+            if (!confirmed) return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const hasGld = roundHasGold(round);
+                const gldDone = isGoldCompleted(round);
+                const newStatus = (!hasGld || gldDone) ? 'completed' : 'silver_completed';
+
+                const updatePayload = {
+                    silver_payment: silver,
+                    status: newStatus
+                };
+                if (newStatus === 'completed') {
+                    updatePayload.completed_at = new Date().toISOString();
+                }
+
+                const { error } = await supabase.from('delivery_rounds').update(updatePayload).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'ปิดยอดเงินสำเร็จ', 'ปิดยอดเงินและบันทึกกำไรเงินเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error("Error confirming silver payment:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const updateCompletedSilver = async (round) => {
+            const silver = round.inputSilver !== '' && round.inputSilver != null ? (parseFloat(round.inputSilver) || 0) : (Number(round.silver_payment) || 0);
+
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_rounds').update({
+                    silver_payment: silver
+                }).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'สำเร็จ', 'อัปเดตยอดเงินเงินเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error("Error updating silver payment:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const revertSilverToPending = async (round) => {
+            const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ต้องการเปลี่ยนสถานะยอดเงินกลับไปเป็น "รอเงินโอน" ใช่หรือไม่?');
+            if (!confirmed) return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const gldDone = isGoldCompleted(round);
+                const newStatus = gldDone ? 'gold_completed' : 'pending';
+
+                const { error } = await supabase.from('delivery_rounds').update({
+                    status: newStatus,
+                    completed_at: null
+                }).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+            } catch (err) {
+                console.error("Error reverting silver status:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        // --- Combined Actions ---
+        const confirmAllReceived = async (round) => {
+            const gold = round.inputGold !== '' && round.inputGold != null ? (parseFloat(round.inputGold) || 0) : (Number(round.gold_payment) || 0);
+            const silver = round.inputSilver !== '' && round.inputSilver != null ? (parseFloat(round.inputSilver) || 0) : (Number(round.silver_payment) || 0);
+            const total = gold + silver;
+
+            const confirmed = await showAppModal('confirm', 'ยืนยันรับเงินโอนทั้งหมด', `ยืนยันว่าสมาคมโอนเงินเข้าบัญชีครบทั้งทองและเงินเรียบร้อยแล้วใช่หรือไม่?\n\n- ยอดทอง: ${formatCurrency(gold)} ฿\n- ยอดเงิน: ${formatCurrency(silver)} ฿\n- รวมทั้งสิ้น: ${formatCurrency(total)} ฿`);
+            if (!confirmed) return;
 
             loadingDeliveryData.value = true;
             try {
@@ -5982,15 +6513,58 @@ createApp({
                     silver_payment: silver,
                     status: 'completed',
                     completed_at: new Date().toISOString()
-                }).eq('id', roundId);
+                }).eq('id', round.id);
+                if (error) throw error;
+
+                await loadDeliveryData();
+                await showAppModal('alert', 'ปิดยอดสำเร็จ', 'ปิดยอดครบทั้งทองและเงินเรียบร้อยแล้ว');
+            } catch (err) {
+                console.error("Error confirming all payments:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
+                loadingDeliveryData.value = false;
+            }
+        };
+
+        const saveDraftPayment = async (round) => {
+            await saveDraftGold(round);
+            if (roundHasSilver(round)) {
+                await saveDraftSilver(round);
+            }
+        };
+
+        const confirmPaymentReceived = async (round) => {
+            return confirmAllReceived(round);
+        };
+
+        const updateCompletedPayment = async (round) => {
+            await updateCompletedGold(round);
+            if (roundHasSilver(round)) {
+                await updateCompletedSilver(round);
+            }
+        };
+
+        const revertPaymentToPending = async (round) => {
+            const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ต้องการเปลี่ยนสถานะกลับไปเป็น "รอเงินโอน" ทั้งหมดใช่หรือไม่?');
+            if (!confirmed) return;
+
+            loadingDeliveryData.value = true;
+            try {
+                const { error } = await supabase.from('delivery_rounds').update({
+                    status: 'pending',
+                    completed_at: null
+                }).eq('id', round.id);
                 if (error) throw error;
 
                 await loadDeliveryData();
             } catch (err) {
-                console.error("Error saving payment:", err);
-                alert('เกิดข้อผิดพลาด: ' + err.message);
+                console.error("Error reverting payment status:", err);
+                await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
                 loadingDeliveryData.value = false;
             }
+        };
+
+        const savePayment = async (roundId, goldAmount, silverAmount) => {
+            return confirmAllReceived({ id: roundId, inputGold: goldAmount, inputSilver: silverAmount });
         };
 
         const deleteDeliveryRound = async (roundId) => {
@@ -6500,6 +7074,20 @@ createApp({
             selectedCompletedIngotIds,
             selectedCompletedIngotsStats,
             toggleSelectAllCompletedIngots,
+
+            ingotViewTab,
+            storedSilverIngots,
+            selectedStoredIngotIds,
+            totalStoredSilverWeight,
+            totalStoredSilverCost,
+            avgStoredSilverPercent,
+            avgStoredSilverBasePrice,
+            selectedStoredIngotsStats,
+            toggleSelectAllStoredIngots,
+            moveToStorage,
+            moveToDelivery,
+            deliverSelectedStoredSilver,
+
             selectedHistoryIngotIds,
             selectedHistoryIngotsStats,
             completeMelting,
@@ -6532,8 +7120,29 @@ createApp({
             removeFromShowcase,
             markAsSoldFromShowcase,
             deleteIngot,
+            revertIngotToMelting,
             createDeliveryRound,
             savePayment,
+            saveDraftPayment,
+            confirmPaymentReceived,
+            updateCompletedPayment,
+            revertPaymentToPending,
+            getRoundCurrentGold,
+            getRoundCurrentSilver,
+            roundHasGold,
+            roundHasSilver,
+            isGoldCompleted,
+            isSilverCompleted,
+            isRoundFullyCompleted,
+            saveDraftGold,
+            confirmGoldReceived,
+            updateCompletedGold,
+            revertGoldToPending,
+            saveDraftSilver,
+            confirmSilverReceived,
+            updateCompletedSilver,
+            revertSilverToPending,
+            confirmAllReceived,
             deleteDeliveryRound,
             returnIngotToPending,
 
