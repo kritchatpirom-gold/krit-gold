@@ -27,7 +27,9 @@ const floor1 = (v) => {
 
 createApp({
     setup() {
-        const currentTab = ref('home');
+        const initialHash = window.location.hash.replace('#', '');
+        const validTabsList = ['home', 'history', 'settings', 'delivery', 'calculator'];
+        const currentTab = ref(validTabsList.includes(initialHash) ? initialHash : 'home');
         const user = ref(null);
         const showAuth = ref(false);
         const authForm = ref({ email: '', password: '' });
@@ -4912,7 +4914,7 @@ createApp({
 
         const syncHashToTab = () => {
             const hash = window.location.hash.replace('#', '');
-            const validTabs = ['home', 'history', 'settings'];
+            const validTabs = ['home', 'history', 'settings', 'delivery', 'calculator'];
             if (validTabs.includes(hash)) {
                 currentTab.value = hash;
             } else if (!window.location.hash) {
@@ -5171,6 +5173,71 @@ createApp({
                 selectedStoredIngotIds.value = storedSilverIngots.value.map(ing => ing.id);
             }
         };
+
+        // --- Delivery Undo Stack & Toast State ---
+        const deliveryUndoStack = ref([]);
+        const activeUndoToast = ref(null);
+        const showUndoHistoryMenu = ref(false);
+        let undoToastTimeout = null;
+
+        const pushDeliveryUndo = (action) => {
+            const undoItem = {
+                id: Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+                type: action.type,
+                title: action.title,
+                undo: action.undo,
+                timestamp: new Date()
+            };
+            deliveryUndoStack.value.push(undoItem);
+            if (deliveryUndoStack.value.length > 20) {
+                deliveryUndoStack.value.shift();
+            }
+            showUndoToast(undoItem);
+        };
+
+        const showUndoToast = (action) => {
+            if (undoToastTimeout) clearTimeout(undoToastTimeout);
+            activeUndoToast.value = action;
+            undoToastTimeout = setTimeout(() => {
+                if (activeUndoToast.value && activeUndoToast.value.id === action.id) {
+                    activeUndoToast.value = null;
+                }
+            }, 12000);
+        };
+
+        const dismissUndoToast = () => {
+            if (undoToastTimeout) clearTimeout(undoToastTimeout);
+            activeUndoToast.value = null;
+        };
+
+        const executeDeliveryUndo = async (actionToUndo = null) => {
+            let action = actionToUndo;
+            if (!action) {
+                if (deliveryUndoStack.value.length === 0) return;
+                action = deliveryUndoStack.value.pop();
+            } else {
+                const idx = deliveryUndoStack.value.findIndex(a => a.id === action.id);
+                if (idx !== -1) deliveryUndoStack.value.splice(idx, 1);
+            }
+            if (!action) return;
+
+            if (activeUndoToast.value && activeUndoToast.value.id === action.id) {
+                dismissUndoToast();
+            }
+
+            loadingDeliveryData.value = true;
+            try {
+                await action.undo();
+                await loadDeliveryData();
+                await showAppModal('alert', 'ย้อนกลับสำเร็จ', `ย้อนกลับการกระทำ "${action.title}" เรียบร้อยแล้ว`);
+            } catch (err) {
+                console.error("Undo error:", err);
+                await showAppModal('alert', 'เกิดข้อผิดพลาดในการย้อนกลับ', err.message);
+            } finally {
+                loadingDeliveryData.value = false;
+            }
+        };
+
         const deliveryRoundsHistory = ref([]);
         const historyViewTab = ref('normal');
 
@@ -5261,6 +5328,19 @@ createApp({
 
         const extraProfitSumForHistoryPeriod = ref(0);
 
+        const isSilverIngot = (ing) => {
+            if (!ing) return false;
+            if (ing.category === 'silver') return true;
+            if (typeof ing.category === 'string' && (ing.category.includes('เงิน') || ing.category.toLowerCase().includes('silver'))) return true;
+            if (ing.transactions && ing.transactions.length > 0 && ing.transactions.every(t => t.type === 'silver')) return true;
+            return false;
+        };
+
+        const isGoldIngot = (ing) => {
+            if (!ing) return false;
+            return !isSilverIngot(ing);
+        };
+
         const loadDeliveryData = async () => {
             loadingDeliveryData.value = true;
             try {
@@ -5337,8 +5417,8 @@ createApp({
                         ing.avg_base_price = sumW > 0 ? (sumWBP / sumW) : 0;
                     });
                     pending.sort((a, b) => {
-                        const isASilver = a.category === 'silver';
-                        const isBSilver = b.category === 'silver';
+                        const isASilver = isSilverIngot(a);
+                        const isBSilver = isSilverIngot(b);
                         if (isASilver && !isBSilver) return 1;
                         if (!isASilver && isBSilver) return -1;
                         return 0;
@@ -5410,6 +5490,7 @@ createApp({
                             let goldRawWeightSum = 0;
                             let silverRawWeightSum = 0;
                             r.delivery_ingots.forEach(ing => {
+                                const isSilver = isSilverIngot(ing);
                                 const cost = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0;
                                 ing.cost = cost;
                                 ing.total_cost = cost;
@@ -5425,7 +5506,7 @@ createApp({
                                     sumWP += (w * p);
                                     ingBaseSum += (bp * w);
                                     ingRawWeightSum += w;
-                                    if (ing.category === 'silver') {
+                                    if (isSilver) {
                                         silverBaseSum += (bp * w);
                                         silverRawWeightSum += w;
                                     } else {
@@ -5436,7 +5517,7 @@ createApp({
                                 ing.avg_percent = sumW > 0 ? (sumWP / sumW) : 0;
                                 ing.avg_base_price = ingRawWeightSum > 0 ? (ingBaseSum / ingRawWeightSum) : 0;
                                 totalCost += cost;
-                                if (ing.category === 'silver') {
+                                if (isSilver) {
                                     silverCost += cost;
                                     silverWeightGrams += Number(ing.melted_weight) || 0;
                                 } else {
@@ -5445,8 +5526,8 @@ createApp({
                                 }
                             });
                             r.delivery_ingots.sort((a, b) => {
-                                const isASilver = a.category === 'silver';
-                                const isBSilver = b.category === 'silver';
+                                const isASilver = isSilverIngot(a);
+                                const isBSilver = isSilverIngot(b);
                                 if (isASilver && !isBSilver) return 1;
                                 if (!isASilver && isBSilver) return -1;
                                 return 0;
@@ -5739,10 +5820,21 @@ createApp({
                 const newIngotId = ingotData[0].id;
 
                 // Update transactions
-                const { error: txError } = await supabase.from('transactions').update({ ingot_id: newIngotId }).in('id', selectedTransactionIds.value);
+                const txIds = [...selectedTransactionIds.value];
+                const { error: txError } = await supabase.from('transactions').update({ ingot_id: newIngotId }).in('id', txIds);
                 if (txError) throw txError;
 
+                selectedTransactionIds.value = [];
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'create_ingot',
+                    title: `หลอมรายการ (${txIds.length} รายการ)`,
+                    undo: async () => {
+                        await supabase.from('transactions').update({ ingot_id: null }).in('id', txIds);
+                        await supabase.from('delivery_ingots').delete().eq('id', newIngotId);
+                    }
+                });
             } catch (err) {
                 console.error("Error creating ingot:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
@@ -5776,6 +5868,12 @@ createApp({
                 else newCategory = 'gold_20_29';
             }
 
+            const prevStatus = ingot.status || 'melting';
+            const prevCategory = ingot.category;
+            const prevWeight = ingot.melted_weight;
+            const prevPercent = ingot.melted_percent;
+            const targetId = ingot.id;
+
             loadingDeliveryData.value = true;
             try {
                 const newStatus = isSilver ? 'stored' : 'completed';
@@ -5789,6 +5887,20 @@ createApp({
                 if (updateError) throw updateError;
 
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'complete_melting',
+                    title: `หลอมเสร็จ: ${ingot.category || (isSilver ? 'ก้อนเงิน' : 'ก้อนทอง')} (${parseFloat(weight)}g)`,
+                    undo: async () => {
+                        await supabase.from('delivery_ingots').update({
+                            category: prevCategory,
+                            status: prevStatus,
+                            melted_weight: prevWeight,
+                            melted_percent: prevPercent
+                        }).eq('id', targetId);
+                    }
+                });
+
                 if (isSilver) {
                     ingotViewTab.value = 'storage';
                     await showAppModal('alert', 'หลอมก้อนเงินสำเร็จ', 'บันทึกก้อนเงินเข้า "คลังก้อนเงินจัดเก็บ" เรียบร้อยแล้ว\n\nสามารถเลือกจัดส่งสมาคมได้ในภายหลัง');
@@ -5812,15 +5924,26 @@ createApp({
 
             if (typeof productName !== 'string') return;
 
+            const targetTxIds = [...selectedTransactionIds.value];
+
             loadingDeliveryData.value = true;
             try {
                 const updateData = { in_showcase: true };
                 if (productName.trim() !== '') {
                     updateData.details = productName.trim();
                 }
-                const { error } = await supabase.from('transactions').update(updateData).in('id', selectedTransactionIds.value);
+                const { error } = await supabase.from('transactions').update(updateData).in('id', targetTxIds);
                 if (error) throw error;
+                selectedTransactionIds.value = [];
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'mark_as_showcase',
+                    title: `เก็บเข้าตู้โชว์ (${targetTxIds.length} รายการ)`,
+                    undo: async () => {
+                        await supabase.from('transactions').update({ in_showcase: false, details: null }).in('id', targetTxIds);
+                    }
+                });
             } catch (err) {
                 console.error("Error setting showcase:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
@@ -5967,11 +6090,21 @@ createApp({
             const confirmed = await showAppModal('confirm', 'ยืนยัน', `ต้องการย้ายรายการที่เลือกจำนวน ${selectedTransactionIds.value.length} รายการกลับไปคิวรอหลอม ใช่หรือไม่?`);
             if (!confirmed) return;
 
+            const targetTxIds = [...selectedTransactionIds.value];
             loadingDeliveryData.value = true;
             try {
-                const { error } = await supabase.from('transactions').update({ in_showcase: false }).in('id', selectedTransactionIds.value);
+                const { error } = await supabase.from('transactions').update({ in_showcase: false }).in('id', targetTxIds);
                 if (error) throw error;
+                selectedTransactionIds.value = [];
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'remove_from_showcase',
+                    title: `ย้ายกลับจากตู้โชว์ (${targetTxIds.length} รายการ)`,
+                    undo: async () => {
+                        await supabase.from('transactions').update({ in_showcase: true }).in('id', targetTxIds);
+                    }
+                });
             } catch (err) {
                 console.error("Error restoring from showcase:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
@@ -5982,11 +6115,37 @@ createApp({
         const deleteIngot = async (ingotId) => {
             const confirmed = await showAppModal('confirm', 'ยืนยัน', 'ต้องการลบก้อนนี้และคืนของเข้าสต็อกใช่หรือไม่?');
             if (!confirmed) return;
+
+            const found = pendingIngots.value.find(i => i.id === ingotId) || meltingIngots.value.find(i => i.id === ingotId);
             loadingDeliveryData.value = true;
             try {
+                const { data: linkedTxs } = await supabase.from('transactions').select('id').eq('ingot_id', ingotId);
+                const txIds = linkedTxs ? linkedTxs.map(t => t.id) : [];
+
                 const { error } = await supabase.from('delivery_ingots').delete().eq('id', ingotId);
                 if (error) throw error;
                 await loadDeliveryData();
+
+                if (found) {
+                    pushDeliveryUndo({
+                        type: 'delete_ingot',
+                        title: `ลบก้อนหลอม: ${found.category || 'ก้อนหลอม'}`,
+                        undo: async () => {
+                            await supabase.from('delivery_ingots').insert([{
+                                id: found.id,
+                                category: found.category,
+                                status: found.status || 'melting',
+                                melted_weight: found.melted_weight,
+                                melted_percent: found.melted_percent,
+                                round_id: found.round_id,
+                                created_at: found.created_at
+                            }]);
+                            if (txIds.length > 0) {
+                                await supabase.from('transactions').update({ ingot_id: found.id }).in('id', txIds);
+                            }
+                        }
+                    });
+                }
             } catch (err) {
                 console.error("Error deleting ingot:", err);
                 loadingDeliveryData.value = false;
@@ -6008,6 +6167,12 @@ createApp({
                         isSilver = found.category === 'silver' || (found.category && found.category.includes('เงิน')) || (found.transactions && found.transactions.some(t => t.type === 'silver'));
                     }
                 }
+
+                const targetIngot = typeof ingot === 'object' ? ingot : pendingIngots.value.find(i => i.id === ingotId);
+                const prevStatus = targetIngot && targetIngot.status ? targetIngot.status : 'completed';
+                const prevCategory = targetIngot ? targetIngot.category : (isSilver ? 'silver' : 'gold');
+                const prevWeight = targetIngot ? targetIngot.melted_weight : null;
+                const prevPercent = targetIngot ? targetIngot.melted_percent : null;
 
                 const revertCategory = isSilver ? 'กำลังหลอม (เงิน)' : 'กำลังหลอม (ทอง)';
 
@@ -6033,6 +6198,19 @@ createApp({
                 }
 
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'revert_ingot_to_melting',
+                    title: `ย้ายก้อนหลอมกลับไปเป็นกำลังหลอม`,
+                    undo: async () => {
+                        await supabase.from('delivery_ingots').update({
+                            status: prevStatus,
+                            category: prevCategory,
+                            melted_weight: prevWeight,
+                            melted_percent: prevPercent
+                        }).eq('id', ingotId);
+                    }
+                });
             } catch (err) {
                 console.error("Error reverting ingot to melting:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
@@ -6048,6 +6226,7 @@ createApp({
             loadingDeliveryData.value = true;
             try {
                 const ingotId = typeof ingot === 'object' ? ingot.id : ingot;
+                const prevStatus = typeof ingot === 'object' && ingot.status ? ingot.status : 'completed';
                 const { error } = await supabase.from('delivery_ingots').update({
                     status: 'stored'
                 }).eq('id', ingotId);
@@ -6058,6 +6237,17 @@ createApp({
                 if (idx !== -1) selectedCompletedIngotIds.value.splice(idx, 1);
 
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'move_to_storage',
+                    title: `ย้ายก้อนเงินเข้าคลังจัดเก็บ`,
+                    undo: async () => {
+                        await supabase.from('delivery_ingots').update({
+                            status: prevStatus
+                        }).eq('id', ingotId);
+                    }
+                });
+
                 await showAppModal('alert', 'สำเร็จ', 'ย้ายก้อนเงินเข้าคลังจัดเก็บเรียบร้อยแล้ว');
             } catch (err) {
                 console.error("Error moving to storage:", err);
@@ -6086,19 +6276,31 @@ createApp({
             const confirmed = await showAppModal('confirm', 'ย้ายไปรอส่งสมาคม', `ต้องการย้ายก้อนเงินจำนวน ${ids.length} ก้อน ไปยัง "ก้อนรอส่งสมาคม" ใช่หรือไม่?`);
             if (!confirmed) return;
 
+            const movedIds = [...ids];
             loadingDeliveryData.value = true;
             try {
                 const { error } = await supabase.from('delivery_ingots').update({
                     status: 'completed'
-                }).in('id', ids);
+                }).in('id', movedIds);
 
                 if (error) throw error;
 
-                selectedStoredIngotIds.value = selectedStoredIngotIds.value.filter(id => !ids.includes(id));
+                selectedStoredIngotIds.value = selectedStoredIngotIds.value.filter(id => !movedIds.includes(id));
 
                 await loadDeliveryData();
                 ingotViewTab.value = 'delivery';
-                await showAppModal('alert', 'สำเร็จ', `ย้ายก้อนเงินจำนวน ${ids.length} ก้อน ไปยัง "ก้อนรอส่งสมาคม" เรียบร้อยแล้ว`);
+
+                pushDeliveryUndo({
+                    type: 'move_to_delivery',
+                    title: `ย้ายก้อนเงิน ${movedIds.length} ก้อนไปรอส่งสมาคม`,
+                    undo: async () => {
+                        await supabase.from('delivery_ingots').update({
+                            status: 'stored'
+                        }).in('id', movedIds);
+                    }
+                });
+
+                await showAppModal('alert', 'สำเร็จ', `ย้ายก้อนเงินจำนวน ${movedIds.length} ก้อน ไปยัง "ก้อนรอส่งสมาคม" เรียบร้อยแล้ว`);
             } catch (err) {
                 console.error("Error moving to delivery:", err);
                 await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message);
@@ -6136,36 +6338,13 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
-                const startOfDay = new Date(dateInput);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(dateInput);
-                endOfDay.setHours(23, 59, 59, 999);
-
-                const { data: existingRounds, error: existingError } = await supabase
-                    .from('delivery_rounds')
-                    .select('id')
-                    .gte('created_at', startOfDay.toISOString())
-                    .lte('created_at', endOfDay.toISOString())
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (existingError) throw existingError;
-
-                let targetRoundId;
-                if (existingRounds && existingRounds.length > 0) {
-                    targetRoundId = existingRounds[0].id;
-                    if (senderName) {
-                        await supabase.from('delivery_rounds').update({ sender_name: senderName }).eq('id', targetRoundId);
-                    }
-                } else {
-                    const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
-                        status: 'pending',
-                        created_at: createdAtIso,
-                        sender_name: senderName || null
-                    }]).select();
-                    if (roundError) throw roundError;
-                    targetRoundId = roundData[0].id;
-                }
+                const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
+                    status: 'pending',
+                    created_at: createdAtIso,
+                    sender_name: senderName || null
+                }]).select();
+                if (roundError) throw roundError;
+                const targetRoundId = roundData[0].id;
 
                 const ingotIds = ingotsToSend.map(i => i.id);
                 const { error: updateError } = await supabase.from('delivery_ingots').update({
@@ -6177,6 +6356,20 @@ createApp({
 
                 selectedStoredIngotIds.value = [];
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'deliver_stored_silver',
+                    title: `จัดส่งก้อนเงินจากคลัง (${ingotIds.length} ก้อน)`,
+                    undo: async () => {
+                        await supabase.from('delivery_ingots').update({ round_id: null, status: 'stored' }).in('id', ingotIds);
+                        const { data: rem } = await supabase.from('delivery_ingots').select('id').eq('round_id', targetRoundId);
+                        if (!rem || rem.length === 0) {
+                            await supabase.from('delivery_rounds').delete().eq('id', targetRoundId);
+                        }
+                        await loadDeliveryData();
+                    }
+                });
+
                 await showAppModal('alert', 'สำเร็จ', `สร้างรอบส่งสมาคมสำหรับก้อนเงินจำนวน ${ingotIds.length} ก้อน เรียบร้อยแล้ว`);
             } catch (err) {
                 console.error("Error delivering stored silver:", err);
@@ -6214,38 +6407,13 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
-                // Check if a round exists on this date
-                const startOfDay = new Date(dateInput);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(dateInput);
-                endOfDay.setHours(23, 59, 59, 999);
-
-                const { data: existingRounds, error: existingError } = await supabase
-                    .from('delivery_rounds')
-                    .select('id')
-                    .gte('created_at', startOfDay.toISOString())
-                    .lte('created_at', endOfDay.toISOString())
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (existingError) throw existingError;
-
-                let targetRoundId;
-                if (existingRounds && existingRounds.length > 0) {
-                    targetRoundId = existingRounds[0].id;
-                    // Update sender_name if provided
-                    if (senderName) {
-                        await supabase.from('delivery_rounds').update({ sender_name: senderName }).eq('id', targetRoundId);
-                    }
-                } else {
-                    const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
-                        status: 'pending',
-                        created_at: createdAtIso,
-                        sender_name: senderName || null
-                    }]).select();
-                    if (roundError) throw roundError;
-                    targetRoundId = roundData[0].id;
-                }
+                const { data: roundData, error: roundError } = await supabase.from('delivery_rounds').insert([{
+                    status: 'pending',
+                    created_at: createdAtIso,
+                    sender_name: senderName || null
+                }]).select();
+                if (roundError) throw roundError;
+                const targetRoundId = roundData[0].id;
 
                 const ingotsToSend = selectedCompletedIngotIds.value.length > 0 ? 
                     completedIngots.value.filter(i => selectedCompletedIngotIds.value.includes(i.id)) : 
@@ -6259,6 +6427,19 @@ createApp({
                 if (updateError) throw updateError;
 
                 await loadDeliveryData();
+
+                pushDeliveryUndo({
+                    type: 'create_delivery_round',
+                    title: `สร้างรอบส่งสมาคม (${ingotIds.length} ก้อน)`,
+                    undo: async () => {
+                        await supabase.from('delivery_ingots').update({ round_id: null }).in('id', ingotIds);
+                        const { data: rem } = await supabase.from('delivery_ingots').select('id').eq('round_id', targetRoundId);
+                        if (!rem || rem.length === 0) {
+                            await supabase.from('delivery_rounds').delete().eq('id', targetRoundId);
+                        }
+                        await loadDeliveryData();
+                    }
+                });
             } catch (err) {
                 console.error("Error creating round:", err);
                 alert('เกิดข้อผิดพลาด: ' + err.message);
@@ -6277,11 +6458,25 @@ createApp({
         };
 
         const roundHasGold = (round) => {
-            return Number(round.gold_weight_grams || 0) > 0 || Number(round.gold_cost || 0) > 0 || (round.delivery_ingots && round.delivery_ingots.some(i => i.category !== 'silver'));
+            if (!round) return false;
+            if (Number(round.gold_payment || 0) > 0) return true;
+            if (Number(round.gold_weight_grams || 0) > 0) return true;
+            if (Number(round.gold_cost || 0) > 0) return true;
+            if (round.delivery_ingots && round.delivery_ingots.length > 0) {
+                return round.delivery_ingots.some(i => isGoldIngot(i));
+            }
+            return false;
         };
 
         const roundHasSilver = (round) => {
-            return Number(round.silver_weight_grams || 0) > 0 || Number(round.silver_cost || 0) > 0 || (round.delivery_ingots && round.delivery_ingots.some(i => i.category === 'silver'));
+            if (!round) return false;
+            if (Number(round.silver_payment || 0) > 0) return true;
+            if (Number(round.silver_weight_grams || 0) > 0) return true;
+            if (Number(round.silver_cost || 0) > 0) return true;
+            if (round.delivery_ingots && round.delivery_ingots.length > 0) {
+                return round.delivery_ingots.some(i => isSilverIngot(i));
+            }
+            return false;
         };
 
         const isGoldCompleted = (round) => {
@@ -6333,6 +6528,10 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
+                const prevStatus = round.status;
+                const prevGold = round.gold_payment;
+                const prevCompletedAt = round.completed_at;
+
                 const hasSilv = roundHasSilver(round);
                 const silvDone = isSilverCompleted(round);
                 const newStatus = (!hasSilv || silvDone) ? 'completed' : 'gold_completed';
@@ -6347,6 +6546,19 @@ createApp({
 
                 const { error } = await supabase.from('delivery_rounds').update(updatePayload).eq('id', round.id);
                 if (error) throw error;
+
+                pushDeliveryUndo({
+                    type: 'confirm_gold',
+                    title: `ยืนยันรับเงินทองรอบ ${round.round_code || round.id}`,
+                    undo: async () => {
+                        await supabase.from('delivery_rounds').update({
+                            status: prevStatus,
+                            gold_payment: prevGold,
+                            completed_at: prevCompletedAt
+                        }).eq('id', round.id);
+                        await loadDeliveryData();
+                    }
+                });
 
                 await loadDeliveryData();
                 await showAppModal('alert', 'ปิดยอดทองสำเร็จ', 'ปิดยอดทองและบันทึกกำไรทองเรียบร้อยแล้ว');
@@ -6382,6 +6594,9 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
+                const prevStatus = round.status;
+                const prevCompletedAt = round.completed_at;
+
                 const silvDone = isSilverCompleted(round);
                 const newStatus = silvDone ? 'silver_completed' : 'pending';
 
@@ -6390,6 +6605,18 @@ createApp({
                     completed_at: null
                 }).eq('id', round.id);
                 if (error) throw error;
+
+                pushDeliveryUndo({
+                    type: 'revert_gold',
+                    title: `เปลี่ยนสถานะยอดทองรอบ ${round.round_code || round.id} กลับไปรอโอน`,
+                    undo: async () => {
+                        await supabase.from('delivery_rounds').update({
+                            status: prevStatus,
+                            completed_at: prevCompletedAt
+                        }).eq('id', round.id);
+                        await loadDeliveryData();
+                    }
+                });
 
                 await loadDeliveryData();
             } catch (err) {
@@ -6431,6 +6658,10 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
+                const prevStatus = round.status;
+                const prevSilver = round.silver_payment;
+                const prevCompletedAt = round.completed_at;
+
                 const hasGld = roundHasGold(round);
                 const gldDone = isGoldCompleted(round);
                 const newStatus = (!hasGld || gldDone) ? 'completed' : 'silver_completed';
@@ -6445,6 +6676,19 @@ createApp({
 
                 const { error } = await supabase.from('delivery_rounds').update(updatePayload).eq('id', round.id);
                 if (error) throw error;
+
+                pushDeliveryUndo({
+                    type: 'confirm_silver',
+                    title: `ยืนยันรับเงินค่าเงินรอบ ${round.round_code || round.id}`,
+                    undo: async () => {
+                        await supabase.from('delivery_rounds').update({
+                            status: prevStatus,
+                            silver_payment: prevSilver,
+                            completed_at: prevCompletedAt
+                        }).eq('id', round.id);
+                        await loadDeliveryData();
+                    }
+                });
 
                 await loadDeliveryData();
                 await showAppModal('alert', 'ปิดยอดเงินสำเร็จ', 'ปิดยอดเงินและบันทึกกำไรเงินเรียบร้อยแล้ว');
@@ -6480,6 +6724,9 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
+                const prevStatus = round.status;
+                const prevCompletedAt = round.completed_at;
+
                 const gldDone = isGoldCompleted(round);
                 const newStatus = gldDone ? 'gold_completed' : 'pending';
 
@@ -6488,6 +6735,18 @@ createApp({
                     completed_at: null
                 }).eq('id', round.id);
                 if (error) throw error;
+
+                pushDeliveryUndo({
+                    type: 'revert_silver',
+                    title: `เปลี่ยนสถานะยอดเงินรอบ ${round.round_code || round.id} กลับไปรอโอน`,
+                    undo: async () => {
+                        await supabase.from('delivery_rounds').update({
+                            status: prevStatus,
+                            completed_at: prevCompletedAt
+                        }).eq('id', round.id);
+                        await loadDeliveryData();
+                    }
+                });
 
                 await loadDeliveryData();
             } catch (err) {
@@ -6508,6 +6767,11 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
+                const prevStatus = round.status;
+                const prevGold = round.gold_payment;
+                const prevSilver = round.silver_payment;
+                const prevCompletedAt = round.completed_at;
+
                 const { error } = await supabase.from('delivery_rounds').update({
                     gold_payment: gold,
                     silver_payment: silver,
@@ -6515,6 +6779,20 @@ createApp({
                     completed_at: new Date().toISOString()
                 }).eq('id', round.id);
                 if (error) throw error;
+
+                pushDeliveryUndo({
+                    type: 'confirm_all',
+                    title: `ยืนยันรับเงินครบทั้งทองและเงินรอบ ${round.round_code || round.id}`,
+                    undo: async () => {
+                        await supabase.from('delivery_rounds').update({
+                            gold_payment: prevGold,
+                            silver_payment: prevSilver,
+                            status: prevStatus,
+                            completed_at: prevCompletedAt
+                        }).eq('id', round.id);
+                        await loadDeliveryData();
+                    }
+                });
 
                 await loadDeliveryData();
                 await showAppModal('alert', 'ปิดยอดสำเร็จ', 'ปิดยอดครบทั้งทองและเงินเรียบร้อยแล้ว');
@@ -6549,11 +6827,26 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
+                const prevStatus = round.status;
+                const prevCompletedAt = round.completed_at;
+
                 const { error } = await supabase.from('delivery_rounds').update({
                     status: 'pending',
                     completed_at: null
                 }).eq('id', round.id);
                 if (error) throw error;
+
+                pushDeliveryUndo({
+                    type: 'revert_payment',
+                    title: `เปลี่ยนสถานะรอบ ${round.round_code || round.id} กลับไปรอเงินโอน`,
+                    undo: async () => {
+                        await supabase.from('delivery_rounds').update({
+                            status: prevStatus,
+                            completed_at: prevCompletedAt
+                        }).eq('id', round.id);
+                        await loadDeliveryData();
+                    }
+                });
 
                 await loadDeliveryData();
             } catch (err) {
@@ -6572,8 +6865,48 @@ createApp({
             if (!confirmed) return;
             loadingDeliveryData.value = true;
             try {
+                const { data: roundData } = await supabase.from('delivery_rounds').select('*').eq('id', roundId).single();
+                const { data: linkedIngots } = await supabase.from('delivery_ingots').select('*, transactions(id)').eq('round_id', roundId);
+                const linkedIngotIds = (linkedIngots || []).map(i => i.id);
+
+                // CRITICAL: Detach all linked ingots first so PostgreSQL CASCADE doesn't delete the ingots!
+                if (linkedIngotIds.length > 0) {
+                    const { error: detachError } = await supabase
+                        .from('delivery_ingots')
+                        .update({ round_id: null })
+                        .in('id', linkedIngotIds);
+                    if (detachError) throw detachError;
+                }
+
                 const { error } = await supabase.from('delivery_rounds').delete().eq('id', roundId);
                 if (error) throw error;
+
+                if (roundData) {
+                    pushDeliveryUndo({
+                        type: 'delete_round',
+                        title: `ลบรอบส่ง ${roundData.round_code || roundId}`,
+                        undo: async () => {
+                            await supabase.from('delivery_rounds').insert([roundData]);
+                            if (linkedIngots && linkedIngots.length > 0) {
+                                for (const ing of linkedIngots) {
+                                    const { data: existing } = await supabase.from('delivery_ingots').select('id').eq('id', ing.id).maybeSingle();
+                                    if (!existing) {
+                                        const { transactions: txList, ...ingotFields } = ing;
+                                        await supabase.from('delivery_ingots').insert([{ ...ingotFields, round_id: roundId }]);
+                                        if (txList && txList.length > 0) {
+                                            const txIds = txList.map(t => t.id);
+                                            await supabase.from('transactions').update({ ingot_id: ing.id }).in('id', txIds);
+                                        }
+                                    } else {
+                                        await supabase.from('delivery_ingots').update({ round_id: roundId }).eq('id', ing.id);
+                                    }
+                                }
+                            }
+                            await loadDeliveryData();
+                        }
+                    });
+                }
+
                 await loadDeliveryData();
             } catch (err) {
                 console.error("Error deleting round:", err);
@@ -6586,11 +6919,26 @@ createApp({
             if (!confirmed) return;
             loadingDeliveryData.value = true;
             try {
+                const targetIngot = ingots.value.find(i => i.id === ingotId);
+                const prevRoundId = targetIngot ? targetIngot.round_id : null;
+
                 const { error } = await supabase
                     .from('delivery_ingots')
                     .update({ round_id: null })
                     .eq('id', ingotId);
                 if (error) throw error;
+
+                if (prevRoundId) {
+                    pushDeliveryUndo({
+                        type: 'return_ingot',
+                        title: `คืนก้อน ${targetIngot?.ingot_code || ingotId} ไปยังรายการรอส่ง`,
+                        undo: async () => {
+                            await supabase.from('delivery_ingots').update({ round_id: prevRoundId }).eq('id', ingotId);
+                            await loadDeliveryData();
+                        }
+                    });
+                }
+
                 await loadDeliveryData();
             } catch (err) {
                 console.error("Error returning ingot to pending:", err);
@@ -7145,6 +7493,13 @@ createApp({
             confirmAllReceived,
             deleteDeliveryRound,
             returnIngotToPending,
+            deliveryUndoStack,
+            activeUndoToast,
+            showUndoHistoryMenu,
+            executeDeliveryUndo,
+            dismissUndoToast,
+            isSilverIngot,
+            isGoldIngot,
 
             extraProfits,
             newExtraProfit,

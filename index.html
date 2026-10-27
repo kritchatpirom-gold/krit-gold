@@ -1508,6 +1508,74 @@
                         <i class="fa-solid fa-circle-notch fa-spin text-5xl text-gold-500"></i>
                     </div>
 
+                    <!-- Delivery Header & Undo Controls -->
+                    <div class="glass p-4 sm:p-5 rounded-2xl border border-gray-800 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-11 h-11 rounded-xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400 shadow-inner">
+                                <i class="fa-solid fa-truck-ramp-box text-xl"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-xl sm:text-2xl font-bold text-white tracking-wide flex items-center gap-2">
+                                    ระบบจัดการหลอมและส่งสมาคม
+                                </h1>
+                                <p class="text-xs sm:text-sm text-gray-400">กระบวนการหลอม คลังเก็บก้อนเงิน และบันทึกรอบส่งสมาคม</p>
+                            </div>
+                        </div>
+
+                        <!-- Undo Action & History Dropdown -->
+                        <div class="relative flex items-center gap-2">
+                            <button @click="executeDeliveryUndo()"
+                                :disabled="deliveryUndoStack.length === 0"
+                                :class="deliveryUndoStack.length > 0 ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 shadow-amber-500/10 shadow-lg cursor-pointer active:scale-95' : 'bg-gray-800/40 text-gray-600 border-gray-800 cursor-not-allowed opacity-60'"
+                                class="px-4 py-2.5 rounded-xl text-sm font-semibold border flex items-center gap-2.5 transition-all duration-200">
+                                <i class="fa-solid fa-rotate-left"></i>
+                                <span>ย้อนกลับล่าสุด (Undo)</span>
+                                <span v-if="deliveryUndoStack.length > 0"
+                                    class="bg-amber-400 text-dark-base text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                                    {{ deliveryUndoStack.length }}
+                                </span>
+                            </button>
+
+                            <button @click="showUndoHistoryMenu = !showUndoHistoryMenu"
+                                :disabled="deliveryUndoStack.length === 0"
+                                :class="deliveryUndoStack.length > 0 ? 'hover:bg-gray-700/60 text-gray-300 hover:text-white cursor-pointer' : 'text-gray-600 cursor-not-allowed opacity-50'"
+                                title="ประวัติการย้อนกลับ"
+                                class="p-2.5 rounded-xl border border-gray-700/60 transition-colors">
+                                <i class="fa-solid fa-clock-rotate-left text-sm"></i>
+                            </button>
+
+                            <!-- Undo History Dropdown Menu -->
+                            <div v-if="showUndoHistoryMenu && deliveryUndoStack.length > 0"
+                                class="absolute right-0 top-14 w-80 sm:w-96 max-h-96 overflow-y-auto glass border border-gray-700 rounded-2xl shadow-2xl p-3 z-50">
+                                <div class="flex items-center justify-between px-2 py-1.5 border-b border-gray-700/60 mb-2">
+                                    <span class="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-history text-amber-400"></i> ประวัติที่สามารถย้อนกลับได้ ({{ deliveryUndoStack.length }})
+                                    </span>
+                                    <button @click="showUndoHistoryMenu = false" class="text-xs text-gray-400 hover:text-white p-1">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <div v-for="(item, idx) in [...deliveryUndoStack].reverse()" :key="item.id"
+                                        class="p-2.5 rounded-xl bg-dark-base/60 hover:bg-dark-surface/80 border border-gray-800/80 flex items-center justify-between gap-2.5 group transition-colors">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-xs text-white font-medium truncate">{{ item.title }}</div>
+                                            <div class="text-[10px] text-gray-500 mt-0.5">
+                                                {{ new Date(item.timestamp).toLocaleTimeString('th-TH') }}
+                                                <span v-if="idx === 0" class="text-amber-400 font-bold ml-1">• ล่าสุด</span>
+                                            </div>
+                                        </div>
+                                        <button v-if="idx === 0"
+                                            @click="executeDeliveryUndo(); showUndoHistoryMenu = false;"
+                                            class="px-2.5 py-1 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-dark-base rounded-lg transition-colors whitespace-nowrap shadow-sm">
+                                            ย้อนกลับ
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 1. Stock / Unsent -->
                     <div class="glass p-6 rounded-2xl border border-gray-800 relative">
                         <div
@@ -2332,7 +2400,7 @@
                                                 <span class="font-mono text-yellow-500">{{
                                                     ing.avg_base_price.toLocaleString('en-US',
                                                     {minimumFractionDigits: 0, maximumFractionDigits: 0}) }} ฿/{{
-                                                    ing.category === 'silver' ? 'กก.' : 'บาท' }}</span>
+                                                    isSilverIngot(ing) ? 'กก.' : 'บาท' }}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -2341,8 +2409,10 @@
                                     <div class="lg:col-span-2 space-y-4">
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                                             
-                                            <!-- 1. Gold Payment & Profit Card -->
-                                            <div class="bg-black/40 p-4 rounded-xl border border-gold-500/30 space-y-3.5 relative overflow-hidden shadow-md">
+                                            <!-- 1. Gold Payment & Profit Card (Only shown if round has gold or gold payment exists) -->
+                                            <div v-if="roundHasGold(round)"
+                                                :class="!roundHasSilver(round) ? 'col-span-1 md:col-span-2' : ''"
+                                                class="bg-black/40 p-4 rounded-xl border border-gold-500/30 space-y-3.5 relative overflow-hidden shadow-md">
                                                 <div class="flex items-center justify-between border-b border-gray-800 pb-2">
                                                     <div class="flex items-center gap-2">
                                                         <div class="w-7 h-7 rounded-lg bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400 text-xs">
@@ -2431,6 +2501,7 @@
 
                                             <!-- 2. Silver Payment & Profit Card (Only shown if round has silver or silver payment exists) -->
                                             <div v-if="roundHasSilver(round)"
+                                                :class="!roundHasGold(round) ? 'col-span-1 md:col-span-2' : ''"
                                                 class="bg-black/40 p-4 rounded-xl border border-gray-600/40 space-y-3.5 relative overflow-hidden shadow-md">
                                                 <div class="flex items-center justify-between border-b border-gray-800 pb-2">
                                                     <div class="flex items-center gap-2">
@@ -2516,13 +2587,6 @@
                                                         </div>
                                                     </template>
                                                 </div>
-                                            </div>
-
-                                            <!-- If round has NO silver, show simple info card -->
-                                            <div v-else class="bg-black/20 p-5 rounded-xl border border-gray-800/60 flex flex-col items-center justify-center text-center text-gray-500 h-full min-h-[160px]">
-                                                <i class="fa-solid fa-cube text-3xl mb-2 text-gray-700"></i>
-                                                <p class="text-xs text-gray-400 font-medium">รอบนี้ไม่มีรายการก้อนเงิน</p>
-                                                <p class="text-[11px] text-gray-600 mt-0.5">การคำนวณและปิดยอดจึงมีเฉพาะทองคำ</p>
                                             </div>
                                         </div>
 
@@ -2695,6 +2759,41 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Floating Undo Toast Notification -->
+                    <transition enter-active-class="transition duration-300 ease-out transform"
+                        enter-from-class="opacity-0 translate-y-6 scale-95"
+                        enter-to-class="opacity-100 translate-y-0 scale-100"
+                        leave-active-class="transition duration-200 ease-in transform"
+                        leave-from-class="opacity-100 translate-y-0 scale-100"
+                        leave-to-class="opacity-0 translate-y-6 scale-95">
+                        <div v-if="activeUndoToast"
+                            class="fixed bottom-6 right-6 z-50 max-w-md w-[calc(100vw-3rem)] bg-dark-surface/95 backdrop-blur-md border border-amber-500/50 rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-4 text-white ring-1 ring-amber-500/20">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 shadow-inner">
+                                    <i class="fa-solid fa-clock-rotate-left text-lg"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="text-[11px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                        <i class="fa-solid fa-circle-check text-[10px]"></i> ทำรายการสำเร็จ
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-100 truncate mt-0.5" :title="activeUndoToast.title">{{ activeUndoToast.title }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button @click="executeDeliveryUndo(activeUndoToast.id)"
+                                    class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-dark-base font-bold text-xs shadow-lg shadow-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                    <span>เลิกทำ</span>
+                                </button>
+                                <button @click="dismissUndoToast()"
+                                    class="p-1.5 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                    title="ปิดการแจ้งเตือน">
+                                    <i class="fa-solid fa-xmark text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </transition>
                 </div>
             </transition>
 
