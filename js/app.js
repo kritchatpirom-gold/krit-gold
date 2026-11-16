@@ -25,10 +25,17 @@ const floor1 = (v) => {
     return Math.floor((num + 0.00001) * 10) / 10;
 };
 
+const getISODate = (d = new Date()) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
 createApp({
     setup() {
         const initialHash = window.location.hash.replace('#', '');
-        const validTabsList = ['home', 'history', 'settings', 'delivery', 'calculator'];
+        const validTabsList = ['home', 'history', 'settings', 'delivery', 'calculator', 'drawer', 'attendance', 'pre_melt', 'price_locks', 'realtime_price'];
         const currentTab = ref(validTabsList.includes(initialHash) ? initialHash : 'home');
         const user = ref(null);
         const showAuth = ref(false);
@@ -857,6 +864,11 @@ createApp({
         };
         const networkVipGoldPremiumAmount_50_100 = ref(0);
         const networkVipGoldPremiumPercent_50_100 = ref(0);
+        const silverPremiumAmountNetworkVvip = ref(0);
+        const networkVvipGoldPremiumAmount_25_49 = ref(0);
+        const networkVvipGoldPremiumPercent_25_49 = ref(0);
+        const networkVvipGoldPremiumAmount_50_100 = ref(0);
+        const networkVvipGoldPremiumPercent_50_100 = ref(0);
         const manualSilverPrice = ref(0);
         const useManualSilverPrice = ref(false);
         const employeeLastSilverUpdate = ref(null);
@@ -920,6 +932,7 @@ createApp({
         const hasVVIP = computed(() => premiumCustomersList.value.some(c => c.tier === 'vvip'));
         const hasNetwork = computed(() => premiumCustomersList.value.some(c => c.tier === 'network'));
         const hasNetworkVIP = computed(() => premiumCustomersList.value.some(c => c.tier === 'network_vip'));
+        const hasNetworkVVIP = computed(() => premiumCustomersList.value.some(c => c.tier === 'network_vvip'));
         let priceChart = null;
 
         // Drawer Balance
@@ -1445,7 +1458,96 @@ createApp({
             return oldBalance;
         };
 
-        const restoreDrawerBalance = async (totalAmount, transactionId = null) => {
+        const DENOMINATIONS = [
+            { label: 'แบงก์ 1,000', key: 'b1000', val: 1000 },
+            { label: 'แบงก์ 500', key: 'b500', val: 500 },
+            { label: 'แบงก์ 100', key: 'b100', val: 100 },
+            { label: 'แบงก์ 50', key: 'b50', val: 50 },
+            { label: 'แบงก์ 20', key: 'b20', val: 20 },
+            { label: 'เหรียญ 10', key: 'c10', val: 10 },
+            { label: 'เหรียญ 5', key: 'c5', val: 5 },
+            { label: 'เหรียญ 1', key: 'c1', val: 1 }
+        ];
+
+        const findBillDeductionLog = async (transactionIds, billCreatedAt = null, cashAmount = null) => {
+            try {
+                const idList = (Array.isArray(transactionIds) ? transactionIds : [transactionIds]).filter(Boolean);
+
+                // 1. Primary lookup: Match reference_id in transaction IDs
+                if (idList.length > 0) {
+                    const { data: logs, error } = await supabase
+                        .from('drawer_logs')
+                        .select('*')
+                        .in('reference_id', idList)
+                        .lte('amount', 0)
+                        .order('created_at', { ascending: false });
+
+                    if (!error && logs && logs.length > 0) {
+                        if (cashAmount !== null && cashAmount > 0) {
+                            const target = Math.ceil(cashAmount);
+                            const matched = logs.find(l => Math.abs(Number(l.amount)) === target);
+                            if (matched) return matched;
+                        }
+                        return logs[0];
+                    }
+                }
+
+                // 2. Secondary lookup: Match by timestamp proximity (+/- 90s) & exact cash amount
+                if (billCreatedAt && cashAmount !== null && cashAmount > 0) {
+                    const target = Math.ceil(cashAmount);
+                    const billTime = new Date(billCreatedAt).getTime();
+                    if (!isNaN(billTime)) {
+                        const timeStart = new Date(billTime - 90000).toISOString();
+                        const timeEnd = new Date(billTime + 90000).toISOString();
+                        const { data: timeLogs, error: timeErr } = await supabase
+                            .from('drawer_logs')
+                            .select('*')
+                            .eq('action', 'TRANSACTION_DEDUCT')
+                            .gte('created_at', timeStart)
+                            .lte('created_at', timeEnd)
+                            .order('created_at', { ascending: false });
+
+                        if (!timeErr && timeLogs && timeLogs.length > 0) {
+                            const matched = timeLogs.find(l => Math.abs(Number(l.amount)) === target);
+                            if (matched) return matched;
+                            return timeLogs[0];
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error looking up drawer deduction log:", err);
+            }
+            return null;
+        };
+
+        const extractBanknotesFromLog = (log) => {
+            if (!log || !log.old_balance || !log.new_balance) return null;
+
+            const breakdown = [];
+            const toRestore = {};
+            let totalAmount = 0;
+
+            for (const d of DENOMINATIONS) {
+                const diff = (Number(log.old_balance[d.key]) || 0) - (Number(log.new_balance[d.key]) || 0);
+                if (diff > 0) {
+                    toRestore[d.key] = diff;
+                    totalAmount += (diff * d.val);
+                    breakdown.push({
+                        label: d.label,
+                        key: d.key,
+                        val: d.val,
+                        count: diff
+                    });
+                } else {
+                    toRestore[d.key] = 0;
+                }
+            }
+
+            if (breakdown.length === 0) return null;
+            return { breakdown, toRestore, totalAmount, log };
+        };
+
+        const restoreDrawerBalance = async (totalAmount, transactionIdOrIds = null, exactToRestore = null) => {
             let amount = Math.ceil(totalAmount);
             if (amount <= 0) return;
 
@@ -1456,61 +1558,46 @@ createApp({
             let amountRestored = 0;
             let exactRestoreDone = false;
 
-            if (transactionId) {
-                // Try to find the exact deduction from drawer_logs
-                const { data: logs, error } = await supabase
-                    .from('drawer_logs')
-                    .select('*')
-                    .or(`id.eq.${transactionId},reference_id.eq.${transactionId}`)
-                    .lte('amount', 0)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (!error && logs && logs.length > 0) {
-                    const log = logs[0];
-                    if (log.old_balance && log.new_balance) {
-                        const denomKeys = ['b1000', 'b500', 'b100', 'b50', 'b20', 'c10', 'c5', 'c1'];
-                        let diffTotal = 0;
-                        const toRestore = {};
-
-                        for (const k of denomKeys) {
-                            const diff = (log.old_balance[k] || 0) - (log.new_balance[k] || 0);
-                            if (diff > 0) {
-                                toRestore[k] = diff;
-                                const val = parseInt(k.replace(/[a-zA-Z]/g, ''));
-                                diffTotal += (diff * val);
-                            } else {
-                                toRestore[k] = 0;
-                            }
-                        }
-
-                        // Verify that the exact bills match the refund amount
-                        if (diffTotal === amount) {
-                            for (const k of denomKeys) {
-                                newBalance[k] += toRestore[k];
-                            }
-                            amountRestored = diffTotal;
-                            amount = 0;
-                            exactRestoreDone = true;
-                        }
+            // 1. If exactToRestore mapping is directly provided
+            if (exactToRestore && typeof exactToRestore === 'object') {
+                let checkTotal = 0;
+                for (const d of DENOMINATIONS) {
+                    const count = Number(exactToRestore[d.key]) || 0;
+                    if (count > 0) {
+                        checkTotal += (count * d.val);
                     }
+                }
+
+                if (checkTotal === amount) {
+                    for (const d of DENOMINATIONS) {
+                        const count = Number(exactToRestore[d.key]) || 0;
+                        newBalance[d.key] = (newBalance[d.key] || 0) + count;
+                    }
+                    amountRestored = checkTotal;
+                    amount = 0;
+                    exactRestoreDone = true;
                 }
             }
 
-            if (!exactRestoreDone) {
-                // Greedy addition fallback
-                const denoms = [
-                    { key: 'b1000', val: 1000 },
-                    { key: 'b500', val: 500 },
-                    { key: 'b100', val: 100 },
-                    { key: 'b50', val: 50 },
-                    { key: 'b20', val: 20 },
-                    { key: 'c10', val: 10 },
-                    { key: 'c5', val: 5 },
-                    { key: 'c1', val: 1 }
-                ];
+            // 2. If not already restored, try finding deduction log from drawer_logs using transactionIdOrIds
+            if (!exactRestoreDone && transactionIdOrIds) {
+                const idList = Array.isArray(transactionIdOrIds) ? transactionIdOrIds : [transactionIdOrIds];
+                const log = await findBillDeductionLog(idList, null, amount);
+                const extracted = extractBanknotesFromLog(log);
 
-                for (const d of denoms) {
+                if (extracted && extracted.totalAmount === amount) {
+                    for (const d of DENOMINATIONS) {
+                        newBalance[d.key] = (newBalance[d.key] || 0) + (extracted.toRestore[d.key] || 0);
+                    }
+                    amountRestored = extracted.totalAmount;
+                    amount = 0;
+                    exactRestoreDone = true;
+                }
+            }
+
+            // 3. Fallback: Greedy addition
+            if (!exactRestoreDone) {
+                for (const d of DENOMINATIONS) {
                     if (amount >= d.val) {
                         const addNotes = Math.floor(amount / d.val);
                         newBalance[d.key] += addNotes;
@@ -1536,7 +1623,8 @@ createApp({
 
                 if (!error) {
                     drawerBalance.value = newBalance;
-                    await logDrawerAction('TRANSACTION_RESTORE', amountRestored, oldBalance, newBalance, transactionId);
+                    const refId = Array.isArray(transactionIdOrIds) ? transactionIdOrIds[0] : transactionIdOrIds;
+                    await logDrawerAction('TRANSACTION_RESTORE', amountRestored, oldBalance, newBalance, refId);
                 }
             } catch (err) {
                 console.error("Exception restoring drawer balance:", err);
@@ -1553,15 +1641,19 @@ createApp({
             }
 
             const amountToRefund = Math.abs(log.amount);
+            const extracted = extractBanknotesFromLog(log);
+            let detailMsg = '';
+            if (extracted && extracted.breakdown.length > 0) {
+                const lines = extracted.breakdown.map(b => `• ${b.label}: ${b.count} ${b.label.includes('เหรียญ') ? 'เหรียญ' : 'ใบ'}`);
+                detailMsg = `\n\n💵 รายการแบงก์ที่จะคืนเข้าลิ้นชัก:\n${lines.join('\n')}`;
+            }
 
-            const confirm = await showAppModal('prompt', 'ยืนยันการคืนเงิน', `ต้องการคืนเงินจำนวน ${formatCurrency(amountToRefund)} บาท เข้าลิ้นชักใช่หรือไม่?\n\n(อ้างอิงรายการ: ${log.action})`, [], 'ยืนยัน', 'ยกเลิก');
+            const confirm = await showAppModal('confirm', 'ยืนยันการคืนเงิน', `ต้องการคืนเงินจำนวน ${formatCurrency(amountToRefund)} บาท เข้าลิ้นชักใช่หรือไม่?${detailMsg}\n\n(อ้างอิงรายการ: ${log.action})`, [], 'ยืนยันคืนเงิน', 'ยกเลิก');
             if (!confirm) return;
 
             try {
                 savingDrawer.value = true;
-                // Use action TRANSACTION_RESTORE for refund, or create a new action type like REFUND if needed, 
-                // but restoreDrawerBalance already logs it as TRANSACTION_RESTORE
-                await restoreDrawerBalance(amountToRefund, log.reference_id || log.id);
+                await restoreDrawerBalance(amountToRefund, log.reference_id || log.id, extracted ? extracted.toRestore : null);
                 await loadDrawerLogs();
                 await showAppModal('alert', 'สำเร็จ', `คืนเงินจำนวน ${formatCurrency(amountToRefund)} บาท เข้าลิ้นชักเรียบร้อยแล้ว`);
             } catch (err) {
@@ -1796,7 +1888,7 @@ createApp({
         });
 
         const checkIsMerchant = (name, idCard, tier) => {
-            if (tier && ['vip', 'vvip', 'network', 'network_vip'].includes(tier)) return true;
+            if (tier && ['vip', 'vvip', 'network', 'network_vip', 'network_vvip'].includes(tier)) return true;
             if (name) {
                 const trimmed = String(name).trim();
                 if (trimmed.includes('พ่อค้า')) return true;
@@ -1835,10 +1927,29 @@ createApp({
                 return false;
             }
 
-            // บังคับพนักงานกรอกทศนิยม 2 ตำแหน่งเมื่อเป็นทองหลอมและลูกค้าเป็นพ่อค้า
-            if (!isAdmin.value && type === 'tong_lom' && isMerchantCustomer.value) {
+            // ลูกค้าทุกหมวดหมู่ ประเภทสินทรัพย์ เงิน: ต้องเป็นจำนวนเต็ม 1-100 เท่านั้น (ห้ามกรอกทศนิยม)
+            if (type === 'silver') {
                 const strVal = String(calcForm.value.percent).trim();
-                return /^\d+(\.\d{2})$/.test(strVal);
+                return /^\d+$/.test(strVal) && Number(strVal) >= 1 && Number(strVal) <= 100;
+            }
+
+            // พ่อค้าในเครือข่าย (VVIP)
+            if (calcForm.value.customerTier === 'network_vvip') {
+                const strVal = String(calcForm.value.percent).trim();
+                if (type === 'tong_lom') {
+                    // ทองหลอม: ต้องเป็นจำนวนเต็ม 1-100 เท่านั้น (ห้ามกรอกทศนิยม)
+                    return /^\d+$/.test(strVal) && Number(strVal) >= 1 && Number(strVal) <= 100;
+                } else {
+                    // สินทรัพย์ประเภทอื่น: กรอกทศนิยม 1 ตำแหน่งได้เหมือนลูกค้าทั่วไป
+                    return /^\d+(\.\d)?$/.test(strVal) && Number(strVal) >= 1 && Number(strVal) <= 100;
+                }
+            }
+
+            // พ่อค้าที่ไม่ใช่พ่อค้าในเครือข่าย (VVIP): บังคับกรอกทศนิยม 2 ตำแหน่งเมื่อเป็นทองหลอม (เช่น 96.50 หรือ 96.00)
+            if (type === 'tong_lom' && isMerchantCustomer.value && calcForm.value.customerTier !== 'network_vvip') {
+                const strVal = String(calcForm.value.percent).trim();
+                const num = Number(strVal);
+                return /^\d+(\.\d{2})$/.test(strVal) && num >= 1 && num <= 100;
             }
 
             return true;
@@ -1900,6 +2011,8 @@ createApp({
                     price += (Number(silverPremiumAmountNetwork.value) || 0);
                 } else if (calcForm.value.customerTier === 'network_vip') {
                     price += (Number(silverPremiumAmountNetworkVip.value) || 0);
+                } else if (calcForm.value.customerTier === 'network_vvip') {
+                    price += (Number(silverPremiumAmountNetworkVvip.value) || 0);
                 }
 
                 return price;
@@ -1916,9 +2029,26 @@ createApp({
                 calcForm.value.manualPrice = null;
             }
             if (newType === 'tong_roop') {
-                calcForm.value.percent = isMerchantCustomer.value ? '96.50' : '96';
+                calcForm.value.percent = isMerchantCustomer.value ? (calcForm.value.customerTier === 'network_vvip' ? '96.5' : '96.50') : '96';
             } else if (newType === 'redeem' || newType === 'tong_tang') {
                 calcForm.value.percent = null;
+            } else if (newType === 'silver' && calcForm.value.percent) {
+                const str = String(calcForm.value.percent).trim();
+                if (str.includes('.')) {
+                    calcForm.value.percent = str.split('.')[0];
+                }
+            } else if (newType === 'tong_lom') {
+                if (calcForm.value.customerTier === 'network_vvip' && calcForm.value.percent) {
+                    const str = String(calcForm.value.percent).trim();
+                    if (str.includes('.')) {
+                        calcForm.value.percent = str.split('.')[0];
+                    }
+                } else if (isMerchantCustomer.value && calcForm.value.percent) {
+                    const str = String(calcForm.value.percent).trim();
+                    if (str === '96') {
+                        calcForm.value.percent = '96.50';
+                    }
+                }
             }
         });
 
@@ -1931,14 +2061,157 @@ createApp({
         watch(isMerchantCustomer, (isMerchant) => {
             if (calcForm.value.type === 'tong_roop') {
                 if (isMerchant && (calcForm.value.percent === '96.00' || calcForm.value.percent === '96' || !calcForm.value.percent)) {
-                    calcForm.value.percent = '96.50';
+                    calcForm.value.percent = (calcForm.value.customerTier === 'network_vvip') ? '96.5' : '96.50';
                 } else if (!isMerchant && (calcForm.value.percent === '96.50' || calcForm.value.percent === '96.5')) {
                     calcForm.value.percent = '96';
+                }
+            } else if (calcForm.value.type === 'tong_lom') {
+                if (isMerchant && calcForm.value.customerTier !== 'network_vvip') {
+                    if (calcForm.value.percent === '96') {
+                        calcForm.value.percent = '96.50';
+                    }
                 }
             }
         });
 
-        // Enforce integer for percent (all types) and 2 decimals for weight (all types)
+        watch(() => calcForm.value.customerTier, (newTier) => {
+            if (newTier === 'network_vvip' && calcForm.value.percent) {
+                const str = String(calcForm.value.percent).trim();
+                if (str.includes('.')) {
+                    if (calcForm.value.type === 'tong_lom') {
+                        calcForm.value.percent = str.split('.')[0];
+                    } else {
+                        const parts = str.split('.');
+                        calcForm.value.percent = parts[0] + '.' + parts[1].substring(0, 1);
+                    }
+                }
+            }
+        });
+
+        const onPercentKeydown = (event, tier, type) => {
+            const controlKeys = ['Backspace', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Delete', 'Home', 'End'];
+            if (controlKeys.includes(event.key)) {
+                return;
+            }
+            if (event.ctrlKey || event.metaKey || event.altKey) {
+                return;
+            }
+
+            const target = event.target;
+            const currentVal = target ? String(target.value || '') : '';
+            const selStart = target ? (target.selectionStart ?? currentVal.length) : currentVal.length;
+            const selEnd = target ? (target.selectionEnd ?? currentVal.length) : currentVal.length;
+
+            const isDot = event.key === '.' || event.key === ',';
+            const isDigit = /^[0-9]$/.test(event.key);
+
+            if (!isDot && !isDigit) {
+                event.preventDefault();
+                return;
+            }
+
+            // ลูกค้าทุกหมวดหมู่ ประเภทสินทรัพย์ เงิน: ดักห้ามกรอกจุดทศนิยม และดักไม่ให้พิมพ์ต่อหากทำให้ค่าเกิน 100 (ไม่ต้องปัดขึ้น)
+            if (type === 'silver') {
+                if (isDot) {
+                    event.preventDefault();
+                    return;
+                }
+                if (isDigit) {
+                    const nextValStr = currentVal.slice(0, selStart) + event.key + currentVal.slice(selEnd);
+                    const nextNum = parseInt(nextValStr, 10);
+                    if (!isNaN(nextNum) && nextNum > 100) {
+                        event.preventDefault();
+                        return;
+                    }
+                }
+                return;
+            }
+
+            if (tier === 'network_vvip') {
+                if (type === 'tong_lom') {
+                    // ทองหลอม VVIP: ดักห้ามกรอกจุดทศนิยม
+                    if (isDot) {
+                        event.preventDefault();
+                        return;
+                    }
+                    // ดักไม่ให้พิมพ์ต่อหากทำให้ค่าเกิน 100 (ไม่ต้องปัดขึ้น)
+                    if (isDigit) {
+                        const nextValStr = currentVal.slice(0, selStart) + event.key + currentVal.slice(selEnd);
+                        const nextNum = parseInt(nextValStr, 10);
+                        if (!isNaN(nextNum) && nextNum > 100) {
+                            event.preventDefault();
+                            return;
+                        }
+                    }
+                } else {
+                    // สินทรัพย์ประเภทอื่น VVIP (เช่น ทองรูปพรรณ, เงิน): กรอกทศนิยม 1 ตำแหน่งได้เหมือนลูกค้าทั่วไป
+                    if (isDot) {
+                        const nextValStr = currentVal.slice(0, selStart) + '.' + currentVal.slice(selEnd);
+                        if ((currentVal.includes('.') && selStart === selEnd) || nextValStr.split('.').length > 2) {
+                            event.preventDefault();
+                            return;
+                        }
+                    }
+                    if (isDigit) {
+                        const nextValStr = currentVal.slice(0, selStart) + event.key + currentVal.slice(selEnd);
+                        if (nextValStr.includes('.')) {
+                            const decimalPart = nextValStr.split('.')[1];
+                            if (decimalPart && decimalPart.length > 1) {
+                                event.preventDefault();
+                                return;
+                            }
+                        }
+                        const nextNum = parseFloat(nextValStr);
+                        if (!isNaN(nextNum) && nextNum > 100) {
+                            event.preventDefault();
+                            return;
+                        }
+                    }
+                }
+            } else if (type === 'tong_lom' && (isMerchantCustomer.value || ['vip', 'vvip', 'network', 'network_vip'].includes(tier))) {
+                // พ่อค้าที่ไม่ใช่ VVIP สำหรับทองหลอม: บังคับทศนิยม 2 ตำแหน่ง (ดักห้ามจุดซ้ำ, ไม่เกิน 2 ตำแหน่งหลังจุด, และค่าไม่เกิน 100)
+                if (isDot) {
+                    const nextValStr = currentVal.slice(0, selStart) + '.' + currentVal.slice(selEnd);
+                    if ((currentVal.includes('.') && selStart === selEnd) || nextValStr.split('.').length > 2) {
+                        event.preventDefault();
+                        return;
+                    }
+                }
+                if (isDigit) {
+                    const nextValStr = currentVal.slice(0, selStart) + event.key + currentVal.slice(selEnd);
+                    if (nextValStr.includes('.')) {
+                        const decimalPart = nextValStr.split('.')[1];
+                        if (decimalPart && decimalPart.length > 2) {
+                            event.preventDefault();
+                            return;
+                        }
+                    }
+                    const nextNum = parseFloat(nextValStr);
+                    if (!isNaN(nextNum) && nextNum > 100) {
+                        event.preventDefault();
+                        return;
+                    }
+                }
+            } else {
+                if (isDot) {
+                    const nextValStr = currentVal.slice(0, selStart) + '.' + currentVal.slice(selEnd);
+                    if ((currentVal.includes('.') && selStart === selEnd) || nextValStr.split('.').length > 2) {
+                        event.preventDefault();
+                        return;
+                    }
+                }
+                if (isDigit) {
+                    const nextValStr = currentVal.slice(0, selStart) + event.key + currentVal.slice(selEnd);
+                    const nextNum = parseFloat(nextValStr);
+                    if (!isNaN(nextNum) && nextNum > 100) {
+                        event.preventDefault();
+                        return;
+                    }
+                }
+            }
+        };
+
+        // Enforce integer for percent (tong_lom VVIP) and decimals according to tier/type
         watch(() => calcForm.value.percent, (val, oldVal) => {
             if (val !== null && val !== undefined && val !== '') {
                 // If it's a string, clean up any invalid characters (keep only numbers and one decimal point)
@@ -1964,29 +2237,103 @@ createApp({
                     return;
                 }
 
+                const isPremium = isMerchantCustomer.value;
+                const type = calcForm.value.type;
+                const tier = calcForm.value.customerTier;
+
+                // ลูกค้าทุกหมวดหมู่ ประเภทสินทรัพย์ เงิน: จำนวนเต็ม 1-100 ไม่ปัดขึ้น ดักไม่ให้พิมพ์ต่อ
+                if (type === 'silver') {
+                    if (strVal.includes('.')) {
+                        strVal = strVal.split('.')[0];
+                    }
+                    let intNum = parseInt(strVal, 10);
+                    if (isNaN(intNum)) {
+                        calcForm.value.percent = '';
+                        return;
+                    }
+                    if (intNum > 100) {
+                        // ไม่ปัดขึ้นเป็น 100 ให้คงค่าเดิมที่ถูกต้อง
+                        if (oldVal !== undefined && oldVal !== null && oldVal !== '' && Number(oldVal) <= 100) {
+                            calcForm.value.percent = String(oldVal);
+                        } else {
+                            calcForm.value.percent = String(strVal).slice(0, 2);
+                        }
+                        return;
+                    }
+                    const finalStr = String(intNum);
+                    if (val !== finalStr) calcForm.value.percent = finalStr;
+                    return;
+                }
+
+                if (tier === 'network_vvip') {
+                    if (type === 'tong_lom') {
+                        // ทองหลอม VVIP: จำนวนเต็ม 1-100 ไม่ปัดขึ้น ดักไม่ให้พิมพ์ต่อ
+                        if (strVal.includes('.')) {
+                            strVal = strVal.split('.')[0];
+                        }
+                        let intNum = parseInt(strVal, 10);
+                        if (isNaN(intNum)) {
+                            calcForm.value.percent = '';
+                            return;
+                        }
+                        if (intNum > 100) {
+                            // ไม่ปัดขึ้นเป็น 100 ให้คงค่าเดิมที่ถูกต้อง
+                            if (oldVal !== undefined && oldVal !== null && oldVal !== '' && Number(oldVal) <= 100) {
+                                calcForm.value.percent = String(oldVal);
+                            } else {
+                                calcForm.value.percent = String(strVal).slice(0, 2);
+                            }
+                            return;
+                        }
+                        const finalStr = String(intNum);
+                        if (val !== finalStr) calcForm.value.percent = finalStr;
+                        return;
+                    } else {
+                        // สินค้าประเภทอื่น VVIP: ทศนิยมได้ 1 ตำแหน่งเหมือนลูกค้าทั่วไป
+                        if (num > 100) {
+                            if (oldVal !== undefined && oldVal !== null && oldVal !== '' && Number(oldVal) <= 100) {
+                                calcForm.value.percent = String(oldVal);
+                            } else {
+                                calcForm.value.percent = '100';
+                            }
+                            return;
+                        }
+                        if (strVal.includes('.')) {
+                            const parts = strVal.split('.');
+                            if (parts[1] && parts[1].length > 1) {
+                                strVal = parts[0] + '.' + parts[1].substring(0, 1);
+                            }
+                        }
+                        if (val !== strVal) calcForm.value.percent = strVal;
+                        return;
+                    }
+                }
+
+                // ลูกค้ากลุ่มอื่น
                 if (num > 100) {
                     calcForm.value.percent = 100;
                     return;
                 }
 
-                const isPremium = isMerchantCustomer.value;
-                const type = calcForm.value.type;
-
                 let allowDecimal = false;
+                let decimalPlaces = 2;
                 if (isAdmin.value) {
                     allowDecimal = true;
+                    decimalPlaces = 2;
                 } else if (type === 'tong_roop') {
                     allowDecimal = true;
+                    decimalPlaces = isPremium ? 2 : 1;
                 } else if (type === 'tong_lom' && isPremium) {
                     allowDecimal = true;
+                    decimalPlaces = 2;
                 }
 
                 if (allowDecimal) {
                     // Allow decimals up to 2 places, max 100
                     if (strVal.includes('.')) {
                         const parts = strVal.split('.');
-                        if (parts[1] && parts[1].length > 2) {
-                            strVal = parts[0] + '.' + parts[1].substring(0, 2);
+                        if (parts[1] && parts[1].length > decimalPlaces) {
+                            strVal = parts[0] + '.' + parts[1].substring(0, decimalPlaces);
                         }
                     }
                     if (val !== strVal) calcForm.value.percent = strVal;
@@ -2062,7 +2409,7 @@ createApp({
                 let activePremium = premiums.value.find(pr => Math.floor(p) >= pr.range_min && Math.floor(p) <= pr.range_max);
                 // ทองหลอมถ้าน้ำหนักรวม >= 5 กรัม หรือเป็นลูกค้าเก่า ให้บวกพรีเมียม
                 const totalWeightForPremium = accumulatedGoldWeight.value + w;
-                const isVipOrVvip = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip');
+                const isVipOrVvip = (tForm.customerTier === 'vip' || tForm.customerTier === 'vvip' || tForm.customerTier === 'network' || tForm.customerTier === 'network_vip' || tForm.customerTier === 'network_vvip');
                 const meetsWeightReq = isVipOrVvip || totalWeightForPremium >= 5 || isOldCustomer.value;
 
                 let rawPremium = 0;
@@ -2086,6 +2433,15 @@ createApp({
                     } else if (p >= 50 && p <= 100) {
                         rawPremium = Number(networkVipGoldPremiumAmount_50_100.value) || 0;
                         rawPercent = Number(networkVipGoldPremiumPercent_50_100.value) || 0;
+                    }
+                    premiumType = rawPercent > 0 ? 'percent' : 'fixed';
+                } else if (tForm.customerTier === 'network_vvip' && meetsWeightReq) {
+                    if (p >= 25 && p < 50) {
+                        rawPremium = Number(networkVvipGoldPremiumAmount_25_49.value) || 0;
+                        rawPercent = Number(networkVvipGoldPremiumPercent_25_49.value) || 0;
+                    } else if (p >= 50 && p <= 100) {
+                        rawPremium = Number(networkVvipGoldPremiumAmount_50_100.value) || 0;
+                        rawPercent = Number(networkVvipGoldPremiumPercent_50_100.value) || 0;
                     }
                     premiumType = rawPercent > 0 ? 'percent' : 'fixed';
                 } else if (activePremium && meetsWeightReq) {
@@ -2159,7 +2515,13 @@ createApp({
 
         const addToBill = () => {
             if (!isFormValid.value) {
-                if (!isAdmin.value && calcForm.value.type === 'tong_lom' && isMerchantCustomer.value && !isPercentValid.value) {
+                if (calcForm.value.type === 'silver' && !isPercentValid.value) {
+                    showAppModal('alert', 'แจ้งเตือน', 'สำหรับสินทรัพย์เงิน ความบริสุทธิ์ (%) ต้องเป็นจำนวนเต็มเท่านั้น (ห้ามกรอกทศนิยม)');
+                } else if (calcForm.value.customerTier === 'network_vvip' && calcForm.value.type === 'tong_lom' && !isPercentValid.value) {
+                    showAppModal('alert', 'แจ้งเตือน', 'สำหรับลูกค้าพ่อค้าในเครือข่าย (VVIP) ความบริสุทธิ์ (%) ของทองหลอมต้องเป็นจำนวนเต็มเท่านั้น (ห้ามกรอกทศนิยม)');
+                } else if (calcForm.value.customerTier === 'network_vvip' && calcForm.value.type !== 'tong_lom' && !isPercentValid.value) {
+                    showAppModal('alert', 'แจ้งเตือน', 'สำหรับลูกค้าพ่อค้าในเครือข่าย (VVIP) ความบริสุทธิ์ (%) สามารถกรอกทศนิยมได้ไม่เกิน 1 ตำแหน่ง');
+                } else if (calcForm.value.type === 'tong_lom' && isMerchantCustomer.value && calcForm.value.customerTier !== 'network_vvip' && !isPercentValid.value) {
                     showAppModal('alert', 'แจ้งเตือน', 'สำหรับลูกค้าพ่อค้า ต้องกรอกความบริสุทธิ์ (%) ของทองหลอมเป็นทศนิยม 2 ตำแหน่ง (เช่น 96.50 หรือ 96.00) ก่อนเพิ่มเข้าบิล');
                 } else if (!isAdmin.value && calcForm.value.type === 'silver' && isMerchantCustomer.value && !isWeightValid.value) {
                     showAppModal('alert', 'แจ้งเตือน', 'สำหรับลูกค้าพ่อค้า ต้องกรอกน้ำหนักของเงินเป็นทศนิยม 1 ตำแหน่ง (เช่น 100.0 หรือ 50.5) ก่อนเพิ่มเข้าบิล');
@@ -2516,6 +2878,7 @@ createApp({
             user.value = data.session?.user || null;
             if (user.value) {
                 if (isAdmin.value && currentTab.value === 'history') loadTransactions();
+                if ((isAdmin.value || isEmployee.value) && currentTab.value === 'delivery') loadDeliveryData();
 
                 // setupRealtimeRequests removed
 
@@ -2528,6 +2891,16 @@ createApp({
                 }
             }
         };
+
+        supabase.auth.onAuthStateChange((event, session) => {
+            const prevUserId = user.value?.id;
+            user.value = session?.user || null;
+            // Only reload on genuine sign-in where user actually changed or freshly logged in, NOT on background TOKEN_REFRESHED / window focus
+            if (event === 'SIGNED_IN' && session?.user && session.user.id !== prevUserId) {
+                if (isAdmin.value && currentTab.value === 'history') loadTransactions();
+                if ((isAdmin.value || isEmployee.value) && currentTab.value === 'delivery') loadDeliveryData();
+            }
+        });
 
         const login = async () => {
             authLoading.value = true;
@@ -2544,6 +2917,7 @@ createApp({
                 } else {
                     user.value = data.user;
                     if (isAdmin.value && currentTab.value === 'history') loadTransactions();
+                    if ((isAdmin.value || isEmployee.value) && currentTab.value === 'delivery') loadDeliveryData();
 
                     // setupRealtimeRequests removed
 
@@ -2660,6 +3034,7 @@ createApp({
                     silverPremiumAmountVvip.value = getSetting('silver_premium_amount_vvip', 0);
                     silverPremiumAmountNetwork.value = getSetting('silver_premium_amount_network', 0);
                     silverPremiumAmountNetworkVip.value = getSetting('silver_premium_amount_network_vip', 0);
+                    silverPremiumAmountNetworkVvip.value = getSetting('silver_premium_amount_network_vvip', 0);
 
                     networkGoldPremiumAmount_25_49.value = getSetting('network_gold_amount_25_49', 0);
                     networkGoldPremiumPercent_25_49.value = getSetting('network_gold_percent_25_49', 0);
@@ -2670,6 +3045,11 @@ createApp({
                     networkVipGoldPremiumPercent_25_49.value = getSetting('network_vip_gold_percent_25_49', 0);
                     networkVipGoldPremiumAmount_50_100.value = getSetting('network_vip_gold_amount_50_100', 0);
                     networkVipGoldPremiumPercent_50_100.value = getSetting('network_vip_gold_percent_50_100', 0);
+
+                    networkVvipGoldPremiumAmount_25_49.value = getSetting('network_vvip_gold_amount_25_49', 0);
+                    networkVvipGoldPremiumPercent_25_49.value = getSetting('network_vvip_gold_percent_25_49', 0);
+                    networkVvipGoldPremiumAmount_50_100.value = getSetting('network_vvip_gold_amount_50_100', 0);
+                    networkVvipGoldPremiumPercent_50_100.value = getSetting('network_vvip_gold_percent_50_100', 0);
                 }
 
                 await loadPremiumCustomers();
@@ -2714,6 +3094,11 @@ createApp({
                 { key: 'network_vip_gold_percent_25_49', value: Number(networkVipGoldPremiumPercent_25_49.value) || 0 },
                 { key: 'network_vip_gold_amount_50_100', value: Number(networkVipGoldPremiumAmount_50_100.value) || 0 },
                 { key: 'network_vip_gold_percent_50_100', value: Number(networkVipGoldPremiumPercent_50_100.value) || 0 },
+                { key: 'silver_premium_amount_network_vvip', value: Number(silverPremiumAmountNetworkVvip.value) || 0 },
+                { key: 'network_vvip_gold_amount_25_49', value: Number(networkVvipGoldPremiumAmount_25_49.value) || 0 },
+                { key: 'network_vvip_gold_percent_25_49', value: Number(networkVvipGoldPremiumPercent_25_49.value) || 0 },
+                { key: 'network_vvip_gold_amount_50_100', value: Number(networkVvipGoldPremiumAmount_50_100.value) || 0 },
+                { key: 'network_vvip_gold_percent_50_100', value: Number(networkVvipGoldPremiumPercent_50_100.value) || 0 },
                 { key: 'merchant_email_mappings', value: 0, value_text: JSON.stringify(merchantEmailMappings.value || {}) }
             ], { onConflict: 'key' });
 
@@ -2862,10 +3247,20 @@ createApp({
                 { key: 'silver_premium_amount_vip', value: Number(silverPremiumAmountVip.value) || 0 },
                 { key: 'silver_premium_amount_vvip', value: Number(silverPremiumAmountVvip.value) || 0 },
                 { key: 'silver_premium_amount_network', value: Number(silverPremiumAmountNetwork.value) || 0 },
+                { key: 'silver_premium_amount_network_vip', value: Number(silverPremiumAmountNetworkVip.value) || 0 },
+                { key: 'silver_premium_amount_network_vvip', value: Number(silverPremiumAmountNetworkVvip.value) || 0 },
                 { key: 'network_gold_amount_25_49', value: Number(networkGoldPremiumAmount_25_49.value) || 0 },
                 { key: 'network_gold_percent_25_49', value: Number(networkGoldPremiumPercent_25_49.value) || 0 },
                 { key: 'network_gold_amount_50_100', value: Number(networkGoldPremiumAmount_50_100.value) || 0 },
-                { key: 'network_gold_percent_50_100', value: Number(networkGoldPremiumPercent_50_100.value) || 0 }
+                { key: 'network_gold_percent_50_100', value: Number(networkGoldPremiumPercent_50_100.value) || 0 },
+                { key: 'network_vip_gold_amount_25_49', value: Number(networkVipGoldPremiumAmount_25_49.value) || 0 },
+                { key: 'network_vip_gold_percent_25_49', value: Number(networkVipGoldPremiumPercent_25_49.value) || 0 },
+                { key: 'network_vip_gold_amount_50_100', value: Number(networkVipGoldPremiumAmount_50_100.value) || 0 },
+                { key: 'network_vip_gold_percent_50_100', value: Number(networkVipGoldPremiumPercent_50_100.value) || 0 },
+                { key: 'network_vvip_gold_amount_25_49', value: Number(networkVvipGoldPremiumAmount_25_49.value) || 0 },
+                { key: 'network_vvip_gold_percent_25_49', value: Number(networkVvipGoldPremiumPercent_25_49.value) || 0 },
+                { key: 'network_vvip_gold_amount_50_100', value: Number(networkVvipGoldPremiumAmount_50_100.value) || 0 },
+                { key: 'network_vvip_gold_percent_50_100', value: Number(networkVvipGoldPremiumPercent_50_100.value) || 0 }
             ]);
             fetchPrices();
         };
@@ -2908,11 +3303,13 @@ createApp({
         let autoSaveTimeout;
         watch([
             silverDeduction, useSilverDeduction, manualSilverPrice, useManualSilverPrice,
-            silverPremiumAmountVip, silverPremiumAmountVvip, silverPremiumAmountNetwork, silverPremiumAmountNetworkVip,
+            silverPremiumAmountVip, silverPremiumAmountVvip, silverPremiumAmountNetwork, silverPremiumAmountNetworkVip, silverPremiumAmountNetworkVvip,
             networkGoldPremiumAmount_25_49, networkGoldPremiumPercent_25_49,
             networkGoldPremiumAmount_50_100, networkGoldPremiumPercent_50_100,
             networkVipGoldPremiumAmount_25_49, networkVipGoldPremiumPercent_25_49,
-            networkVipGoldPremiumAmount_50_100, networkVipGoldPremiumPercent_50_100
+            networkVipGoldPremiumAmount_50_100, networkVipGoldPremiumPercent_50_100,
+            networkVvipGoldPremiumAmount_25_49, networkVvipGoldPremiumPercent_25_49,
+            networkVvipGoldPremiumAmount_50_100, networkVvipGoldPremiumPercent_50_100
         ], () => {
             clearTimeout(autoSaveTimeout);
             autoSaveTimeout = setTimeout(() => {
@@ -2984,7 +3381,7 @@ createApp({
         const loadPremiumCustomers = async () => {
             const { data } = await supabase.from('customers')
                 .select('*')
-                .in('tier', ['vip', 'vvip', 'network', 'network_vip'])
+                .in('tier', ['vip', 'vvip', 'network', 'network_vip', 'network_vvip'])
                 .order('updated_at', { ascending: false });
             if (data) {
                 premiumCustomersList.value = data;
@@ -3099,7 +3496,7 @@ createApp({
                     }
                     const { data } = await query;
                     if (data && data.length > 0) {
-                        const vip = data.find(c => ['vip', 'vvip', 'network', 'network_vip'].includes(c.tier));
+                        const vip = data.find(c => ['vip', 'vvip', 'network', 'network_vip', 'network_vvip'].includes(c.tier));
                         if (vip) {
                             customerTier = vip.tier;
                         }
@@ -3109,7 +3506,7 @@ createApp({
                 }
             }
 
-            billItems.value = g.items.map(t => {
+            const mappedItems = g.items.map(t => {
                 const itemIsMerchant = checkIsMerchant(t.customer_name || g.customer_name, t.id_card || effectiveIdCard, customerTier);
                 const weight = parseFloat(t.weight) || 0;
                 const netPrice = parseFloat(t.net_price) || 0;
@@ -3133,6 +3530,15 @@ createApp({
                     per_gram: perGram
                 };
             });
+
+            // เรียงลำดับรายการสำหรับพิมพ์บิลย้อนหลัง: ทองขึ้นก่อน เงินอยู่ข้างล่าง
+            mappedItems.sort((a, b) => {
+                const aIsSilver = a.type === 'silver' ? 1 : 0;
+                const bIsSilver = b.type === 'silver' ? 1 : 0;
+                return aIsSilver - bIsSilver;
+            });
+
+            billItems.value = mappedItems;
 
             calcForm.value.customerName = g.customer_name || '';
             calcForm.value.phone = g.phone || '';
@@ -3278,6 +3684,15 @@ createApp({
 
         const calculateEditTrxNetPrice = () => {
             const tForm = editTrxModal.value;
+            if (tForm.type === 'silver' && tForm.percent) {
+                tForm.percent = Math.floor(Number(tForm.percent));
+            } else if (tForm.customerTier === 'network_vvip' && tForm.percent) {
+                if (tForm.type === 'tong_lom') {
+                    tForm.percent = Math.floor(Number(tForm.percent));
+                } else {
+                    tForm.percent = Math.floor(Number(tForm.percent) * 10) / 10;
+                }
+            }
             if (tForm.type === 'tong_roop' && (!tForm.percent || tForm.percent <= 0)) {
                 tForm.percent = 96.00;
             }
@@ -3373,7 +3788,7 @@ createApp({
                     }
                     const { data } = await query;
                     if (data && data.length > 0) {
-                        const vip = data.find(c => ['vip', 'vvip', 'network', 'network_vip'].includes(c.tier));
+                        const vip = data.find(c => ['vip', 'vvip', 'network', 'network_vip', 'network_vvip'].includes(c.tier));
                         if (vip) {
                             customerTier = vip.tier;
                             isMerchant = true;
@@ -3410,6 +3825,15 @@ createApp({
             const diffAmount = tForm.original_net_price - tForm.net_price;
 
             let savePercent = Number(tForm.percent) || 0;
+            if (tForm.type === 'silver') {
+                savePercent = Math.floor(savePercent);
+            } else if (tForm.customerTier === 'network_vvip') {
+                if (tForm.type === 'tong_lom') {
+                    savePercent = Math.floor(savePercent);
+                } else {
+                    savePercent = Math.floor(savePercent * 10) / 10;
+                }
+            }
             if (['redeem', 'tong_tang'].includes(tForm.type)) {
                 savePercent = 96.5;
             }
@@ -3449,25 +3873,46 @@ createApp({
         const deleteTransaction = async (id) => {
             if (await showAppModal('confirm', 'ยืนยันการลบ', 'ยืนยันการลบรายการนี้ใช่หรือไม่?')) {
                 const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
-                // Fetch the transaction to get net_price and transfer_amount
-                const { data: trx } = await supabase.from('transactions').select('net_price, transfer_amount').eq('id', id).single();
+                // Fetch the transaction to get net_price, transfer_amount, created_at
+                const { data: trx } = await supabase.from('transactions').select('id, net_price, transfer_amount, created_at').eq('id', id).single();
+
+                let cashRefund = 0;
+                let exactToRestore = null;
+                let historyNote = '';
+
+                if (trx && trx.net_price) {
+                    const transferPart = Number(trx.transfer_amount || 0);
+                    cashRefund = Number(trx.net_price) - transferPart;
+                    if (cashRefund > 0) {
+                        const deductionLog = await findBillDeductionLog([id], trx.created_at, cashRefund);
+                        const extracted = extractBanknotesFromLog(deductionLog);
+                        if (extracted && extracted.totalAmount === cashRefund) {
+                            exactToRestore = extracted.toRestore;
+                            const lines = extracted.breakdown.map(b => `• ${b.label}: ${b.count} ${b.label.includes('เหรียญ') ? 'เหรียญ' : 'ใบ'} (${formatCurrency(b.count * b.val)} บาท)`);
+                            historyNote = `\n\n💵 ประวัติการจ่ายเงินสดของรายการนี้:\n${lines.join('\n')}\n\n✓ ระบบจะคืนเงินเข้าลิ้นชักตรงตามรายการแบงก์ที่จ่ายจริงข้างต้น`;
+                        } else {
+                            historyNote = `\n\n(ไม่พบประวัติการตัดแบงก์ของรายการนี้ ระบบจะคำนวณคืนตามมูลค่า)`;
+                        }
+                    }
+                }
+
+                let shouldRestoreCash = false;
+                if (cashRefund > 0) {
+                    const confirmMsg = `คุณต้องการคืนเงินสดจำนวน ${formatCurrency(cashRefund)} บาท เข้าลิ้นชักหรือไม่?${historyNote}\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเงินเข้าลิ้นชัก)`;
+                    shouldRestoreCash = await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', confirmMsg, [], 'คืนเงินเข้าลิ้นชัก', 'ไม่คืนเงิน');
+                }
 
                 // Delete assets from storage first
                 await deleteTransactionAssets(id, deleteAssets);
                 const { error } = await supabase.from('transactions').delete().eq('id', id);
                 if (!error) {
-                    if (trx && trx.net_price) {
-                        const transferPart = Number(trx.transfer_amount || 0);
-                        const cashRefund = Number(trx.net_price) - transferPart;
-                        if (cashRefund > 0) {
-                            if (await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${cashRefund} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
-                                await restoreDrawerBalance(cashRefund, id);
-                            }
-                        }
+                    if (shouldRestoreCash && cashRefund > 0) {
+                        await restoreDrawerBalance(cashRefund, id, exactToRestore);
                     }
                     loadTransactions();
+                } else {
+                    await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาดในการลบ: ' + error.message);
                 }
-                else await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาดในการลบ: ' + error.message);
             }
         };
 
@@ -3475,25 +3920,50 @@ createApp({
             const ids = g.items.map(t => t.id);
             if (await showAppModal('confirm', 'ยืนยันการลบ', `ยืนยันการลบบิลนี้ (${g.items.length} รายการ) ใช่หรือไม่?`)) {
                 const deleteAssets = await showAppModal('confirm', 'ลบภาพส่วนตัว', 'คุณต้องการลบภาพบัตรประชาชนและภาพลายเซ็นออกจากระบบด้วยหรือไม่?\n\n(กด ใช่ เพื่อลบรูปด้วย / กด ไม่ เพื่อเก็บรูปไว้)', [], 'ใช่', 'ไม่');
-                // Fetch the transaction to get net_price and transfer_amount
-                const { data: trxs } = await supabase.from('transactions').select('net_price, transfer_amount').in('id', ids);
+
+                // Fetch the transaction to get net_price, transfer_amount, created_at
+                const { data: trxs } = await supabase.from('transactions').select('id, net_price, transfer_amount, created_at').in('id', ids);
+
+                let totalRefund = 0;
+                if (trxs && trxs.length > 0) {
+                    trxs.forEach(trx => {
+                        const transferPart = Number(trx.transfer_amount || 0);
+                        const cashRefund = Number(trx.net_price) - transferPart;
+                        if (cashRefund > 0) totalRefund += cashRefund;
+                    });
+                } else if (g.net_price) {
+                    const transferPart = g.items.reduce((sum, t) => sum + (Number(t.transfer_amount) || 0), 0);
+                    const cashRefund = Number(g.net_price) - transferPart;
+                    if (cashRefund > 0) totalRefund += cashRefund;
+                }
+
+                // Look up deduction history from drawer_logs BEFORE deleting
+                let exactToRestore = null;
+                let historyNote = '';
+                if (totalRefund > 0) {
+                    const deductionLog = await findBillDeductionLog(ids, g.created_at, totalRefund);
+                    const extracted = extractBanknotesFromLog(deductionLog);
+                    if (extracted && extracted.totalAmount === totalRefund) {
+                        exactToRestore = extracted.toRestore;
+                        const lines = extracted.breakdown.map(b => `• ${b.label}: ${b.count} ${b.label.includes('เหรียญ') ? 'เหรียญ' : 'ใบ'} (${formatCurrency(b.count * b.val)} บาท)`);
+                        historyNote = `\n\n💵 ประวัติการจ่ายเงินสดของบิลนี้:\n${lines.join('\n')}\n\n✓ ระบบจะคืนเงินเข้าลิ้นชักตรงตามรายการแบงก์ที่จ่ายจริงข้างต้น`;
+                    } else {
+                        historyNote = `\n\n(ไม่พบประวัติการตัดแบงก์ของบิลนี้ ระบบจะคำนวณคืนตามมูลค่า)`;
+                    }
+                }
+
+                let shouldRestoreCash = false;
+                if (totalRefund > 0) {
+                    const confirmMsg = `คุณต้องการคืนเงินสดจำนวน ${formatCurrency(totalRefund)} บาท เข้าลิ้นชักหรือไม่?${historyNote}\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเงินเข้าลิ้นชัก)`;
+                    shouldRestoreCash = await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', confirmMsg, [], 'คืนเงินเข้าลิ้นชัก', 'ไม่คืนเงิน');
+                }
 
                 await deleteTransactionAssets(ids, deleteAssets);
                 const { error } = await supabase.from('transactions').delete().in('id', ids);
 
                 if (!error) {
-                    if (trxs && trxs.length > 0) {
-                        let totalRefund = 0;
-                        trxs.forEach(trx => {
-                            const transferPart = Number(trx.transfer_amount || 0);
-                            const cashRefund = Number(trx.net_price) - transferPart;
-                            if (cashRefund > 0) totalRefund += cashRefund;
-                        });
-                        if (totalRefund > 0) {
-                            if (await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
-                                await restoreDrawerBalance(totalRefund);
-                            }
-                        }
+                    if (shouldRestoreCash && totalRefund > 0) {
+                        await restoreDrawerBalance(totalRefund, ids, exactToRestore);
                     }
                     loadTransactions();
                 } else {
@@ -3509,12 +3979,17 @@ createApp({
                 loadingTransactions.value = true;
 
                 // Fetch to get net prices and transfer amounts
-                const { data: trxs } = await supabase.from('transactions').select('net_price, transfer_amount').in('id', selectedTransactions.value);
+                const { data: trxs } = await supabase.from('transactions').select('id, net_price, transfer_amount, created_at').in('id', selectedTransactions.value);
                 const totalRefund = trxs ? trxs.reduce((sum, t) => {
                     const transferPart = Number(t.transfer_amount || 0);
                     const cashPart = (Number(t.net_price) || 0) - transferPart;
                     return sum + (cashPart > 0 ? cashPart : 0);
                 }, 0) : 0;
+
+                let shouldRestoreCash = false;
+                if (totalRefund > 0) {
+                    shouldRestoreCash = await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${formatCurrency(totalRefund)} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเงินเข้าลิ้นชัก)`, [], 'คืนเงินเข้าลิ้นชัก', 'ไม่คืนเงิน');
+                }
 
                 // Delete assets from storage first
                 await deleteTransactionAssets(selectedTransactions.value, deleteAssets);
@@ -3524,10 +3999,8 @@ createApp({
                     .in('id', selectedTransactions.value);
 
                 if (!error) {
-                    if (totalRefund > 0) {
-                        if (await showAppModal('confirm', 'คืนเงินเข้าลิ้นชัก', `คุณต้องการคืนเงินสดจำนวน ${totalRefund} บาท เข้าลิ้นชักหรือไม่?\n\n(กดยกเลิก หากรายการนี้จ่ายเป็นเงินโอนและไม่ต้องการคืนเข้าลิ้นชัก)`)) {
-                            await restoreDrawerBalance(totalRefund);
-                        }
+                    if (shouldRestoreCash && totalRefund > 0) {
+                        await restoreDrawerBalance(totalRefund, selectedTransactions.value);
                     }
                     selectedTransactions.value = [];
                     await loadTransactions();
@@ -3535,6 +4008,31 @@ createApp({
                     await showAppModal('alert', 'ผิดพลาด', 'เกิดข้อผิดพลาดในการลบ: ' + error.message);
                     loadingTransactions.value = false;
                 }
+            }
+        };
+
+        const viewBillCashDetails = async (g) => {
+            const ids = g.items.map(t => t.id);
+            const transferTotal = g.items.reduce((s, t) => s + (Number(t.transfer_amount) || 0), 0);
+            const cashTotal = Math.max(0, Number(g.net_price) - transferTotal);
+
+            if (cashTotal <= 0) {
+                await showAppModal('alert', 'การชำระเงิน', 'บิลนี้ชำระด้วยเงินโอนทั้งหมด (ไม่ได้จ่ายเป็นเงินสด)');
+                return;
+            }
+
+            const deductionLog = await findBillDeductionLog(ids, g.created_at, cashTotal);
+            const extracted = extractBanknotesFromLog(deductionLog);
+
+            if (extracted && extracted.breakdown.length > 0) {
+                const lines = extracted.breakdown.map(b => `• ${b.label}: ${b.count} ${b.label.includes('เหรียญ') ? 'เหรียญ' : 'ใบ'} (${formatCurrency(b.count * b.val)} บาท)`);
+                await showAppModal('alert', `ประวัติการจ่ายเงินสด (บิล: ${g.customer_name || 'เงินสด'})`,
+                    `ยอดเงินสดที่จ่าย: ${formatCurrency(cashTotal)} บาท\nเวลาที่บันทึก: ${formatDate(g.created_at)}\n\n💵 รายการแบงก์/เหรียญที่จ่ายออกจากลิ้นชัก:\n${lines.join('\n')}`
+                );
+            } else {
+                await showAppModal('alert', `ประวัติการจ่ายเงินสด (บิล: ${g.customer_name || 'เงินสด'})`,
+                    `ยอดเงินสดที่จ่าย: ${formatCurrency(cashTotal)} บาท\nเวลาที่บันทึก: ${formatDate(g.created_at)}\n\n(ไม่พบประวัติการตัดแบงก์จากลิ้นชักของบิลนี้ในระบบ อาจเป็นรายการที่บันทึกก่อนหน้าหรือจ่ายนอกระบบ)`
+                );
             }
         };
 
@@ -3608,7 +4106,15 @@ createApp({
                 groups[key].net_price += (Number(t.net_price) || 0);
             });
             // Sort by created_at descending
-            return Object.values(groups).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const result = Object.values(groups).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            result.forEach(g => {
+                g.items.sort((a, b) => {
+                    const aIsSilver = a.type === 'silver' ? 1 : 0;
+                    const bIsSilver = b.type === 'silver' ? 1 : 0;
+                    return aIsSilver - bIsSilver;
+                });
+            });
+            return result;
         });
 
         const toggleGroupSelection = (g, checked) => {
@@ -3757,6 +4263,13 @@ createApp({
                 alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน (เบอร์โทร, รูปถ่ายสินค้า, ลายเซ็น)');
                 return;
             }
+
+            // Ensure gold items appear first, silver items appear below
+            billItems.value.sort((a, b) => {
+                const aIsSilver = a.type === 'silver' ? 1 : 0;
+                const bIsSilver = b.type === 'silver' ? 1 : 0;
+                return aIsSilver - bIsSilver;
+            });
 
             // Capture signature
             if (signaturePad && !signaturePad.isEmpty()) {
@@ -4283,7 +4796,7 @@ createApp({
             } else if (customer.customer_name) {
                 const { data } = await supabase.from('customers').select('tier').eq('customer_name', customer.customer_name.trim());
                 if (data && data.length > 0) {
-                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip' || c.tier === 'network' || c.tier === 'network_vip');
+                    const vipTier = data.find(c => ['vip', 'vvip', 'network', 'network_vip', 'network_vvip'].includes(c.tier));
                     if (vipTier) {
                         calcForm.value.customerTier = vipTier.tier;
                     } else {
@@ -4316,7 +4829,7 @@ createApp({
             } else if (customer.customer_name) {
                 const { data } = await supabase.from('customers').select('tier').eq('customer_name', customer.customer_name.trim());
                 if (data && data.length > 0) {
-                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip' || c.tier === 'network' || c.tier === 'network_vip');
+                    const vipTier = data.find(c => ['vip', 'vvip', 'network', 'network_vip', 'network_vvip'].includes(c.tier));
                     if (vipTier) {
                         calcForm.value.customerTier = vipTier.tier;
                     } else {
@@ -4349,7 +4862,7 @@ createApp({
             if (newVal && newVal.trim().length >= 2) {
                 const { data } = await supabase.from('customers').select('tier').eq('customer_name', newVal.trim());
                 if (data && data.length > 0) {
-                    const vipTier = data.find(c => c.tier === 'vip' || c.tier === 'vvip' || c.tier === 'network' || c.tier === 'network_vip');
+                    const vipTier = data.find(c => ['vip', 'vvip', 'network', 'network_vip', 'network_vvip'].includes(c.tier));
                     if (vipTier) {
                         calcForm.value.customerTier = vipTier.tier;
                     } else {
@@ -4914,7 +5427,7 @@ createApp({
 
         const syncHashToTab = () => {
             const hash = window.location.hash.replace('#', '');
-            const validTabs = ['home', 'history', 'settings', 'delivery', 'calculator'];
+            const validTabs = ['home', 'history', 'settings', 'delivery', 'calculator', 'drawer', 'attendance', 'pre_melt', 'price_locks', 'realtime_price'];
             if (validTabs.includes(hash)) {
                 currentTab.value = hash;
             } else if (!window.location.hash) {
@@ -4922,7 +5435,7 @@ createApp({
             }
         };
 
-        onMounted(() => {
+        onMounted(async () => {
             syncHashToTab();
             window.addEventListener('hashchange', syncHashToTab);
 
@@ -4935,8 +5448,12 @@ createApp({
 
             loadPremiums();
             loadDrawerBalance();
-            checkAuth();
+            await checkAuth();
             fetchExpenseRequests();
+
+            if (currentTab.value === 'delivery' && !user.value) {
+                loadDeliveryData();
+            }
 
             nextTick(() => {
                 setTimeout(() => {
@@ -4957,7 +5474,28 @@ createApp({
             }
         });
 
-        watch(currentTab, (newTab) => {
+        watch(currentTab, (newTab, oldTab) => {
+            if (newTab !== oldTab) {
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                    document.activeElement.blur();
+                }
+                window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+
+                nextTick(() => {
+                    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                    document.documentElement.scrollTop = 0;
+                    document.body.scrollTop = 0;
+                });
+
+                setTimeout(() => {
+                    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                    document.documentElement.scrollTop = 0;
+                    document.body.scrollTop = 0;
+                }, 350);
+            }
+
             if (window.location.hash.replace('#', '') !== newTab) {
                 window.location.hash = newTab;
             }
@@ -4971,6 +5509,8 @@ createApp({
                 loadTransactions();
             } else if (newTab === 'drawer') {
                 loadDrawerBalance();
+            } else if (newTab === 'delivery') {
+                loadDeliveryData(true);
             }
             mobileMenuOpen.value = false;
         });
@@ -5210,6 +5750,32 @@ createApp({
             activeUndoToast.value = null;
         };
 
+        const deliveryRefreshToast = ref(false);
+        let deliveryRefreshToastTimeout = null;
+
+        const manualRefreshDeliveryData = async () => {
+            await loadDeliveryData(false);
+            if (deliveryRefreshToastTimeout) clearTimeout(deliveryRefreshToastTimeout);
+            deliveryRefreshToast.value = true;
+            deliveryRefreshToastTimeout = setTimeout(() => {
+                deliveryRefreshToast.value = false;
+            }, 3000);
+        };
+
+        const handleTabClick = (tab) => {
+            if (currentTab.value === tab) {
+                if (tab === 'delivery') {
+                    manualRefreshDeliveryData();
+                } else if (tab === 'history') {
+                    loadTransactions();
+                } else if (tab === 'drawer') {
+                    loadDrawerBalance();
+                }
+            } else {
+                currentTab.value = tab;
+            }
+        };
+
         const executeDeliveryUndo = async (actionToUndo = null) => {
             let action = actionToUndo;
             if (!action) {
@@ -5297,34 +5863,41 @@ createApp({
         });
 
         const normalDeliveryRounds = computed(() => {
-            return deliveryRoundsHistory.value.filter(r => !r.delivery_ingots.every(ing => ing.category && String(ing.category).startsWith('อื่นๆ:')));
+            return deliveryRoundsHistory.value.filter(r => {
+                const ingots = Array.isArray(r.delivery_ingots) ? r.delivery_ingots : [];
+                if (ingots.length === 0) return true;
+                return !ingots.every(ing => ing.category && String(ing.category).startsWith('อื่นๆ:'));
+            });
         });
 
         const otherDeliveryRounds = computed(() => {
-            return deliveryRoundsHistory.value.filter(r => r.delivery_ingots.every(ing => ing.category && String(ing.category).startsWith('อื่นๆ:')));
+            return deliveryRoundsHistory.value.filter(r => {
+                const ingots = Array.isArray(r.delivery_ingots) ? r.delivery_ingots : [];
+                return ingots.length > 0 && ingots.every(ing => ing.category && String(ing.category).startsWith('อื่นๆ:'));
+            });
         });
         const loadingDeliveryData = ref(false);
         const stockDateFilterMode = ref('all');
-        const stockStartDate = ref(new Date().toLocaleDateString('en-CA'));
-        const stockEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        const stockStartDate = ref(getISODate());
+        const stockEndDate = ref(getISODate());
 
         const historyDateFilterMode = ref('all');
-        const historyStartDate = ref(new Date().toLocaleDateString('en-CA'));
-        const historyEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        const historyStartDate = ref(getISODate());
+        const historyEndDate = ref(getISODate());
         const historyStatusFilter = ref('all');
 
         const selectedTransactionIds = ref([]);
 
         const extraProfits = ref([]);
         const newExtraProfit = ref({
-            profit_date: new Date().toLocaleDateString('en-CA'),
+            profit_date: getISODate(),
             amount: '',
             note: ''
         });
 
         const extraProfitDateFilterMode = ref('all');
-        const extraProfitStartDate = ref(new Date().toLocaleDateString('en-CA'));
-        const extraProfitEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        const extraProfitStartDate = ref(getISODate());
+        const extraProfitEndDate = ref(getISODate());
 
         const extraProfitSumForHistoryPeriod = ref(0);
 
@@ -5341,7 +5914,7 @@ createApp({
             return !isSilverIngot(ing);
         };
 
-        const loadDeliveryData = async () => {
+        const loadDeliveryData = async (shouldScrollTop = false) => {
             loadingDeliveryData.value = true;
             try {
                 let query = supabase.from('transactions')
@@ -5361,7 +5934,8 @@ createApp({
 
                 query = query.order('created_at', { ascending: false });
 
-                const { data: unsent } = await query;
+                const { data: unsent, error: unsentErr } = await query;
+                if (unsentErr) console.error("Error loading unsent transactions:", unsentErr);
                 unsentTransactions.value = unsent || [];
 
                 selectedTransactionIds.value = [];
@@ -5397,15 +5971,17 @@ createApp({
                 groupedUnsent.value = groups;
 
                 // 2. Fetch pending ingots
-                const { data: pending } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight, percent, base_price)').is('round_id', null).order('created_at', { ascending: true });
+                const { data: pending, error: pendingErr } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight, percent, base_price)').is('round_id', null).order('created_at', { ascending: true });
+                if (pendingErr) console.error("Error loading pending ingots:", pendingErr);
                 if (pending) {
                     pending.forEach(ing => {
-                        const cost = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0;
+                        const txs = Array.isArray(ing.transactions) ? ing.transactions : [];
+                        const cost = txs.reduce((sum, t) => sum + Number(t.net_price || 0), 0);
                         ing.total_cost = cost;
                         ing.cost = cost;
-                        ing.raw_weight = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0) : 0;
+                        ing.raw_weight = txs.reduce((sum, t) => sum + Number(t.weight || 0), 0);
                         let sumW = 0, sumWP = 0, sumWBP = 0;
-                        ing.transactions.forEach(t => {
+                        txs.forEach(t => {
                             const w = Number(t.weight) || 0;
                             const p = Number(t.percent) || 0;
                             const bp = Number(t.base_price) || 0;
@@ -5462,8 +6038,8 @@ createApp({
 
                         roundsQuery = roundsQuery.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
 
-                        const startStr = start.toLocaleDateString('en-CA');
-                        const endStr = end.toLocaleDateString('en-CA');
+                        const startStr = getISODate(start);
+                        const endStr = getISODate(end);
                         epQuery = epQuery.gte('profit_date', startStr).lte('profit_date', endStr);
                     } else {
                         roundsQuery = roundsQuery.limit(30);
@@ -5472,7 +6048,7 @@ createApp({
 
                     const [roundsRes, epRes] = await Promise.all([roundsQuery, epQuery]);
 
-                    let rounds = roundsRes.data;
+                    let rounds = roundsRes ? roundsRes.data : null;
                     if (rounds) {
                         if (historyStatusFilter.value === 'waiting_transfer') {
                             rounds = rounds.filter(r => r.status !== 'completed' && (Number(r.gold_payment || 0) > 0 || Number(r.silver_payment || 0) > 0));
@@ -5489,16 +6065,18 @@ createApp({
                             let silverBaseSum = 0;
                             let goldRawWeightSum = 0;
                             let silverRawWeightSum = 0;
-                            r.delivery_ingots.forEach(ing => {
+                            const ingots = Array.isArray(r.delivery_ingots) ? r.delivery_ingots : [];
+                            ingots.forEach(ing => {
                                 const isSilver = isSilverIngot(ing);
-                                const cost = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.net_price), 0) : 0;
+                                const txs = Array.isArray(ing.transactions) ? ing.transactions : [];
+                                const cost = txs.reduce((sum, t) => sum + Number(t.net_price || 0), 0);
                                 ing.cost = cost;
                                 ing.total_cost = cost;
-                                ing.raw_weight = ing.transactions ? ing.transactions.reduce((sum, t) => sum + Number(t.weight), 0) : 0;
+                                ing.raw_weight = txs.reduce((sum, t) => sum + Number(t.weight || 0), 0);
                                 let sumW = 0, sumWP = 0;
                                 let ingBaseSum = 0;
                                 let ingRawWeightSum = 0;
-                                ing.transactions.forEach(t => {
+                                txs.forEach(t => {
                                     const w = Number(t.weight) || 0;
                                     const p = Number(t.percent) || 0;
                                     const bp = Number(t.base_price) || 0;
@@ -5525,13 +6103,14 @@ createApp({
                                     goldWeightGrams += Number(ing.melted_weight) || 0;
                                 }
                             });
-                            r.delivery_ingots.sort((a, b) => {
+                            ingots.sort((a, b) => {
                                 const isASilver = isSilverIngot(a);
                                 const isBSilver = isSilverIngot(b);
                                 if (isASilver && !isBSilver) return 1;
                                 if (!isASilver && isBSilver) return -1;
                                 return 0;
                             });
+                            r.delivery_ingots = ingots;
                             r.total_cost = totalCost;
                             r.gold_cost = goldCost;
                             r.silver_cost = silverCost;
@@ -5548,7 +6127,7 @@ createApp({
                     }
                     deliveryRoundsHistory.value = rounds || [];
 
-                    const epData = epRes.data;
+                    const epData = epRes ? epRes.data : null;
                     extraProfitSumForHistoryPeriod.value = epData ? epData.reduce((sum, item) => sum + Number(item.amount || 0), 0) : 0;
                 } else {
                     deliveryRoundsHistory.value = [];
@@ -5560,6 +6139,13 @@ createApp({
                 console.error("Error loading delivery data:", err);
             } finally {
                 loadingDeliveryData.value = false;
+                if (shouldScrollTop) {
+                    nextTick(() => {
+                        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+                        document.documentElement.scrollTop = 0;
+                        document.body.scrollTop = 0;
+                    });
+                }
             }
         };
 
@@ -5591,8 +6177,8 @@ createApp({
                         end = new Date(extraProfitEndDate.value + 'T23:59:59+07:00');
                     }
 
-                    const startStr = start.toLocaleDateString('en-CA');
-                    const endStr = end.toLocaleDateString('en-CA');
+                    const startStr = getISODate(start);
+                    const endStr = getISODate(end);
                     query = query.gte('profit_date', startStr).lte('profit_date', endStr);
                 } else {
                     query = query.limit(30);
@@ -6963,12 +7549,6 @@ createApp({
             allPremiumType.value = type;
         };
 
-        watch(currentTab, (newTab) => {
-            if (newTab === 'delivery') {
-                loadDeliveryData();
-            }
-        });
-
         // --- Pre-melt Calculator Feature ---
         const preMeltItems = ref([{ id: Date.now(), type: 'gold', weight: null, percent: null }]);
 
@@ -7288,6 +7868,7 @@ createApp({
             hasVVIP,
             hasNetwork,
             hasNetworkVIP,
+            hasNetworkVVIP,
             searchOldCustomers,
             addCustomerTier,
             removeCustomerTier,
@@ -7304,6 +7885,7 @@ createApp({
             silverPremiumAmountVvip,
             silverPremiumAmountNetwork,
             silverPremiumAmountNetworkVip,
+            silverPremiumAmountNetworkVvip,
             networkGoldPremiumAmount_25_49,
             networkGoldPremiumPercent_25_49,
             networkGoldPremiumAmount_50_100,
@@ -7312,6 +7894,10 @@ createApp({
             networkVipGoldPremiumPercent_25_49,
             networkVipGoldPremiumAmount_50_100,
             networkVipGoldPremiumPercent_50_100,
+            networkVvipGoldPremiumAmount_25_49,
+            networkVvipGoldPremiumPercent_25_49,
+            networkVvipGoldPremiumAmount_50_100,
+            networkVvipGoldPremiumPercent_50_100,
             manualSilverPrice,
             useManualSilverPrice,
             isSilverPriceSetToday,
@@ -7352,6 +7938,7 @@ createApp({
             isFilterActive,
             deleteTransaction,
             deleteGroup,
+            viewBillCashDetails,
             editTransaction,
             editTrxModal,
             calculateEditTrxNetPrice,
@@ -7379,6 +7966,7 @@ createApp({
             isBaseValid,
             isMerchantCustomer,
             isPercentValid,
+            onPercentKeydown,
             isWeightValid,
             currentAssetPrice,
             calculatedResult,
@@ -7498,6 +8086,9 @@ createApp({
             showUndoHistoryMenu,
             executeDeliveryUndo,
             dismissUndoToast,
+            deliveryRefreshToast,
+            manualRefreshDeliveryData,
+            handleTabClick,
             isSilverIngot,
             isGoldIngot,
 

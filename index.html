@@ -133,7 +133,7 @@
                         <button v-if="isAdmin || isEmployee" @click="currentTab = 'drawer'"
                             :class="currentTab === 'drawer' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">ลิ้นชักเงิน</button>
-                        <button v-if="isAdmin || isEmployee" @click="currentTab = 'delivery'"
+                        <button v-if="isAdmin || isEmployee" @click="handleTabClick('delivery'); window.scrollTo({ top: 0, left: 0, behavior: 'instant' })"
                             :class="currentTab === 'delivery' ? 'text-gold-400 font-bold border-b-2 border-gold-400' : 'text-gray-300 font-medium'"
                             class="hover:text-gold-300 pb-1 transition-all-custom">Delivery & Profit</button>
 
@@ -178,7 +178,7 @@
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ประเมินหลอม</button>
                     <button v-if="isAdmin || isEmployee" @click="currentTab = 'drawer'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ลิ้นชักเงิน</button>
-                    <button v-if="isAdmin || isEmployee" @click="currentTab = 'delivery'; mobileMenuOpen = false"
+                    <button v-if="isAdmin || isEmployee" @click="handleTabClick('delivery'); mobileMenuOpen = false; window.scrollTo({ top: 0, left: 0, behavior: 'instant' })"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">รายการส่งของ</button>
                     <button v-if="isAdmin || isEmployee" @click="currentTab = 'price_locks'; mobileMenuOpen = false"
                         class="block w-full text-left px-3 py-2 rounded-md font-medium text-gray-300 hover:text-gold-400">ประวัติการล็อคราคา</button>
@@ -1501,7 +1501,7 @@
 
             <transition name="slide-fade" mode="out-in">
                 <!-- Delivery & Profit -->
-                <div v-if="currentTab === 'delivery'" key="delivery" class="max-w-6xl mx-auto space-y-6">
+                <div id="delivery" v-if="currentTab === 'delivery'" key="delivery" class="max-w-6xl mx-auto space-y-6 scroll-mt-24">
                     <!-- Loading State -->
                     <div v-if="loadingDeliveryData"
                         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -1524,6 +1524,14 @@
 
                         <!-- Undo Action & History Dropdown -->
                         <div class="relative flex items-center gap-2">
+                            <button @click="manualRefreshDeliveryData()"
+                                :disabled="loadingDeliveryData"
+                                class="px-3.5 py-2.5 rounded-xl text-sm font-semibold border border-gray-700 bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center gap-2 transition-all duration-200 cursor-pointer active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="รีเฟรชข้อมูล">
+                                <i class="fa-solid fa-rotate-right" :class="{ 'fa-spin': loadingDeliveryData }"></i>
+                                <span class="hidden sm:inline">รีเฟรชข้อมูล</span>
+                            </button>
+
                             <button @click="executeDeliveryUndo()"
                                 :disabled="deliveryUndoStack.length === 0"
                                 :class="deliveryUndoStack.length > 0 ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 shadow-amber-500/10 shadow-lg cursor-pointer active:scale-95' : 'bg-gray-800/40 text-gray-600 border-gray-800 cursor-not-allowed opacity-60'"
@@ -2794,6 +2802,34 @@
                             </div>
                         </div>
                     </transition>
+
+                    <!-- Floating Delivery Refresh Toast Notification -->
+                    <transition enter-active-class="transition duration-300 ease-out transform"
+                        enter-from-class="opacity-0 translate-y-6 scale-95"
+                        enter-to-class="opacity-100 translate-y-0 scale-100"
+                        leave-active-class="transition duration-200 ease-in transform"
+                        leave-from-class="opacity-100 translate-y-0 scale-100"
+                        leave-to-class="opacity-0 translate-y-6 scale-95">
+                        <div v-if="deliveryRefreshToast"
+                            class="fixed bottom-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] bg-dark-surface/95 backdrop-blur-md border border-emerald-500/50 rounded-2xl shadow-2xl p-4 flex items-center justify-between gap-3 text-white ring-1 ring-emerald-500/20">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 shadow-inner">
+                                    <i class="fa-solid fa-circle-check text-lg"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="text-[11px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                        อัปเดตข้อมูลสำเร็จ
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-200 mt-0.5 truncate">รีเฟรชข้อมูลล่าสุดเรียบร้อยแล้ว</div>
+                                </div>
+                            </div>
+                            <button @click="deliveryRefreshToast = false"
+                                class="p-1.5 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                title="ปิดการแจ้งเตือน">
+                                <i class="fa-solid fa-xmark text-sm"></i>
+                            </button>
+                        </div>
+                    </transition>
                 </div>
             </transition>
 
@@ -2841,6 +2877,7 @@
                                                 'bg-purple-500/10 border-4 border-purple-500 shadow-[0_0_20px_rgba(168,85,247,0.2)]': calcForm.customerTier === 'vvip',
                                                 'bg-blue-500/10 border-4 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]': calcForm.customerTier === 'network',
                                                 'bg-cyan-500/10 border-4 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.2)]': calcForm.customerTier === 'network_vip',
+                                                'bg-emerald-500/10 border-4 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]': calcForm.customerTier === 'network_vvip',
                                                 'bg-gold-400/5 border border-gold-500/20': calcForm.customerTier === 'normal' || !calcForm.customerTier
                                             }">
                                             <div
@@ -2857,6 +2894,7 @@
                                                                 'border-4 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)] hover:shadow-[0_0_20px_rgba(168,85,247,0.8)]': calcForm.customerTier === 'vvip',
                                                                 'border-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_20px_rgba(59,130,246,0.8)]': calcForm.customerTier === 'network',
                                                                 'border-4 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)] hover:shadow-[0_0_20px_rgba(6,182,212,0.8)]': calcForm.customerTier === 'network_vip',
+                                                                'border-4 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)] hover:shadow-[0_0_20px_rgba(16,185,129,0.8)]': calcForm.customerTier === 'network_vvip',
                                                                 'border-2 border-gold-500/30 shadow-2xl hover:border-gold-500/60': calcForm.customerTier === 'normal' || !calcForm.customerTier
                                                             }" @click="viewingPhoto = calcForm.idCardPhoto" />
                                                         <div v-else
@@ -2866,10 +2904,11 @@
                                                                 'border-4 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]': calcForm.customerTier === 'vvip',
                                                                 'border-4 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]': calcForm.customerTier === 'network',
                                                                 'border-4 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.5)]': calcForm.customerTier === 'network_vip',
+                                                                'border-4 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]': calcForm.customerTier === 'network_vvip',
                                                                 'border-2 border-gray-700 shadow-2xl': calcForm.customerTier === 'normal' || !calcForm.customerTier
                                                             }">
                                                             <i class="fa-solid fa-user text-4xl mb-2"
-                                                                :class="{'text-gold-400': calcForm.customerTier === 'vip', 'text-purple-500': calcForm.customerTier === 'vvip', 'text-blue-400': calcForm.customerTier === 'network', 'text-cyan-400': calcForm.customerTier === 'network_vip'}"></i>
+                                                                :class="{'text-gold-400': calcForm.customerTier === 'vip', 'text-purple-500': calcForm.customerTier === 'vvip', 'text-blue-400': calcForm.customerTier === 'network', 'text-cyan-400': calcForm.customerTier === 'network_vip', 'text-emerald-400': calcForm.customerTier === 'network_vvip'}"></i>
                                                             <span class="text-[10px]">ไม่มีรูปถ่าย</span>
                                                         </div>
                                                         <div class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center border-2 border-dark-base shadow-lg"
@@ -2897,6 +2936,9 @@
                                                                 <span v-if="calcForm.customerTier === 'network_vip'"
                                                                     class="bg-cyan-500/20 text-cyan-400 text-[10px] px-2 py-0.5 rounded border border-cyan-500/30 mt-1">พ่อค้าในเครือข่าย
                                                                     (VIP)</span>
+                                                                <span v-if="calcForm.customerTier === 'network_vvip'"
+                                                                    class="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded border border-emerald-500/30 mt-1">พ่อค้าในเครือข่าย
+                                                                    (VVIP)</span>
                                                             </h3>
                                                             <p
                                                                 class="text-gray-400 text-xs font-mono mt-1 tracking-widest">
@@ -2943,6 +2985,9 @@
                                                 <span v-if="calcForm.customerTier === 'network_vip'"
                                                     class="bg-cyan-500/20 text-cyan-400 text-[10px] px-2 py-0.5 rounded border border-cyan-500/30">ในเครือข่าย
                                                     VIP</span>
+                                                <span v-if="calcForm.customerTier === 'network_vvip'"
+                                                    class="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded border border-emerald-500/30">ในเครือข่าย
+                                                    VVIP</span>
                                             </label>
                                             <input type="text" v-model="calcForm.customerName"
                                                 class="w-full px-4 py-2.5 bg-dark-base border border-gray-700 text-white rounded-lg focus:ring-1 outline-none transition-colors"
@@ -3213,23 +3258,56 @@
                                                 <label class="block text-sm font-medium text-gray-400">ความบริสุทธิ์
                                                     (%)</label>
                                                 <span
-                                                    v-if="!isAdmin && calcForm.type === 'tong_lom' && isMerchantCustomer"
+                                                    v-if="calcForm.type === 'silver'"
+                                                    class="text-[10px] text-emerald-400 font-medium">
+                                                    * จำนวนเต็มเท่านั้น (ไม่มีทศนิยม)
+                                                </span>
+                                                <span
+                                                    v-else-if="calcForm.customerTier === 'network_vvip' && calcForm.type === 'tong_lom'"
+                                                    class="text-[10px] text-emerald-400 font-medium">
+                                                    * จำนวนเต็มเท่านั้น (ไม่มีทศนิยม)
+                                                </span>
+                                                <span
+                                                    v-else-if="calcForm.customerTier === 'network_vvip'"
+                                                    class="text-[10px] text-emerald-400 font-medium">
+                                                    * ทศนิยมได้ 1 ตำแหน่ง
+                                                </span>
+                                                <span
+                                                    v-else-if="calcForm.type === 'tong_lom' && isMerchantCustomer && calcForm.customerTier !== 'network_vvip'"
                                                     class="text-[10px] text-amber-400 font-medium">
                                                     * บังคับทศนิยม 2 ตำแหน่ง
                                                 </span>
                                             </div>
                                             <div class="relative">
-                                                <input type="text" inputmode="decimal" v-model="calcForm.percent"
-                                                    :placeholder="(!isAdmin && calcForm.type === 'tong_lom' && isMerchantCustomer) ? 'เช่น 96.50' : ''"
+                                                <input type="text"
+                                                    :inputmode="(calcForm.type === 'silver' || (calcForm.customerTier === 'network_vvip' && calcForm.type === 'tong_lom')) ? 'numeric' : 'decimal'"
+                                                    v-model="calcForm.percent"
+                                                    @keydown="onPercentKeydown($event, calcForm.customerTier, calcForm.type)"
+                                                    :placeholder="calcForm.type === 'silver' ? 'เช่น 99 หรือ 92' : ((calcForm.customerTier === 'network_vvip' && calcForm.type === 'tong_lom') ? 'เช่น 96' : (calcForm.customerTier === 'network_vvip' ? 'เช่น 96.5' : ((calcForm.type === 'tong_lom' && isMerchantCustomer && calcForm.customerTier !== 'network_vvip') ? 'เช่น 96.50' : '')))"
                                                     class="w-full pl-4 pr-8 py-2.5 bg-dark-base border text-white text-lg rounded-lg outline-none transition-colors"
                                                     :class="(!isPercentValid && calcForm.percent) ? 'border-red-500 text-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-700 focus:ring-1 focus:ring-gold-500 focus:border-gold-500'">
                                                 <span class="absolute right-3 top-3 text-gray-500">%</span>
                                             </div>
-                                            <!-- ข้อความเตือนสีแดงกรณีไม่กรอกทศนิยม 2 ตำแหน่งสำหรับพ่อค้า -->
-                                            <p v-if="!isAdmin && calcForm.type === 'tong_lom' && isMerchantCustomer && calcForm.percent && !isPercentValid"
+                                            <!-- ข้อความเตือนสำหรับความบริสุทธิ์ -->
+                                            <p v-if="calcForm.type === 'silver' && calcForm.percent && !isPercentValid"
                                                 class="text-xs text-red-400 mt-1.5 flex items-center gap-1 font-medium animate-fade-in">
                                                 <i class="fa-solid fa-circle-exclamation text-[10px]"></i>
-                                                บังคับกรอกทศนิยม 2 ตำแหน่งสำหรับพ่อค้า (เช่น 96.50, 96.00)
+                                                สินทรัพย์เงินต้องเป็นจำนวนเต็ม 1-100 เท่านั้น (ห้ามกรอกทศนิยม)
+                                            </p>
+                                            <p v-else-if="calcForm.customerTier === 'network_vvip' && calcForm.type === 'tong_lom' && calcForm.percent && !isPercentValid"
+                                                class="text-xs text-red-400 mt-1.5 flex items-center gap-1 font-medium animate-fade-in">
+                                                <i class="fa-solid fa-circle-exclamation text-[10px]"></i>
+                                                ทองหลอมสำหรับพ่อค้าในเครือข่าย (VVIP) ต้องเป็นจำนวนเต็ม 1-100 เท่านั้น (ห้ามกรอกทศนิยม)
+                                            </p>
+                                            <p v-else-if="calcForm.customerTier === 'network_vvip' && calcForm.percent && !isPercentValid"
+                                                class="text-xs text-red-400 mt-1.5 flex items-center gap-1 font-medium animate-fade-in">
+                                                <i class="fa-solid fa-circle-exclamation text-[10px]"></i>
+                                                สำหรับพ่อค้าในเครือข่าย (VVIP) กรอกทศนิยมได้ไม่เกิน 1 ตำแหน่ง (เช่น 96.5)
+                                            </p>
+                                            <p v-else-if="calcForm.type === 'tong_lom' && isMerchantCustomer && calcForm.customerTier !== 'network_vvip' && calcForm.percent && !isPercentValid"
+                                                class="text-xs text-red-400 mt-1.5 flex items-center gap-1 font-medium animate-fade-in">
+                                                <i class="fa-solid fa-circle-exclamation text-[10px]"></i>
+                                                บังคับกรอกทศนิยม 2 ตำแหน่งสำหรับพ่อค้า (เช่น 96.50 หรือ 96.00)
                                             </p>
                                             <!-- ปุ่มความบริสุทธิ์ทางลัด (แสดงแค่คนทั่วไป และซ่อนถ้าเป็นไถ่ถอน/เงิน) -->
                                             <div v-show="!isLoggedIn && calcForm.type !== 'redeem' && calcForm.type !== 'silver'"
@@ -3310,15 +3388,24 @@
                                             :class="isFormValid ? 'bg-gold-600 hover:bg-gold-500 text-white hover-glow shadow-md' : 'bg-gray-700 text-gray-500 cursor-not-allowed opacity-60'"
                                             class="px-6 py-2 rounded-lg font-bold transition-all flex flex-col items-center">
                                             <div><i class="fa-solid fa-plus mr-2"></i>เพิ่มเข้ารายการบิล</div>
-                                            <span v-if="!isFormValid && isLoggedIn && !isAdmin"
+                                            <span v-if="!isFormValid && isLoggedIn"
                                                 class="text-[9px] text-red-400 mt-1 font-normal">
                                                 <template
-                                                    v-if="calcForm.type === 'tong_lom' && isMerchantCustomer && !isPercentValid">*
+                                                    v-if="calcForm.type === 'silver' && !isPercentValid">*
+                                                    กรุณากรอก % เป็นจำนวนเต็ม</template>
+                                                <template
+                                                    v-else-if="calcForm.customerTier === 'network_vvip' && calcForm.type === 'tong_lom' && !isPercentValid">*
+                                                    กรุณากรอก % เป็นจำนวนเต็ม</template>
+                                                <template
+                                                    v-else-if="calcForm.customerTier === 'network_vvip' && !isPercentValid">*
+                                                    กรุณากรอก % ทศนิยมไม่เกิน 1 ตำแหน่ง</template>
+                                                <template
+                                                    v-else-if="calcForm.type === 'tong_lom' && isMerchantCustomer && calcForm.customerTier !== 'network_vvip' && !isPercentValid">*
                                                     กรุณากรอก % ทศนิยม 2 ตำแหน่ง</template>
                                                 <template
-                                                    v-else-if="calcForm.type === 'silver' && isMerchantCustomer && !isWeightValid">*
+                                                    v-else-if="!isAdmin && calcForm.type === 'silver' && isMerchantCustomer && !isWeightValid">*
                                                     กรุณากรอกน้ำหนักทศนิยม 1 ตำแหน่ง</template>
-                                                <template v-else>* กรอกข้อมูลให้ครบถ้วน</template>
+                                                <template v-else-if="!isAdmin">* กรอกข้อมูลให้ครบถ้วน</template>
                                             </span>
                                         </button>
                                     </div>
@@ -3640,51 +3727,69 @@
                         </div>
                     </div>
 
-                    <div
-                        class="bg-gold-900/20 border border-gold-500/30 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center shadow-lg gap-2 mt-4 mb-4">
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                            <span class="text-gray-300 font-medium">ยอดรายการ ({{ transactions.length }} รายการ):</span>
-                            <button v-if="selectedTransactions.length > 0" @click="deleteSelected"
-                                class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 text-sm rounded-lg border border-red-700/50 transition-all shadow shadow-red-900/20">
-                                <i class="fa-solid fa-trash mr-1"></i> ลบที่เลือก ({{ selectedTransactions.length }})
-                            </button>
-                        </div>
-                        <div class="flex items-center gap-6">
-                            <div v-if="selectedTransactions.length > 0"
-                                class="flex items-center gap-4 bg-dark-base/80 border border-gray-700 px-4 py-2 rounded-lg mr-2">
-                                <div class="flex flex-col items-end">
-                                    <span class="text-[10px] text-gray-500 uppercase">น้ำหนัก (เลือก)</span>
-                                    <span class="text-lg font-bold text-gray-300">{{
-                                        selectedHistoryStats.weight.toFixed(3) }} <span
-                                            class="text-xs font-normal opacity-50">ก.</span></span>
-                                </div>
-                                <div class="flex flex-col items-end" v-if="selectedHistoryStats.avgBasePrice > 0">
-                                    <span class="text-[10px] text-yellow-500 uppercase">เฉลี่ย (เลือก)</span>
-                                    <span class="text-lg font-bold text-yellow-500">{{
-                                        formatCurrency(selectedHistoryStats.avgBasePrice) }} <span
-                                            class="text-xs font-normal opacity-50">฿/หน่วย</span></span>
-                                </div>
-                                <div class="flex flex-col items-end">
-                                    <span class="text-[10px] text-gold-500 uppercase font-semibold">ยอดสุทธิ
-                                        (เลือก)</span>
-                                    <span class="text-2xl font-bold text-gold-400">{{
-                                        formatCurrency(selectedHistoryStats.netPrice) }} ฿</span>
-                                </div>
-                            </div>
-                            <div class="flex flex-col items-end">
-                                <span class="text-[10px] text-gray-500 uppercase">น้ำหนักรวม</span>
-                                <span class="text-xl font-bold text-gray-200">{{ totalWeight.toFixed(3) }} <span
-                                        class="text-xs font-normal opacity-50">ก.</span></span>
-                            </div>
-                            <div class="flex flex-col items-end">
-                                <span class="text-[10px] text-gold-500 uppercase font-semibold">ยอดเงินรวม</span>
-                                <span class="text-3xl font-bold text-gold-400">{{ formatCurrency(transactionsTotal) }}
-                                    ฿</span>
+                    <!-- Summary Card & Selected Stats -->
+                    <div class="bg-gold-900/20 border border-gold-500/30 rounded-xl p-3.5 sm:p-5 shadow-lg mt-4 mb-4 space-y-3.5">
+                        <!-- Top Row: Count, Delete button, and CSV button -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gold-500/20">
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <span class="text-gray-300 font-medium text-sm sm:text-base">ยอดรายการ ({{ transactions.length }} รายการ):</span>
+                                <button v-if="selectedTransactions.length > 0" @click="deleteSelected"
+                                    class="px-3 py-1.5 bg-red-900/80 hover:bg-red-800 text-red-200 text-xs sm:text-sm font-semibold rounded-lg border border-red-600/60 transition-all shadow-md active:scale-95 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-trash text-xs"></i> ลบที่เลือก ({{ selectedTransactions.length }})
+                                </button>
+                                <button v-if="selectedTransactions.length > 0" @click="selectedTransactions = []"
+                                    class="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 text-xs rounded-lg border border-gray-700 transition-colors">
+                                    ยกเลิกการเลือก
+                                </button>
                             </div>
                             <button v-if="transactions.length > 0" @click="exportCSV"
-                                class="inline-flex items-center px-4 py-2 bg-green-900/40 border border-green-600/50 hover:bg-green-800/60 text-green-400 text-sm font-semibold rounded-lg transition-all shadow-md ml-2">
-                                <i class="fa-solid fa-file-csv mr-2 text-lg"></i> CSV
+                                class="inline-flex items-center px-3.5 py-1.5 sm:py-2 bg-green-900/40 border border-green-600/50 hover:bg-green-800/60 text-green-400 text-xs sm:text-sm font-semibold rounded-lg transition-all shadow-md active:scale-95 ml-auto sm:ml-0">
+                                <i class="fa-solid fa-file-csv mr-2 text-base sm:text-lg"></i> CSV
                             </button>
+                        </div>
+
+                        <!-- Selected Items Stats (Animated & Responsive) -->
+                        <transition enter-active-class="transition duration-200 ease-out"
+                            enter-from-class="opacity-0 -translate-y-2 scale-98"
+                            enter-to-class="opacity-100 translate-y-0 scale-100"
+                            leave-active-class="transition duration-150 ease-in"
+                            leave-from-class="opacity-100 translate-y-0 scale-100"
+                            leave-to-class="opacity-0 -translate-y-2 scale-98">
+                            <div v-if="selectedTransactions.length > 0"
+                                class="bg-dark-base/90 border border-gold-500/40 rounded-xl p-3 sm:px-4 sm:py-3 shadow-inner flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                <div class="flex items-center gap-2 text-gold-400 text-xs font-bold uppercase tracking-wider">
+                                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gold-500/20 text-gold-400 text-[11px]">
+                                        <i class="fa-solid fa-check"></i>
+                                    </span>
+                                    <span>สรุปรายการที่เลือก ({{ selectedTransactions.length }} รายการ)</span>
+                                </div>
+                                <div class="grid grid-cols-2 sm:flex sm:items-center gap-3 sm:gap-6 justify-end">
+                                    <div class="flex flex-col items-start sm:items-end">
+                                        <span class="text-[10px] text-gray-400 uppercase font-medium">น้ำหนัก (เลือก)</span>
+                                        <span class="text-sm sm:text-lg font-bold text-gray-200">{{ selectedHistoryStats.weight.toFixed(3) }} <span class="text-xs font-normal opacity-50">ก.</span></span>
+                                    </div>
+                                    <div class="flex flex-col items-start sm:items-end" v-if="selectedHistoryStats.avgBasePrice > 0">
+                                        <span class="text-[10px] text-yellow-500 uppercase font-medium">เฉลี่ย (เลือก)</span>
+                                        <span class="text-sm sm:text-lg font-bold text-yellow-400">{{ formatCurrency(selectedHistoryStats.avgBasePrice) }} <span class="text-xs font-normal opacity-50">฿/น.</span></span>
+                                    </div>
+                                    <div class="flex flex-col items-start sm:items-end col-span-2 sm:col-span-1 border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-800">
+                                        <span class="text-[10px] text-gold-500 uppercase font-semibold">ยอดสุทธิ (เลือก)</span>
+                                        <span class="text-lg sm:text-2xl font-bold text-gold-400">{{ formatCurrency(selectedHistoryStats.netPrice) }} ฿</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </transition>
+
+                        <!-- Overall Totals Row -->
+                        <div class="flex flex-wrap items-center justify-between sm:justify-end gap-4 sm:gap-8 pt-1">
+                            <div class="flex flex-col items-start sm:items-end">
+                                <span class="text-[10px] text-gray-400 uppercase font-medium">น้ำหนักรวมทั้งหมด</span>
+                                <span class="text-lg sm:text-xl font-bold text-gray-200">{{ totalWeight.toFixed(3) }} <span class="text-xs font-normal opacity-50">ก.</span></span>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-[10px] text-gold-500 uppercase font-semibold">ยอดเงินรวมทั้งหมด</span>
+                                <span class="text-2xl sm:text-3xl font-bold text-gold-400">{{ formatCurrency(transactionsTotal) }} ฿</span>
+                            </div>
                         </div>
                     </div>
 
@@ -3693,8 +3798,10 @@
                             <thead class="bg-dark-base border-b border-gray-800">
                                 <tr>
                                     <th class="px-4 py-4 text-left w-12">
-                                        <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll"
-                                            class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                        <label class="inline-flex items-center justify-center p-1 cursor-pointer">
+                                            <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll"
+                                                class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                        </label>
                                     </th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">วันที่</th>
                                     <th class="px-6 py-4 text-left font-semibold text-gray-400 text-sm">ลูกค้า</th>
@@ -3709,21 +3816,23 @@
                             </thead>
                             <tbody class="divide-y divide-gray-800">
                                 <tr v-if="loadingTransactions">
-                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500"><i
+                                    <td colspan="9" class="px-6 py-8 text-center text-gray-500"><i
                                             class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังโหลด...</td>
                                 </tr>
                                 <tr v-else-if="transactions.length === 0">
-                                    <td colspan="7" class="px-6 py-10 text-center text-gray-500">ไม่พบรายการของวันนี้
+                                    <td colspan="9" class="px-6 py-10 text-center text-gray-500">ไม่พบรายการของวันนี้
                                     </td>
                                 </tr>
                                 <tr v-for="g in groupedTransactions" :key="g.key"
                                     class="hover:bg-gray-800/30 transition-colors"
                                     :class="g.ids.some(id => selectedTransactions.includes(id)) ? 'bg-gold-900/10' : ''">
                                     <td class="px-4 py-4 whitespace-nowrap text-sm align-top pt-5">
-                                        <input type="checkbox"
-                                            :checked="g.ids.every(id => selectedTransactions.includes(id))"
-                                            @change="toggleGroupSelection(g, $event.target.checked)"
-                                            class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                        <label class="inline-flex items-center justify-center p-1.5 -m-1.5 cursor-pointer touch-manipulation" @click.stop>
+                                            <input type="checkbox"
+                                                :checked="g.ids.every(id => selectedTransactions.includes(id))"
+                                                @change="toggleGroupSelection(g, $event.target.checked)"
+                                                class="w-4 h-4 rounded border-gray-700 bg-dark-surface text-gold-500 focus:ring-gold-500/50 cursor-pointer accent-gold-500">
+                                        </label>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 align-top pt-5">{{
                                         formatDate(g.created_at) }}</td>
@@ -3766,7 +3875,9 @@
                                         <div class="text-[10px] font-normal mt-1 flex flex-col items-end gap-0.5">
                                             <span
                                                 v-if="(g.net_price - g.items.reduce((s,t) => s + (Number(t.transfer_amount)||0), 0)) > 0"
-                                                class="text-green-500/80">
+                                                @click="viewBillCashDetails(g)"
+                                                class="text-green-500/80 hover:text-green-400 cursor-pointer underline decoration-dotted transition-colors"
+                                                title="คลิกเพื่อดูประวัติแบงก์ที่จ่าย">
                                                 <i class="fa-solid fa-money-bill-wave mr-1"></i>เงินสด {{
                                                 formatCurrency(g.net_price - g.items.reduce((s,t) => s +
                                                 (Number(t.transfer_amount)||0), 0)) }}
@@ -3827,6 +3938,50 @@
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Floating Mobile Selection Action Bar (Only on mobile when items selected) -->
+                    <transition enter-active-class="transition duration-300 ease-out transform"
+                        enter-from-class="opacity-0 translate-y-full"
+                        enter-to-class="opacity-100 translate-y-0"
+                        leave-active-class="transition duration-200 ease-in transform"
+                        leave-from-class="opacity-100 translate-y-0"
+                        leave-to-class="opacity-0 translate-y-full">
+                        <div v-if="selectedTransactions.length > 0"
+                            class="md:hidden fixed bottom-4 inset-x-3 sm:inset-x-4 z-40 bg-gray-900/95 border border-gold-500/70 backdrop-blur-md rounded-2xl p-3 shadow-2xl shadow-black/90">
+                            <!-- Header line: Item count + Cancel button -->
+                            <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-800">
+                                <div class="flex items-center gap-1.5 text-xs text-gold-400 font-bold">
+                                    <i class="fa-solid fa-check-circle text-gold-500"></i>
+                                    <span>เลือก {{ selectedTransactions.length }} รายการ</span>
+                                </div>
+                                <button @click="selectedTransactions = []"
+                                    class="px-2.5 py-1 text-[11px] font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg border border-gray-700 active:scale-95 transition-all">
+                                    <i class="fa-solid fa-xmark mr-1"></i>ยกเลิกการเลือก
+                                </button>
+                            </div>
+                            <!-- Stats grid: น้ำหนัก, ราคาเฉลี่ย, ยอดสุทธิ -->
+                            <div class="grid grid-cols-3 gap-2 text-center">
+                                <div class="bg-dark-base/80 rounded-xl p-2 border border-gray-800/80 flex flex-col justify-center">
+                                    <span class="text-[10px] text-gray-400 font-medium">น้ำหนัก</span>
+                                    <span class="text-xs sm:text-sm font-bold text-gray-200 truncate">
+                                        {{ selectedHistoryStats.weight.toFixed(2) }} <span class="text-[9px] font-normal text-gray-400">ก.</span>
+                                    </span>
+                                </div>
+                                <div class="bg-dark-base/80 rounded-xl p-2 border border-gray-800/80 flex flex-col justify-center">
+                                    <span class="text-[10px] text-yellow-500 font-medium">ราคาเฉลี่ย</span>
+                                    <span class="text-xs sm:text-sm font-bold text-yellow-400 truncate">
+                                        {{ selectedHistoryStats.avgBasePrice > 0 ? formatCurrency(selectedHistoryStats.avgBasePrice) : '-' }}
+                                    </span>
+                                </div>
+                                <div class="bg-dark-base/80 rounded-xl p-2 border border-gold-500/30 flex flex-col justify-center">
+                                    <span class="text-[10px] text-gold-400 font-semibold">ยอดสุทธิ</span>
+                                    <span class="text-xs sm:text-sm font-bold text-gold-400 truncate">
+                                        {{ formatCurrency(selectedHistoryStats.netPrice) }} ฿
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </transition>
                 </div>
 
                 <!-- AttendanceTab -->
@@ -5101,6 +5256,53 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Network Merchant (VVIP) Gold Settings -->
+                        <div v-if="isAdmin" class="mt-6 p-6 rounded-xl border border-gray-800 bg-gray-900/30">
+                            <h4 class="font-bold text-lg text-white mb-4"><i
+                                    class="fa-solid fa-users-crown mr-2 text-emerald-400"></i> ตั้งค่าราคาบวกทอง
+                                พ่อค้าในเครือข่าย (VVIP)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- 25-49% -->
+                                <div class="space-y-3 p-4 bg-dark-base rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">ความบริสุทธิ์ช่วง 25% -
+                                        49%</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กรัม)</span>
+                                            <input type="number" step="any"
+                                                v-model.number="networkVvipGoldPremiumAmount_25_49"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">หรือ บวกเปอเซ็นต์ (%)</span>
+                                            <input type="number" step="any"
+                                                v-model.number="networkVvipGoldPremiumPercent_25_49"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 50-100% -->
+                                <div class="space-y-3 p-4 bg-dark-base rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-gray-300 mb-2">ความบริสุทธิ์ช่วง 50% -
+                                        100%</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กรัม)</span>
+                                            <input type="number" step="any"
+                                                v-model.number="networkVvipGoldPremiumAmount_50_100"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                        <div class="flex-1 relative">
+                                            <span class="text-xs text-gray-500 mb-1 block">หรือ บวกเปอเซ็นต์ (%)</span>
+                                            <input type="number" step="any"
+                                                v-model.number="networkVvipGoldPremiumPercent_50_100"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="glass p-8 rounded-2xl border border-gray-800" :class="{'mt-6': isAdmin}">
@@ -5213,6 +5415,20 @@
                                             <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กิโลกรัม)</span>
                                             <input type="number" step="any"
                                                 v-model.number="silverPremiumAmountNetworkVip"
+                                                @change="autoSaveSettings" :disabled="isEmployee"
+                                                class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Network VVIP -->
+                                <div class="space-y-3 p-4 bg-gray-900/50 rounded-lg border border-gray-700/50">
+                                    <label class="block text-sm font-medium text-emerald-400 mb-2"><i
+                                            class="fa-solid fa-users-crown text-xs"></i> พ่อค้าในเครือข่าย (VVIP)</label>
+                                    <div class="flex gap-4">
+                                        <div class="flex-1">
+                                            <span class="text-xs text-gray-500 mb-1 block">บวกราคา (บาท/กิโลกรัม)</span>
+                                            <input type="number" step="any"
+                                                v-model.number="silverPremiumAmountNetworkVvip"
                                                 @change="autoSaveSettings" :disabled="isEmployee"
                                                 class="w-full bg-dark-surface border border-gray-700 text-white rounded px-3 py-2 text-sm focus:border-gold-500 transition-colors">
                                         </div>
@@ -5436,6 +5652,7 @@
                                                 <option value="vvip">VVIP (พ่อค้าใหญ่)</option>
                                                 <option value="network">พ่อค้าในเครือข่าย</option>
                                                 <option value="network_vip">พ่อค้าในเครือข่าย (VIP)</option>
+                                                <option value="network_vvip">พ่อค้าในเครือข่าย (VVIP)</option>
                                             </select>
                                             <button @click="addCustomerTier(res)"
                                                 class="bg-gold-600 hover:bg-gold-500 text-black px-3 py-1 rounded font-bold text-sm"><i
@@ -5552,6 +5769,32 @@
                                             <div v-if="!hasNetworkVIP"
                                                 class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">
                                                 ไม่มีรายชื่อพ่อค้าในเครือข่าย (VIP)</div>
+                                        </div>
+                                    </div>
+                                    <!-- Network VVIP Section -->
+                                    <div>
+                                        <h4 class="text-emerald-400 font-bold mb-3 flex items-center gap-2 text-sm"><i
+                                                class="fa-solid fa-users-crown"></i> พ่อค้าในเครือข่าย (VVIP)</h4>
+                                        <div class="flex flex-col gap-2">
+                                            <template v-for="cust in premiumCustomersList"
+                                                :key="'network_vvip_'+cust.id_card">
+                                                <div v-if="cust.tier === 'network_vvip'"
+                                                    class="bg-gray-800 p-3 rounded-lg border border-gray-700 flex justify-between items-center">
+                                                    <div class="flex flex-col">
+                                                        <span class="text-white font-bold flex items-center gap-2">{{
+                                                            cust.customer_name }}</span>
+                                                        <span class="text-xs text-gray-400">{{ (!cust.id_card ||
+                                                            cust.id_card.startsWith('NO_ID_')) ? '(ไม่มีเลขบัตร)' :
+                                                            cust.id_card }}</span>
+                                                    </div>
+                                                    <button @click="removeCustomerTier(cust.id_card)"
+                                                        class="text-red-400 hover:text-red-300 p-2"><i
+                                                            class="fa-solid fa-trash"></i></button>
+                                                </div>
+                                            </template>
+                                            <div v-if="!hasNetworkVVIP"
+                                                class="text-center text-gray-600 text-xs py-2 bg-gray-800/50 rounded-lg border border-gray-800 border-dashed">
+                                                ไม่มีรายชื่อพ่อค้าในเครือข่าย (VVIP)</div>
                                         </div>
                                     </div>
                                 </div>
@@ -6097,8 +6340,12 @@
                                     class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
                             </div>
                             <div v-show="editTrxModal.type !== 'redeem' && editTrxModal.type !== 'tong_tang'">
-                                <label class="block text-sm text-gray-400 mb-1">ความบริสุทธิ์ (%)</label>
-                                <input type="number" step="any" v-model.number="editTrxModal.percent"
+                                <label class="block text-sm text-gray-400 mb-1">
+                                    ความบริสุทธิ์ (%)
+                                    <span v-if="editTrxModal.type === 'silver' || (editTrxModal.customerTier === 'network_vvip' && editTrxModal.type === 'tong_lom')" class="text-xs text-gold-400 font-normal">* จำนวนเต็ม</span>
+                                    <span v-else-if="editTrxModal.type === 'tong_lom' && (editTrxModal.isMerchant || checkIsMerchant(editTrxModal.customer_name, editTrxModal.id_card, editTrxModal.customerTier)) && editTrxModal.customerTier !== 'network_vvip'" class="text-xs text-amber-400 font-normal">* ทศนิยม 2 ตำแหน่ง</span>
+                                </label>
+                                <input type="number" :step="(editTrxModal.type === 'silver' || (editTrxModal.customerTier === 'network_vvip' && editTrxModal.type === 'tong_lom')) ? '1' : ((editTrxModal.type === 'tong_lom' && (editTrxModal.isMerchant || checkIsMerchant(editTrxModal.customer_name, editTrxModal.id_card, editTrxModal.customerTier)) && editTrxModal.customerTier !== 'network_vvip') ? '0.01' : 'any')" v-model.number="editTrxModal.percent"
                                     @input="calculateEditTrxNetPrice"
                                     class="w-full bg-dark-base border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-gold-500">
                             </div>
@@ -6130,7 +6377,7 @@
         </transition>
 
     </div>
-    <script src="/js/app.js?v=1.0.37" type="module"></script>
+    <script src="/js/app.js?v=1.0.53" type="module"></script>
 </body>
 
 </html>
