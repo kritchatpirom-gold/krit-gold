@@ -788,9 +788,25 @@
 
                     <!-- History List -->
                     <div class="glass p-6 rounded-2xl border border-gray-800 relative mt-6">
-                        <h2 class="text-2xl font-bold text-gray-300 mb-6"><i
-                                class="fa-solid fa-clock-rotate-left mr-2"></i> ประวัติการขอเบิกเงิน</h2>
-                        <div v-if="expenseRequests.length === 0" class="text-center text-gray-500 py-8">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-gray-800 pb-4">
+                            <h2 class="text-2xl font-bold text-gray-300"><i
+                                    class="fa-solid fa-clock-rotate-left mr-2"></i> ประวัติการขอเบิกเงิน</h2>
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-gray-400 whitespace-nowrap"><i class="fa-solid fa-filter mr-1"></i> แสดงผล:</label>
+                                <select v-model="expenseFilterMode"
+                                    class="bg-dark-base border border-gray-700 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm font-bold shadow-sm">
+                                    <option value="5">ล่าสุด (5 รายการ)</option>
+                                    <option value="10">ล่าสุด (10 รายการ)</option>
+                                    <option value="30">ล่าสุด (30 รายการ)</option>
+                                    <option value="all">ทั้งหมด</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div v-if="loadingExpenseRequests" class="text-center text-gray-500 py-8">
+                            <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังโหลดประวัติการขอเบิก...
+                        </div>
+                        <div v-else-if="expenseRequests.length === 0" class="text-center text-gray-500 py-8">
                             <p>ยังไม่มีประวัติการเบิกเงิน</p>
                         </div>
                         <div v-else class="space-y-3">
@@ -1798,7 +1814,13 @@
                                 </button>
                                 <div class="text-xl text-orange-500 mb-2 animate-pulse"><i class="fa-solid fa-fire"></i>
                                 </div>
-                                <div class="font-bold text-white mb-1">{{ ing.category }}</div>
+                                <div class="font-bold text-white mb-1 flex items-center justify-between flex-wrap gap-1">
+                                    <span>{{ ing.category }}</span>
+                                    <span v-if="ing.category && (ing.category.includes('ทองรูปพรรณ') || ing.category.includes('ไถ่ถอน'))"
+                                        class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        เข้าสต็อก 1-98%
+                                    </span>
+                                </div>
                                 <div class="text-xs text-gray-400 mb-2">{{ new
                                     Date(ing.created_at).toLocaleString('th-TH') }}</div>
                                 <div class="space-y-1 text-sm border-t border-gray-700 pt-2 mb-4">
@@ -2198,7 +2220,9 @@
                                 <!-- Date Filter -->
                                 <select v-model="historyDateFilterMode"
                                     class="bg-dark-base border border-gray-700 text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-gold-500 text-sm font-bold shadow-sm">
-                                    <option value="all">ล่าสุด (30 รายการ)</option>
+                                    <option value="all">ล่าสุด (5 รายการ)</option>
+                                    <option value="latest_10">ล่าสุด (10 รายการ)</option>
+                                    <option value="latest_30">ล่าสุด (30 รายการ)</option>
                                     <option value="today">วันนี้</option>
                                     <option value="yesterday">เมื่อวาน</option>
                                     <option value="week">สัปดาห์นี้</option>
@@ -2228,7 +2252,9 @@
                                 </div>
                                 <div>
                                     <div class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">
-                                        ยอดรวมกำไรสุทธิ <span v-if="historyDateFilterMode === 'all'">(30
+                                        ยอดรวมกำไรสุทธิ <span v-if="historyDateFilterMode === 'all'">(5
+                                            รายการล่าสุด)</span><span v-else-if="historyDateFilterMode === 'latest_10'">(10
+                                            รายการล่าสุด)</span><span v-else-if="historyDateFilterMode === 'latest_30'">(30
                                             รายการล่าสุด)</span><span v-else>(ตามช่วงเวลาที่เลือก)</span></div>
                                     <div :class="historyTotalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'"
                                         class="text-3xl font-extrabold font-mono">{{ formatCurrency(historyTotalProfit)
@@ -2725,7 +2751,7 @@
                             <div class="lg:col-span-2 space-y-4">
                                 <h3 class="font-bold text-white text-base"><i
                                         class="fa-solid fa-list text-gold-500 mr-2"></i> รายการกำไรเพิ่มเติม <span
-                                        v-if="historyDateFilterMode === 'all'">(30 รายการล่าสุด)</span><span
+                                        v-if="extraProfitDateFilterMode === 'all'">(30 รายการล่าสุด)</span><span
                                         v-else>(ตามช่วงเวลาที่เลือก)</span></h3>
                                 <div class="overflow-x-auto bg-black/20 rounded-xl border border-gray-800">
                                     <table class="min-w-full divide-y divide-gray-800 text-sm">

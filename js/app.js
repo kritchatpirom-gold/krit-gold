@@ -890,6 +890,7 @@ createApp({
         const attendanceFilterMode = ref('today'); // 'today', 'yesterday', 'week', 'month', 'range', 'all'
         const attendanceStartDate = ref(new Date().toLocaleDateString('en-CA'));
         const attendanceEndDate = ref(new Date().toLocaleDateString('en-CA'));
+        const expenseFilterMode = ref('5'); // Default filter 5 รายการล่าสุด
         const expenseRequests = ref([]);
         const expenseReason = ref('');
         const expenseBreakdownForm = ref({ b1000: '', b500: '', b100: '', b50: '', b20: '', c10: '', c5: '', c1: '' });
@@ -1263,11 +1264,19 @@ createApp({
         const fetchExpenseRequests = async () => {
             loadingExpenseRequests.value = true;
             try {
-                const { data, error } = await supabase
+                let query = supabase
                     .from('expense_requests')
                     .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(50);
+                    .order('created_at', { ascending: false });
+
+                if (expenseFilterMode.value !== 'all') {
+                    const limitCount = parseInt(expenseFilterMode.value, 10) || 5;
+                    query = query.limit(limitCount);
+                } else {
+                    query = query.limit(100);
+                }
+
+                const { data, error } = await query;
                 if (error) throw error;
                 expenseRequests.value = data || [];
             } catch (err) {
@@ -3333,6 +3342,7 @@ createApp({
                 const unique = [];
                 const seen = new Set();
                 for (const item of data) {
+                    if (item.id_card === 'INTERNAL_MELT' || (item.customer_name && item.customer_name.includes('หลอมภายใน'))) continue;
                     const uniqueKey = (item.id_card && item.id_card.trim() !== '') ? item.id_card : item.customer_name;
                     if (!seen.has(uniqueKey) && item.customer_name) {
                         seen.add(uniqueKey);
@@ -3425,7 +3435,16 @@ createApp({
             const { data, error } = await query;
 
             if (data) {
-                transactions.value = data.map(t => {
+                // กรองรายการที่ไม่ใช่บิลรับซื้อจากลูกค้าจริง (เช่น รายการแปลงสต็อกหลอมรวมภายในร้าน)
+                const customerData = data.filter(t => {
+                    const isInternal = t.id_card === 'INTERNAL_MELT' ||
+                        t.phone === 'INTERNAL' ||
+                        (typeof t.customer_name === 'string' && t.customer_name.includes('หลอมภายใน')) ||
+                        (typeof t.details === 'string' && t.details.startsWith('หลอมจากทองรูปพรรณ'));
+                    return !isInternal;
+                });
+
+                transactions.value = customerData.map(t => {
                     const fixUrl = (url) => {
                         if (!url || url === 'null' || url === 'undefined' || typeof url !== 'string') return null;
                         if (url.startsWith('data:')) return url;
@@ -3608,22 +3627,28 @@ createApp({
 
         const reprintLatestReceipt = async () => {
             try {
-                // Fetch the latest 10 transactions (to capture the whole bill)
+                // Fetch the latest 20 transactions (to capture the whole bill, excluding internal records)
                 const { data, error } = await supabase
                     .from('transactions')
                     .select('*')
                     .order('created_at', { ascending: false })
-                    .limit(10);
+                    .limit(20);
 
                 if (error) throw error;
-                if (!data || data.length === 0) {
+                const customerData = (data || []).filter(t => 
+                    t.id_card !== 'INTERNAL_MELT' && 
+                    t.phone !== 'INTERNAL' &&
+                    !(typeof t.customer_name === 'string' && t.customer_name.includes('หลอมภายใน')) &&
+                    !(typeof t.details === 'string' && t.details.startsWith('หลอมจากทองรูปพรรณ'))
+                );
+                if (customerData.length === 0) {
                     await showAppModal('alert', 'ไม่พบข้อมูล', 'ไม่มีรายการล่าสุดให้ปริ้นย้อนหลัง');
                     return;
                 }
 
                 // Group them exactly like groupedTransactions
                 const groups = {};
-                data.forEach(t => {
+                customerData.forEach(t => {
                     const dateKey = t.created_at ? t.created_at.substring(0, 16) : 'unknown';
                     const key = `${dateKey}_${t.customer_name || 'noname'}_${t.phone || 'nophone'}`;
 
@@ -5408,6 +5433,10 @@ createApp({
             }
         });
 
+        watch(expenseFilterMode, () => {
+            fetchExpenseRequests();
+        });
+
         watch(currentTab, (newTab) => {
             if (newTab === 'attendance') {
                 loadTodayAttendance();
@@ -5971,10 +6000,15 @@ createApp({
                 groupedUnsent.value = groups;
 
                 // 2. Fetch pending ingots
-                const { data: pending, error: pendingErr } = await supabase.from('delivery_ingots').select('*, transactions(net_price, weight, percent, base_price)').is('round_id', null).order('created_at', { ascending: true });
+                const { data: pending, error: pendingErr } = await supabase
+                    .from('delivery_ingots')
+                    .select('*, transactions(id, type, net_price, weight, percent, base_price, details, customer_name)')
+                    .is('round_id', null)
+                    .order('created_at', { ascending: true });
                 if (pendingErr) console.error("Error loading pending ingots:", pendingErr);
-                if (pending) {
-                    pending.forEach(ing => {
+                const activePending = pending ? pending.filter(ing => ing.status !== 'melted_to_stock') : [];
+                if (activePending) {
+                    activePending.forEach(ing => {
                         const txs = Array.isArray(ing.transactions) ? ing.transactions : [];
                         const cost = txs.reduce((sum, t) => sum + Number(t.net_price || 0), 0);
                         ing.total_cost = cost;
@@ -5992,7 +6026,7 @@ createApp({
                         ing.avg_percent = sumW > 0 ? (sumWP / sumW) : 0;
                         ing.avg_base_price = sumW > 0 ? (sumWBP / sumW) : 0;
                     });
-                    pending.sort((a, b) => {
+                    activePending.sort((a, b) => {
                         const isASilver = isSilverIngot(a);
                         const isBSilver = isSilverIngot(b);
                         if (isASilver && !isBSilver) return 1;
@@ -6000,7 +6034,7 @@ createApp({
                         return 0;
                     });
                 }
-                pendingIngots.value = pending || [];
+                pendingIngots.value = activePending || [];
 
                 // 3. Fetch rounds history (Admin ONLY)
                 if (isAdmin.value) {
@@ -6014,7 +6048,7 @@ createApp({
 
                     let epQuery = supabase.from('extra_profits').select('amount');
 
-                    if (historyDateFilterMode.value !== 'all') {
+                    if (historyDateFilterMode.value !== 'all' && historyDateFilterMode.value !== 'latest_10' && historyDateFilterMode.value !== 'latest_30') {
                         let start = new Date();
                         let end = new Date();
                         start.setHours(0, 0, 0, 0);
@@ -6042,7 +6076,10 @@ createApp({
                         const endStr = getISODate(end);
                         epQuery = epQuery.gte('profit_date', startStr).lte('profit_date', endStr);
                     } else {
-                        roundsQuery = roundsQuery.limit(30);
+                        let limitCount = 5;
+                        if (historyDateFilterMode.value === 'latest_10') limitCount = 10;
+                        else if (historyDateFilterMode.value === 'latest_30') limitCount = 30;
+                        roundsQuery = roundsQuery.limit(limitCount);
                         epQuery = epQuery.limit(1000);
                     }
 
@@ -6392,7 +6429,16 @@ createApp({
                 type = userInput;
             }
             const isAllTongTang = selectedItems.every(i => i.type === 'tong_tang');
-            let category = type === 'silver' ? 'กำลังหลอม (เงิน)' : 'กำลังหลอม (ทอง)';
+            const isAllTongRoop = selectedItems.every(i => i.type === 'tong_roop' || i.type === 'redeem');
+            const hasTongRoop = selectedItems.some(i => i.type === 'tong_roop' || i.type === 'redeem');
+
+            let category = type === 'silver'
+                ? 'กำลังหลอม (เงิน)'
+                : (isAllTongRoop
+                    ? 'กำลังหลอม (ทองรูปพรรณ/ไถ่ถอน)'
+                    : (hasTongRoop
+                        ? 'กำลังหลอม (ทองรูปพรรณรวม)'
+                        : (isAllTongTang ? 'กำลังหลอม (ทองคำแท่ง)' : 'กำลังหลอม (ทอง)')));
 
             loadingDeliveryData.value = true;
             try {
@@ -6429,29 +6475,85 @@ createApp({
         };
 
         const completeMelting = async (ingot) => {
-            const isAllTongTang = ingot.transactions && ingot.transactions.every(i => i.type === 'tong_tang');
+            // 1. Fetch fresh linked transactions to ensure accurate calculations
+            let txs = [];
+            try {
+                const { data: linkedTxs, error: txFetchErr } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('ingot_id', ingot.id);
+                if (!txFetchErr && linkedTxs && linkedTxs.length > 0) {
+                    txs = linkedTxs;
+                } else if (ingot.transactions && Array.isArray(ingot.transactions)) {
+                    txs = ingot.transactions;
+                }
+            } catch (e) {
+                console.warn('Could not fetch linked transactions:', e);
+                txs = ingot.transactions || [];
+            }
 
-            const defaultWeight = ingot.raw_weight > 0 ? parseFloat(ingot.raw_weight.toFixed(2)) : '';
-            const defaultPercent = isAllTongTang ? '96.5' : '';
+            const isAllTongTang = txs.length > 0 && txs.every(i => i.type === 'tong_tang');
+            const hasTongRoop = (ingot.category && (ingot.category.includes('ทองรูปพรรณ') || ingot.category.includes('ไถ่ถอน'))) ||
+                (txs.length > 0 && txs.some(i => i.type === 'tong_roop' || i.type === 'redeem'));
 
-            const inputs = await showAppModal('prompt', 'ข้อมูลก้อนหลอม', 'กรุณาระบุน้ำหนักและเปอร์เซ็นต์ของก้อนที่หลอมเสร็จแล้ว:', [
-                { label: 'น้ำหนัก (กรัม)', type: 'number', defaultValue: defaultWeight },
-                { label: 'เปอร์เซ็นต์ (%)', type: 'number', defaultValue: defaultPercent }
-            ]);
+            const rawWeight = txs.reduce((sum, t) => sum + Number(t.weight || 0), 0) || Number(ingot.raw_weight || 0);
+            const totalCost = txs.reduce((sum, t) => sum + Number(t.net_price || 0), 0) || Number(ingot.total_cost || 0);
+            let sumWP = 0, sumWBP = 0;
+            txs.forEach(t => {
+                const w = Number(t.weight || 0);
+                sumWP += (w * Number(t.percent || 0));
+                sumWBP += (w * Number(t.base_price || 0));
+            });
+            const avgPercent = rawWeight > 0 ? (sumWP / rawWeight) : Number(ingot.avg_percent || 0);
+            const avgBasePrice = rawWeight > 0 ? (sumWBP / rawWeight) : Number(ingot.avg_base_price || 0);
+
+            const defaultWeight = rawWeight > 0 ? parseFloat(rawWeight.toFixed(2)) : (ingot.raw_weight > 0 ? parseFloat(ingot.raw_weight.toFixed(2)) : '');
+            let defaultPercent = '';
+            if (isAllTongTang) {
+                defaultPercent = '96.5';
+            } else if (avgPercent > 0) {
+                defaultPercent = parseFloat(avgPercent.toFixed(2));
+            }
+
+            const isSilver = ingot.category && (ingot.category.includes('เงิน') || ingot.category === 'silver' || txs.some(t => t.type === 'silver'));
+
+            // Prepare modal fields
+            const modalFields = [
+                { label: 'น้ำหนักหลังหลอม (กรัม)', type: 'number', defaultValue: defaultWeight },
+                { label: 'เปอร์เซ็นต์หลังหลอม (%)', type: 'number', defaultValue: defaultPercent }
+            ];
+
+            // แสดงตัวเลือกปลายทางหลังหลอมเฉพาะกรณีทองรูปพรรณ/ไถ่ถอน
+            if (!isSilver && hasTongRoop) {
+                modalFields.push({
+                    label: 'ปลายทางหลังหลอม',
+                    type: 'select',
+                    defaultValue: 'stock_1_98',
+                    options: [
+                        { value: 'stock_1_98', label: '📥 บันทึกเข้าสต็อกทองรอหลอม (1-98%)' },
+                        { value: 'delivery', label: '📦 ก้อนรอส่งสมาคม' }
+                    ]
+                });
+            }
+
+            const inputs = await showAppModal('prompt', 'ข้อมูลก้อนหลอม', 'กรุณาระบุน้ำหนักและเปอร์เซ็นต์ของก้อนที่หลอมเสร็จแล้ว:', modalFields);
 
             if (!inputs || inputs.length < 2) return;
-            const weight = inputs[0];
-            const percent = inputs[1];
+            const weightInput = String(inputs[0] != null ? inputs[0] : '').trim().replace(',', '.');
+            const percentInput = String(inputs[1] != null ? inputs[1] : '').trim().replace(',', '.');
+            const destination = (!isSilver && hasTongRoop && inputs.length >= 3) ? inputs[2] : (isSilver ? 'storage' : 'delivery');
 
-            if (!weight || !percent) return;
+            if (!weightInput || !percentInput) return;
+            const meltedWeightNum = parseFloat(weightInput);
+            const meltedPercentNum = parseFloat(percentInput);
 
-            const isSilver = ingot.category && (ingot.category.includes('เงิน') || ingot.category === 'silver' || (ingot.transactions && ingot.transactions.some(t => t.type === 'silver')));
-            let newCategory = 'silver';
-            if (!isSilver) {
-                const p = parseFloat(percent);
-                if (p >= 60) newCategory = 'gold_60_100';
-                else if (p >= 30) newCategory = 'gold_30_59';
-                else newCategory = 'gold_20_29';
+            if (isNaN(meltedWeightNum) || meltedWeightNum <= 0) {
+                await showAppModal('alert', 'ข้อมูลไม่ถูกต้อง', 'กรุณาระบุน้ำหนักที่ถูกต้อง (ต้องมากกว่า 0)');
+                return;
+            }
+            if (isNaN(meltedPercentNum) || meltedPercentNum <= 0 || meltedPercentNum > 100) {
+                await showAppModal('alert', 'ข้อมูลไม่ถูกต้อง', 'กรุณาระบุเปอร์เซ็นต์ที่ถูกต้อง (1 - 100%)');
+                return;
             }
 
             const prevStatus = ingot.status || 'melting';
@@ -6462,34 +6564,116 @@ createApp({
 
             loadingDeliveryData.value = true;
             try {
-                const newStatus = isSilver ? 'stored' : 'completed';
-                const { error: updateError } = await supabase.from('delivery_ingots').update({
-                    category: newCategory,
-                    status: newStatus,
-                    melted_weight: parseFloat(weight),
-                    melted_percent: parseFloat(percent)
-                }).eq('id', ingot.id);
+                if (!isSilver && destination === 'stock_1_98') {
+                    // === FLOW B: หลอมเข้าสู่สต็อกทอง 1-98% ในสต็อกรอหลอมประจำวัน ===
+                    const txIds = txs.map(t => t.id);
 
-                if (updateError) throw updateError;
+                    // 1. อัปเดตสถานะ Ingot เป็น 'melted_to_stock'
+                    const { error: updateError } = await supabase.from('delivery_ingots').update({
+                        category: 'หลอมเข้าสต็อก (ทอง 1-98%)',
+                        status: 'melted_to_stock',
+                        melted_weight: meltedWeightNum,
+                        melted_percent: meltedPercentNum
+                    }).eq('id', targetId);
 
-                await loadDeliveryData();
+                    if (updateError) throw updateError;
 
-                pushDeliveryUndo({
-                    type: 'complete_melting',
-                    title: `หลอมเสร็จ: ${ingot.category || (isSilver ? 'ก้อนเงิน' : 'ก้อนทอง')} (${parseFloat(weight)}g)`,
-                    undo: async () => {
-                        await supabase.from('delivery_ingots').update({
-                            category: prevCategory,
-                            status: prevStatus,
-                            melted_weight: prevWeight,
-                            melted_percent: prevPercent
-                        }).eq('id', targetId);
+                    // 2. สร้าง Transaction ใหม่ประเภท tong_lom เข้าสต็อกรอหลอม (กำหนด id_card/phone เป็น INTERNAL เพื่อไม่ให้ปนในยอดซื้อขาย)
+                    const newTxData = {
+                        type: 'tong_lom',
+                        customer_name: 'หลอมภายในร้าน (ทองรูปพรรณ/ไถ่ถอน)',
+                        id_card: 'INTERNAL_MELT',
+                        phone: 'INTERNAL',
+                        weight: meltedWeightNum,
+                        percent: meltedPercentNum,
+                        base_price: avgBasePrice,
+                        net_price: totalCost,
+                        transfer_amount: 0,
+                        premium_amount: 0,
+                        details: `หลอมจากทองรูปพรรณ/ไถ่ถอน (${txs.length} รายการ, นน.เดิม ${rawWeight.toFixed(2)}g)`,
+                        in_showcase: false,
+                        ingot_id: null,
+                        created_at: new Date().toISOString()
+                    };
+
+                    const { data: newTx, error: newTxErr } = await supabase.from('transactions').insert([newTxData]).select();
+                    if (newTxErr) throw newTxErr;
+                    const createdTxId = newTx && newTx[0] ? newTx[0].id : null;
+
+                    await loadDeliveryData();
+
+                    // 3. รองรับการกดย้อนกลับ (Undo)
+                    pushDeliveryUndo({
+                        type: 'melt_to_stock',
+                        title: `หลอมเข้าสต็อกทอง (1-98%): ${meltedWeightNum}g (${meltedPercentNum}%)`,
+                        undo: async () => {
+                            if (createdTxId) {
+                                await supabase.from('transactions').delete().eq('id', createdTxId);
+                            }
+                            await supabase.from('delivery_ingots').update({
+                                category: prevCategory,
+                                status: prevStatus,
+                                melted_weight: prevWeight,
+                                melted_percent: prevPercent
+                            }).eq('id', targetId);
+                            if (txIds.length > 0) {
+                                await supabase.from('transactions').update({ ingot_id: targetId }).in('id', txIds);
+                            }
+                            await loadDeliveryData();
+                        }
+                    });
+
+                    // 4. แสดงสรุปผลและน้ำหนักที่สูญเสีย (Loss)
+                    const lossWeight = rawWeight - meltedWeightNum;
+                    const lossPercent = rawWeight > 0 ? ((lossWeight / rawWeight) * 100).toFixed(2) : 0;
+                    let summaryMsg = `บันทึกก้อนทองหลอมเข้า "สต็อกของทอง (1-98%)" เรียบร้อยแล้ว\n\n` +
+                        `• น้ำหนักหลังหลอม: ${meltedWeightNum.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} กรัม\n` +
+                        `• เปอร์เซ็นต์หลังหลอม: ${meltedPercentNum}%\n` +
+                        `• ต้นทุนรวม: ${formatCurrency(totalCost)} บาท`;
+                    if (lossWeight !== 0) {
+                        summaryMsg += `\n• น้ำหนัก${lossWeight > 0 ? 'หายไป (Loss)' : 'เพิ่มขึ้น'}: ${Math.abs(lossWeight).toFixed(2)} กรัม (${Math.abs(lossPercent)}%)`;
                     }
-                });
+                    await showAppModal('alert', 'หลอมเข้าสต็อกสำเร็จ', summaryMsg);
 
-                if (isSilver) {
-                    ingotViewTab.value = 'storage';
-                    await showAppModal('alert', 'หลอมก้อนเงินสำเร็จ', 'บันทึกก้อนเงินเข้า "คลังก้อนเงินจัดเก็บ" เรียบร้อยแล้ว\n\nสามารถเลือกจัดส่งสมาคมได้ในภายหลัง');
+                } else {
+                    // === FLOW ส่งสมาคม หรือ ก้อนเงิน ===
+                    let newCategory = 'silver';
+                    if (!isSilver) {
+                        const p = meltedPercentNum;
+                        if (p >= 60) newCategory = 'gold_60_100';
+                        else if (p >= 30) newCategory = 'gold_30_59';
+                        else newCategory = 'gold_20_29';
+                    }
+
+                    const newStatus = isSilver ? 'stored' : 'completed';
+                    const { error: updateError } = await supabase.from('delivery_ingots').update({
+                        category: newCategory,
+                        status: newStatus,
+                        melted_weight: meltedWeightNum,
+                        melted_percent: meltedPercentNum
+                    }).eq('id', ingot.id);
+
+                    if (updateError) throw updateError;
+
+                    await loadDeliveryData();
+
+                    pushDeliveryUndo({
+                        type: 'complete_melting',
+                        title: `หลอมเสร็จ: ${ingot.category || (isSilver ? 'ก้อนเงิน' : 'ก้อนทอง')} (${meltedWeightNum}g)`,
+                        undo: async () => {
+                            await supabase.from('delivery_ingots').update({
+                                category: prevCategory,
+                                status: prevStatus,
+                                melted_weight: prevWeight,
+                                melted_percent: prevPercent
+                            }).eq('id', targetId);
+                        }
+                    });
+
+                    if (isSilver) {
+                        ingotViewTab.value = 'storage';
+                        await showAppModal('alert', 'หลอมก้อนเงินสำเร็จ', 'บันทึกก้อนเงินเข้า "คลังก้อนเงินจัดเก็บ" เรียบร้อยแล้ว\n\nสามารถเลือกจัดส่งสมาคมได้ในภายหลัง');
+                    }
                 }
             } catch (err) {
                 console.error("Error completing melting:", err);
@@ -7674,6 +7858,7 @@ createApp({
 
         return {
             expenseRequests,
+            expenseFilterMode,
             expenseReason,
             expenseBreakdownForm,
             expenseAmount,
